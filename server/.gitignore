@@ -1,0 +1,4 @@
+client/
+static/*
+!static/fallback.png
+.env.local
