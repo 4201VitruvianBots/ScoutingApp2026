@@ -1,6 +1,6 @@
 # Team 4201 Scouting System
 
-[![Build all components](https://github.com/4201VitruvianBots/scouting-app-2025/actions/workflows/build.yml/badge.svg)](https://github.com/4201VitruvianBots/scouting-app-2025/actions/workflows/build.yml) [![Format with Prettier](https://github.com/4201VitruvianBots/scouting-app-2025/actions/workflows/format.yml/badge.svg)](https://github.com/4201VitruvianBots/scouting-app-2025/actions/workflows/format.yml)
+[![Build all components](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/build.yml/badge.svg)](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/build.yml) [![Format with Prettier](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/format.yml/badge.svg)](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/format.yml)
 
 ## Overview
 
@@ -20,8 +20,8 @@ On the Scouting Laptop, do the following:
 -   Following the instructions provided by nvm in the prior step, install the latest Node version with the command `nvm install node`. Once installed, run `nvm use node`.
 -   Install Docker Desktop on the computer [(Docker Desktop for Linux)](https://docs.docker.com/desktop/setup/install/linux/), [(Docker Desktop for Windows)](https://docs.docker.com/desktop/setup/install/windows-install/)
 -   Install GitKraken on the computer [(GitKraken Install)](https://www.gitkraken.com/download)
--   Clone the `scouting-app-2025` repository using Git to the laptop
--   Open the `scouting-app-2025` folder in VSCode. Once open, create a new terminal (`Terminal` > `New Terminal`), and run the command `npm install`
+-   Clone the `ScoutingApp2026` repository using Git to the laptop
+-   Open the `ScoutingApp2026` folder in VSCode. Once open, create a new terminal (`Terminal` > `New Terminal`), and run the command `npm install`
 -   Once the install command completes, run the command `npm run build --workspace database` to build our database image
 -   As long as the previous command completed successfully, run the command `npm run start` to start the server.
 
@@ -30,7 +30,7 @@ If all the steps above complete correctly, after running `npm run start` you sho
 ```bash
 $ npm run start
 
-> scouting-app-2025@1.0.0 start
+> ScoutingApp2026@1.0.0 start
 > npm run start --workspace server
 
 
@@ -65,7 +65,7 @@ To easily use the collected, we provide a python script to convert our database 
 
 To export all currently collected data, do the following:
 
--   Open the `scouting-app-2025` folder in VSCode. Once open, create a new terminal (`Terminal` > `New Terminal`). **Press 'New Terminal' twice to create two separate terminals, which should show up as separate tabs on the bottom right of your screen.**
+-   Open the `ScoutingApp2026` folder in VSCode. Once open, create a new terminal (`Terminal` > `New Terminal`). **Press 'New Terminal' twice to create two separate terminals, which should show up as separate tabs on the bottom right of your screen.**
 -   In the first terminal, _as long as the scouting app isn't currently running on the laptop_, run `npm run start` to start the backend application
 -   Switch to the second terminal without stopping `npm` from the first. In the second terminal, run the command `cd data-analysis`
 -   Run the command `python -m venv venv` to create a new Python virtual environment
