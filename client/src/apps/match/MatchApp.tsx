@@ -17,6 +17,7 @@ import { useQueue } from '../../lib/useQueue';
 import scheduleFile from '../../assets/matchSchedule.json';
 import { usePreventUnload } from '../../lib/usePreventUnload';
 import ToggleButton from '../../components/LightVDarkMode';
+import { CenterAxes } from 'reaviz/stories/LinearAxis.story.js';
 
 const schedule = scheduleFile as MatchSchedule;
 
@@ -263,11 +264,27 @@ function MatchApp() {
             </div>
 
             <div className='relative'>
-                <h2 className='mb-5 mt-12 text-center text-5xl font-semibold text-green-600'>
+                <h2 className='mb-0 mt-12 text-center text-5xl font-semibold text-green-600'>
                     Autonomous
                 </h2>
+
+            <h3 className='text-2xl mb-4 mt-7 text-center text-green-600'>
+                How Many Did They Miss?
+            </h3>
+
+            <div className='grid content-evenly grid-cols-3 gap-1'>
+                <button type="button" className=' after:text-green-600 after:bg-black cursor-pointer bg-green-600 text-black' onClick={() => {}}> 
+                    None </button>
+                <button type="button" className=' focus:text-green-600 focus:bg-black cursor-pointer bg-green-600 text-black' onClick={() => {}}> 
+                    Some </button>
+                <button type="button" className=' focus:text-green-600 focus:bg-black cursor-pointer bg-green-600 text-black' onClick={() => {}}> 
+                    Most </button>
+            </div>
+
+
                 
-                <h2 className='my-6 mt-12 text-center text-5xl font-semibold text-green-600'>
+
+                <h2 className='my-6 mt-12 text-center text-5xl font-semibold text-green-id600'>
                     Tele-Op
                 </h2>
                
