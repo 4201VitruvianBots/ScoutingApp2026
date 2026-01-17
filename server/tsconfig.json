@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "nodenext",
+        "rootDir": "src/",
+        "moduleResolution": "nodenext",
+        "outDir": "dist/",
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+
+        // Handled by @typescript-esilnt
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "noFallthroughCasesInSwitch": false
+    },
+    "include": ["src/**/*.ts"]
+}
