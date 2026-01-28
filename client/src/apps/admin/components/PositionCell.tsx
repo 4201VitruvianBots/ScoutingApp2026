@@ -3,7 +3,7 @@ import { MaterialSymbol } from 'react-material-symbols';
 function PositionCell({
     scouter,
 }: {
-    scouter: { schedule: number; real: number[] } | boolean;
+    scouter: { schedule: number | undefined; real: number[] } | boolean;
 }) {
     const isBoolean = typeof scouter === 'boolean';
     return (

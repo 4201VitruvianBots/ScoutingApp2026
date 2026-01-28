@@ -1,16 +1,15 @@
 import { RobotPosition, StatusReport, SuperPosition } from 'requests';
 import { ScouterCard } from './ScouterCard';
+import { getAlliancePositions } from '../../../lib/gameConfig';
 
 function ScouterTable({ scouters }: { scouters: StatusReport[] }) {
+    const redPositions = getAlliancePositions('red');
+    const bluePositions = getAlliancePositions('blue');
     const sortedScouter = Object.fromEntries(
         (
             [
-                'red_1',
-                'red_2',
-                'red_3',
-                'blue_1',
-                'blue_2',
-                'blue_3',
+                ...redPositions,
+                ...bluePositions,
                 'red_ss',
                 'blue_ss',
             ] satisfies (RobotPosition | SuperPosition)[]
@@ -22,13 +21,22 @@ function ScouterTable({ scouters }: { scouters: StatusReport[] }) {
 
     return (
         <div className='grid grid-cols-4 gap-2'>
-            <ScouterCard scouter={sortedScouter.red_1} title='Red 1' red />
-            <ScouterCard scouter={sortedScouter.red_2} title='Red 2' red />
-            <ScouterCard scouter={sortedScouter.red_3} title='Red 3' red />
+            {redPositions.map((position, index) => (
+                <ScouterCard
+                    key={position}
+                    scouter={sortedScouter[position]}
+                    title={`Red ${index + 1}`}
+                    red
+                />
+            ))}
             <ScouterCard scouter={sortedScouter.red_ss} title='Red SS' red />
-            <ScouterCard scouter={sortedScouter.blue_1} title='Blue 1' />
-            <ScouterCard scouter={sortedScouter.blue_2} title='Blue 2' />
-            <ScouterCard scouter={sortedScouter.blue_3} title='Blue 3' />
+            {bluePositions.map((position, index) => (
+                <ScouterCard
+                    key={position}
+                    scouter={sortedScouter[position]}
+                    title={`Blue ${index + 1}`}
+                />
+            ))}
             <ScouterCard scouter={sortedScouter.blue_ss} title='Blue SS' />
         </div>
     );

@@ -1,7 +1,13 @@
 import { startDockerContainer } from 'database';
 import mongoose from 'mongoose';
 import { matchApp, superApp, leaderboardApp } from '../src/Schema.js';
-import { CommentValues, MatchData, SuperData, ScouterData } from 'requests';
+import {
+    CommentValues,
+    MatchData,
+    SuperData,
+    ScouterData,
+    AutoFuelWinner,
+} from 'requests';
 import { dotenvLoad } from 'dotenv-mono';
 
 function randint(max: number, min = 0) {
@@ -18,31 +24,25 @@ await mongoose.connect('mongodb://0.0.0.0:27017/');
 const comments: CommentValues[] = [
     'great_driving',
     'good_driving',
-    'source_only',
-    'clogging',
-    'effective_defense',
-    'okay_defense',
-    'ineffective_defense',
-    'sturdy_build',
-    'weak_build',
-    'avoids_under_stage',
+    'ok_driving',
+    'rough_driving',
+    'fast_cycles',
+    'drops_fuel',
+    'accurate_shots',
+    'inaccurate_shots',
+    'aggressive_defense',
+    'smart_defense',
+    'defense_liability',
+    'fast_climb',
+    'slow_climb',
+    'no_climb',
 ];
-
-// const scouterLeaderName: leaderboardValues[] = [
-//     'Vanessa',
-//     'Crisanto',
-//     'Christian',
-//     'Nathan',
-//     'Ashreeya',
-//     'Tica',
-//];
 
 dotenvLoad({ path: '.env' });
 dotenvLoad({ path: '.env.local' });
 
 const apiKey = process.env.API_KEY!;
 const eventKey = process.env.EVENT_KEY!;
-console.log(apiKey);
 
 interface SimpleTeam {
     key: string;
@@ -63,14 +63,12 @@ const result = await fetch(
     }
 );
 
-console.log(result.status);
-
 const data = (await result.json()) as SimpleTeam[];
-console.log(data);
 const teams = data.map(e => e.team_number).sort((a, b) => a - b);
-console.log(teams);
 
-for (let matchNumber = 1; matchNumber < 400; matchNumber++) {
+const autoFuelWinners: AutoFuelWinner[] = ['red', 'blue', 'tie', 'unknown'];
+
+for (let matchNumber = 1; matchNumber < 200; matchNumber++) {
     for (const robotPosition of [
         'red_1',
         'red_2',
@@ -79,47 +77,36 @@ for (let matchNumber = 1; matchNumber < 400; matchNumber++) {
         'blue_2',
         'blue_3',
     ] as const) {
-        console.log(matchNumber);
         const team = choose(teams);
+        const autoFuelWinner = choose(autoFuelWinners);
         await new matchApp({
-            autoCoral: {
-                L1: randint(5),
-                L2: randint(5),
-                L3: randint(5),
-                L4: randint(5),
-                
-            },
-            autoAlgae: {
-                netRobot: randint(5),
-                processor: randint(5),
-                removed: randint(5),
-            },
-            climb: choose([
-                'shallow',
-                'deep',
-                'park',
-                'none',
-                'failed',
-            ]),
-            leftStartingZone: Math.random() > 0.5,
             metadata: {
                 robotPosition,
                 robotTeam: team,
                 scouterName: 'Jim',
                 matchNumber: matchNumber,
             },
-            teleCoral: {
-                L1: randint(10),
-                L2: randint(10),
-                L3: randint(10),
-                L4: randint(10),
+            robotAbsent: false,
+            autoStartingPosition: choose(['left', 'center', 'right', null]),
+            autoMoved: Math.random() > 0.2,
+            autoFuelScored: randint(12),
+            autoTower: choose(['none', 'level1', 'failed']),
+            autoFuelWinner,
+            shift1ActiveHubIfTie:
+                autoFuelWinner === 'tie' ? choose(['red', 'blue']) : null,
+            teleFuelBySegment: {
+                transition: randint(8),
+                shift1: randint(15),
+                shift2: randint(15),
+                shift3: randint(15),
+                shift4: randint(15),
+                endgame: randint(10),
             },
-            teleAlgae: {
-                netRobot: randint(5),
-                processor: randint(5),
-                removed: 0
-            },
-
+            teleTower: choose(['none', 'level1', 'level2', 'level3', 'failed']),
+            climbTimeBucket: choose(['early', 'mid', 'late', null]),
+            breakdown: choose(['none', 'stuck', 'tipped', 'comms', 'mechanism']),
+            driverQuality: choose(['great', 'good', 'ok', 'rough']),
+            freeText: '',
         } satisfies MatchData).save();
 
         await new superApp({
@@ -130,42 +117,38 @@ for (let matchNumber = 1; matchNumber < 400; matchNumber++) {
                 matchNumber: matchNumber,
             },
             fouls: {
-                insideRobot: randint(2),
-                protectedZone: randint(2),
-                multiplePieces: randint(2),
-                other: randint(2),
                 pinning: randint(2),
-                cageFoul: randint(2)
+                towerContactInEndgame: randint(2),
+                outOfZoneShooting: randint(2),
+                ejectedFuel: randint(2),
+                other: randint(2),
             },
-            break: {
-                batteryFall: randint(2),
-                commsFail: randint(2),
-                mechanismDmg: randint(2),
+            breaks: {
+                mechanism: randint(2),
+                battery: randint(2),
+                comms: randint(2),
+                bumper: randint(2),
             },
-            defense: choose(['fullDef', 'someDef', 'noDef']),
-            defended: Math.random() > 0.5,
+            defenseProvided: choose(['none', 'some', 'heavy']),
+            defenseReceived: Math.random() > 0.5,
             comments: comments.filter(() => randint(4) === 0),
-            humanShooter:
-                randint(3) === 0
-                    ? {
-                          Net: Math.random() > 0.5,
-                      }
-                    : undefined,
-            netHuman: randint(4)        
+            humanPlayerFuelScored: randint(6),
         } satisfies SuperData).save();
     }
 }
 
-for (let scouterNumber = 1; scouterNumber < 100; scouterNumber++) {
-    console.log(scouterNumber);
-        await new leaderboardApp({                
-            
-                scouterName:choose(['Vanessa', 'Crisanto', 'Christian', 'Nathan', 'Ashreeya', 'Tica']),
-                accuracy: randint(100),
-            
-
-        } satisfies ScouterData).save();
-
+for (let scouterNumber = 1; scouterNumber < 60; scouterNumber++) {
+    await new leaderboardApp({
+        scouterName: choose([
+            'Vanessa',
+            'Crisanto',
+            'Christian',
+            'Nathan',
+            'Ashreeya',
+            'Tica',
+        ]),
+        accuracy: randint(100),
+    } satisfies ScouterData).save();
 }
 
 await mongoose.disconnect();

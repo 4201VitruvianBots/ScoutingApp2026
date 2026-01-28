@@ -20,25 +20,30 @@ interface ColourOption {
 const commentOptions: SelectOption<CommentValues>[] = [
     { label: 'great driving', value: 'great_driving', color: '#5ac750' },
     { label: 'good driving', value: 'good_driving', color: '#50a1c7' },
-    { label: 'source only', value: 'source_only', color: '#c78450' },
-    { label: 'knock pieces', value: 'knock_pieces', color: '#c107f0' },
-    { label: 'coral stuck', value: 'coral stuck', color: '#c107f0' },
-    { label: 'algae stuck', value: 'algae stuck', color: '#c107f0' },
-    { label: 'clogging', value: 'clogging', color: '#c78450' },
+    { label: 'ok driving', value: 'ok_driving', color: '#c78450' },
+    { label: 'rough driving', value: 'rough_driving', color: '#c75050' },
+    { label: 'fast cycles', value: 'fast_cycles', color: '#5ac750' },
+    { label: 'drops fuel', value: 'drops_fuel', color: '#c75050' },
+    { label: 'accurate shots', value: 'accurate_shots', color: '#5ac750' },
     {
-        label: 'effective defense',
-        value: 'effective_defense',
-        color: '#5ac750',
-    },
-    { label: 'okay defense', value: 'okay_defense', color: '#50a1c7' },
-    {
-        label: 'ineffective defense',
-        value: 'ineffective_defense',
+        label: 'inaccurate shots',
+        value: 'inaccurate_shots',
         color: '#c75050',
     },
-    { label: 'sturdy build', value: 'sturdy_build', color: '#5ac750' },
-    { label: 'weak build', value: 'weak_build', color: '#c75050' },
-    
+    {
+        label: 'aggressive defense',
+        value: 'aggressive_defense',
+        color: '#c107f0',
+    },
+    { label: 'smart defense', value: 'smart_defense', color: '#50a1c7' },
+    {
+        label: 'defense liability',
+        value: 'defense_liability',
+        color: '#c75050',
+    },
+    { label: 'fast climb', value: 'fast_climb', color: '#5ac750' },
+    { label: 'slow climb', value: 'slow_climb', color: '#c78450' },
+    { label: 'no climb', value: 'no_climb', color: '#c75050' },
 ];
 
 const colourStyles: StylesConfig<ColourOption, true> = {
@@ -105,7 +110,7 @@ function CannedCommentBox({
         <div className='contents p-10 '>
             <Select
                 closeMenuOnSelect={false}
-                defaultValue={[commentOptions[3], commentOptions[3]]}
+                defaultValue={[]}
                 isMulti
                 value={value}
                 options={commentOptions}

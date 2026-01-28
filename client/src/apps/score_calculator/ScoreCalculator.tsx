@@ -1,237 +1,208 @@
-//import ToggleButton from '../../components/ToggleButton'
-import React, { Dispatch, SetStateAction, useState } from 'react';
-
+import { Dispatch, SetStateAction, useState } from 'react';
 import LinkButton from '../../components/LinkButton';
 import { MaterialSymbol } from 'react-material-symbols';
+import { gameConfig } from '../../lib/gameConfig';
 
 function Counter({
     value,
     onChange,
-    children,
+    label,
+    min = 0,
+    max,
 }: {
     value: number;
     onChange: Dispatch<SetStateAction<number>>;
-    children: string;
+    label: string;
+    min?: number;
+    max?: number;
 }) {
     return (
-        <>
-            <button
-                className=' rounded-l-lg bg-red-400 px-4 border py-8 text-zinc-100 active:brightness-75'
-                onClick={() => onChange(value > 0 ? value - 1 : value)}>
-                -
-            </button>
-            <button
-                className='rounded-r-lg px-1 text-clip bg-slate-600 border text-zinc-100 active:brightness-75'
-                onClick={() => onChange(value + 1)}>
-                + {children} ({value})
-            </button>
-        </>
+        <div className='flex flex-col items-center gap-2 rounded-lg bg-[#2f3646] p-4'>
+            <p className='text-sm text-gray-200'>{label}</p>
+            <div className='flex items-center gap-2'>
+                <button
+                    className='rounded bg-red-400 px-4 py-2 text-lg text-white'
+                    onClick={() => onChange(Math.max(min, value - 1))}>
+                    -
+                </button>
+                <div className='min-w-[50px] text-center text-2xl font-bold text-white'>
+                    {value}
+                </div>
+                <button
+                    className='rounded bg-[#48c55c] px-4 py-2 text-lg text-black'
+                    onClick={() => {
+                        const next = value + 1;
+                        onChange(max != undefined ? Math.min(max, next) : next);
+                    }}>
+                    +
+                </button>
+            </div>
+        </div>
     );
 }
 
 function ScoreCalculator() {
-    const [autoLeave, setAutoLeave] = useState(0);
-    const [autoCoral1, setAutoCoral1] = useState(0);
-    const [autoCoral2, setAutoCoral2] = useState(0);
-    const [autoCoral3, setAutoCoral3] = useState(0);
-    const [autoCoral4, setAutoCoral4] = useState(0);
-    const [autoAlgaeProcessor, setAutoAlgaeProcessor] = useState(0);
-    const [autoAlgaeNet, setAutoAlgaeNet] = useState(0);
-    const [teleCoral1, setTeleCoral1] = useState(0);
-    const [teleCoral2, setTeleCoral2] = useState(0);
-    const [teleCoral3, setTeleCoral3] = useState(0);
-    const [teleCoral4, setTeleCoral4] = useState(0);
-    const [teleAlgaeNet, setTeleAlgaeNet] = useState(0);
-    const [teleAlgaeProcessor, setTeleAlgaeProcessor] = useState(0);
-    const [park, setPark] = useState(0);
-    const [Deep, setDeep] = useState(0);
-    const [Shallow, setShallow] = useState(0);
-    
-    const autoPoints = autoLeave * 3 + autoCoral1 * 3 + autoCoral2 * 4 + autoCoral3 * 6 + autoCoral4 * 7 + autoAlgaeProcessor * 6 + autoAlgaeNet *4;
-    const CoralPoints =
-        autoCoral1 * 3 + autoCoral2 * 4 + autoCoral3 * 6 + autoCoral4 * 7 + teleCoral1 * 2 + teleCoral2 * 3 + teleCoral3 * 4 + teleCoral4 * 5;
-    const AlgaePoints = 
-        autoAlgaeProcessor * 6 + teleAlgaeProcessor * 6 + autoAlgaeNet *4 + teleAlgaeNet * 4;
-    const cagePoints =
-        park * 2 + Deep * 12 + Shallow * 6;
-    const autoCoralTotal = autoCoral1 * 3 + autoCoral2 * 4 + autoCoral3 * 6 + autoCoral4 * 7;
-    const teleCoralTotal = teleCoral1* 2  + teleCoral2 * 3 + teleCoral3 * 4 + teleCoral4 * 5;
-    const teleopPoints = teleCoralTotal + cagePoints + teleAlgaeNet * 4 + teleAlgaeProcessor * 6;
-    const totalPoints =
-        autoPoints +
-        CoralPoints + 
-        AlgaePoints +
-        cagePoints -
-        autoCoralTotal;
-    //added the minus coz its being counted twice
+    const [autoFuelActive, setAutoFuelActive] = useState(0);
+    const [autoTowerL1, setAutoTowerL1] = useState(0);
+    const [teleFuelActive, setTeleFuelActive] = useState(0);
+    const [teleTowerL1, setTeleTowerL1] = useState(0);
+    const [teleTowerL2, setTeleTowerL2] = useState(0);
+    const [teleTowerL3, setTeleTowerL3] = useState(0);
+    const [foulsMinor, setFoulsMinor] = useState(0);
+    const [foulsMajor, setFoulsMajor] = useState(0);
 
-    const handleReset = () => {
-        setAutoLeave(0);
-        setAutoCoral1(0);
-        setAutoCoral2(0);
-        setAutoCoral3(0);
-        setAutoCoral4(0);
-        setAutoAlgaeProcessor(0);
-        setAutoAlgaeNet(0);
-        setTeleCoral1(0);
-        setTeleCoral2(0);
-        setTeleCoral3(0);
-        setTeleCoral4(0);
-        setTeleAlgaeProcessor(0);
-        setTeleAlgaeNet(0);
-        setPark(0);
-        setDeep(0);
-        setShallow(0);
+    const fuelPoints = gameConfig.scoring.fuelPointsActive;
+    const autoTowerPoints = gameConfig.scoring.towerAuto.level1;
+    const teleTowerPoints = gameConfig.scoring.towerTele;
+
+    const autoFuelScore = autoFuelActive * fuelPoints;
+    const autoTowerScore = autoTowerL1 * autoTowerPoints;
+    const teleFuelScore = teleFuelActive * fuelPoints;
+    const teleTowerScore =
+        teleTowerL1 * teleTowerPoints.level1 +
+        teleTowerL2 * teleTowerPoints.level2 +
+        teleTowerL3 * teleTowerPoints.level3;
+    const foulScore = foulsMinor * 2 + foulsMajor * 5;
+
+    const totalScore =
+        autoFuelScore + autoTowerScore + teleFuelScore + teleTowerScore + foulScore;
+
+    const { rpThresholds } = gameConfig.scoring;
+    const energized = totalScore >= rpThresholds.energized;
+    const supercharged = totalScore >= rpThresholds.supercharged;
+    const traversal = totalScore >= rpThresholds.traversal;
+
+    const resetAll = () => {
+        setAutoFuelActive(0);
+        setAutoTowerL1(0);
+        setTeleFuelActive(0);
+        setTeleTowerL1(0);
+        setTeleTowerL2(0);
+        setTeleTowerL3(0);
+        setFoulsMinor(0);
+        setFoulsMajor(0);
     };
 
     return (
-        <div className='flex h-dvh flex-col bg-gray-800'>
-            <div className='mb-2 bg-gray-800'>
-                <br />
-                <h1 className='mb-4 text-center text-6xl  font-bold text-[#48c55c]'>
+        <div className='min-h-screen bg-[#171c26] text-white'>
+            <div className='flex items-center justify-between bg-[#2f3646] px-6 py-4'>
+                <LinkButton link='/' className='flex items-center'>
+                    <MaterialSymbol icon='home' size={40} fill grade={200} color='white' />
+                </LinkButton>
+                <h1 className='text-2xl font-bold text-[#48c55c]'>
                     Score Calculator
                 </h1>
-            </div>
-
-            <div className='fixed left-4 top-4 z-20  flex flex-col gap-2 rounded-md bg-slate-200 p-1'>
-                <LinkButton link='/' className='snap-none'>
-                    <MaterialSymbol
-                        icon='home'
-                        size={50}
-                        fill
-                        grade={200}
-                        color='green'
-                        className='snap-none'
-                    />
-                </LinkButton>
-            </div>
-
-            <div className='flex flex-grow flex-col'>
                 <button
-                    onClick={handleReset}
-                    className='text-2xl col-span-2 mx-2 rounded-md  bg-blue-400/70 px-3 py-2 text-black active:brightness-75'>
-                    Reset All
+                    onClick={resetAll}
+                    className='rounded bg-gray-600 px-4 py-2 text-sm text-white'>
+                    Reset
                 </button>
-                <h2 className='text-center text-5xl font-bold text-green-400 my-2'>
-                            Auto
-                        </h2>
-                    <>
-                    <div className='snap-center flex justify-center gap-2 my-2'>
-                        <Counter value={autoLeave} onChange={setAutoLeave}>
-                            Auto Leave
-                        </Counter>
-                        <Counter value={autoCoral1} onChange={setAutoCoral1}>
-                            Auto Coral L1
-                        </Counter>
-                        <Counter value={autoCoral2} onChange={setAutoCoral2}>
-                            Auto Coral L2
-                        </Counter>
-                        <Counter value={autoCoral3} onChange={setAutoCoral3}>
-                            Auto Coral L3
-                        </Counter>
-                        <Counter value={autoCoral4} onChange={setAutoCoral4}>
-                            Auto Coral L4
-                        </Counter>
-                    </div>
-                    </>
-                    <>
-                    <div className='snap-center flex justify-center gap-2 my-2'>
-                    <Counter value={autoAlgaeProcessor} onChange={setAutoAlgaeProcessor}>
-                            Auto Algae Processor
-                        </Counter>
-                        <Counter value={autoAlgaeNet} onChange={setAutoAlgaeNet}>
-                            Auto Algae Net
-                        </Counter>
-                    </div>
-                    </>
-                    <h2 className='col-span-2 text-center text-5xl font-bold text-green-400 my-2'>
-                            Teleop
-                    </h2>
-                    <>
-                    <div className='snap-center flex justify-center my-2 gap-2'>
-                        
-                        <Counter value={teleCoral1} onChange={setTeleCoral1}>
-                            Tele Coral L1
-                        </Counter>
-                        <Counter value={teleCoral2} onChange={setTeleCoral2}>
-                            Tele Coral L2
-                        </Counter>
-                        <Counter value={teleCoral3} onChange={setTeleCoral3}>
-                            Tele Coral L3
-                        </Counter>
-                        <Counter value={teleCoral4} onChange={setTeleCoral4}>
-                            Tele Coral L4
-                        </Counter>
-                    </div>
-                    </>
-                    <>
-                        <div className='snap-center flex justify-center gap-2 my-2'>
-                        <Counter value={teleAlgaeProcessor} onChange={setTeleAlgaeProcessor}>
-                            Tele Algae Processor
-                        </Counter>
-                        <Counter value={teleAlgaeNet} onChange={setTeleAlgaeNet}>
-                            Tele Algae Net
-                        </Counter>
-                        </div>
-                    </>
-                    <h2 className='col-span-2 my-2 text-center text-5xl font-bold text-green-400'>
-                            Endgame
-                    </h2>
-                    <div className='snap-center flex justify-center text-3xl my-2 gap-2'>
-                        
-                        <Counter value={park} onChange={setPark}>
-                            Park
-                        </Counter>
-                        <Counter value={Deep} onChange={setDeep}>
-                            Deep
-                        </Counter>
-                        <Counter value={Shallow} onChange={setShallow}>
-                            Shallow
-                        </Counter>
-                        
-                    </div>
-                </div>
-                
-                <div className='grid grid-cols-12 justify-center py-2 bg-gray-800 text-black-100 text-xl'>
-                <p className='col-span-3 border-green-800 border-4 bg-green-400 px-3 py-2 text-center'>Auto Leave</p>
-                    <p className='col-span-9 border-green-800 border-4 bg-green-300 px-3 py-2 text-center'>Points: {autoLeave*3}</p>
-                <p className='col-span-3 border-green-800 border-4 bg-green-500 px-3 py-2 text-center'>Auto Coral</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L1: {autoCoral1}</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L2: {autoCoral2}</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L3: {autoCoral3}</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L4: {autoCoral4}</p>
-                    <p className='col-span-5 border-green-800 border-4 bg-green-400 px-3 py-2 text-center'>Points: {autoCoralTotal}</p>
-                <p className='col-span-3 border-green-900 border-4 bg-green-400 px-3 py-2 text-center font-bold'>Total Auto</p>
-                    <p className='col-span-9 border-green-900 border-4 bg-green-300 px-3 py-2 text-center font-bold'>Points: {autoPoints}</p>
-                    <p className='col-span-3 border-green-800 border-4 bg-green-500 px-3 py-2 text-center'>Teleop Coral</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L1: {teleCoral1+autoCoral1}</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L2: {teleCoral2+autoCoral2}</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L3: {teleCoral3+autoCoral3}</p>
-                    <p className='col-span-1 border-green-800 border-4 bg-green-400 px-3 py-2'>L4: {teleCoral4+autoCoral4}</p>
-                    <p className='col-span-5 border-green-800 border-4 bg-green-400 px-3 py-2 text-center'>Points: {teleCoralTotal}</p>
-                <p className='col-span-3 border-green-800 border-4 bg-green-400 px-3 py-2 text-center'>Algae</p>
-                    <p className='col-span-2 border-green-800 border-4 bg-green-300 px-3 py-2'>Net: {teleAlgaeNet+autoAlgaeNet}</p>
-                    <p className='col-span-2 border-green-800 border-4 bg-green-300 px-3 py-2'>Processor: {teleAlgaeProcessor+autoAlgaeProcessor}</p>
-                    <p className='col-span-5 border-green-800 border-4 bg-green-300 px-3 py-2 text-center'>Points: {AlgaePoints}</p>
-                <p className='col-span-3 border-green-800 border-4 bg-green-500 px-3 py-2 text-center'>Barge</p>
-                <div className='col-span-4 flex'>
-                    <p className='border-green-800 border-4 bg-green-400 px-3 py-2 w-80'>Park: {park}</p>
-                    <p className='border-green-800 border-4 bg-green-400 px-3 py-2 w-80'>Deep: {Deep}</p>
-                    <p className='border-green-800 border-4 bg-green-400 px-3 py-2 w-80'>Shallow: {Shallow}</p>
-                </div>
-                    <p className='col-span-5 border-green-800 border-4 bg-green-400 px-3 py-2 text-center'>Points: {cagePoints}</p>
-                <p className='col-span-3 border-green-900 border-4 bg-green-400 px-3 py-2 text-center font-bold'>Total Teleop</p>
-                    <p className='col-span-9 border-green-900 border-4 bg-green-300 px-3 py-2 text-center font-bold'>Points: {teleopPoints}</p>
-
-                   
-                </div>
-                <p className='text-black-100 text-md rounded-md border-green-800 bg-green-400/70 px-3 py-2 text-center font-black'>
-                        Total:{' '}
-                        <span className='rounded-lg bg-black/15 p-2 py-1'>
-                            {totalPoints}
-                        </span>
-                    </p>
             </div>
+
+            <div className='mx-auto grid w-full max-w-5xl gap-6 px-6 py-8'>
+                <section>
+                    <h2 className='mb-3 text-xl font-semibold text-[#48c55c]'>
+                        AUTO
+                    </h2>
+                    <div className='grid gap-4 md:grid-cols-2'>
+                        <Counter
+                            value={autoFuelActive}
+                            onChange={setAutoFuelActive}
+                            label='Auto Fuel (Active Hub)'
+                        />
+                        <Counter
+                            value={autoTowerL1}
+                            onChange={setAutoTowerL1}
+                            label='Auto Tower Level 1 (max 2)'
+                            max={gameConfig.scoring.towerAuto.maxRobots}
+                        />
+                    </div>
+                </section>
+
+                <section>
+                    <h2 className='mb-3 text-xl font-semibold text-[#48c55c]'>
+                        TELEOP
+                    </h2>
+                    <div className='grid gap-4 md:grid-cols-2'>
+                        <Counter
+                            value={teleFuelActive}
+                            onChange={setTeleFuelActive}
+                            label='Tele Fuel (Active Hub)'
+                        />
+                        <Counter
+                            value={teleTowerL1}
+                            onChange={setTeleTowerL1}
+                            label='Tele Tower Level 1'
+                        />
+                        <Counter
+                            value={teleTowerL2}
+                            onChange={setTeleTowerL2}
+                            label='Tele Tower Level 2'
+                        />
+                        <Counter
+                            value={teleTowerL3}
+                            onChange={setTeleTowerL3}
+                            label='Tele Tower Level 3'
+                        />
+                    </div>
+                </section>
+
+                <section>
+                    <h2 className='mb-3 text-xl font-semibold text-[#48c55c]'>
+                        FOULS (What-if)
+                    </h2>
+                    <div className='grid gap-4 md:grid-cols-2'>
+                        <Counter
+                            value={foulsMinor}
+                            onChange={setFoulsMinor}
+                            label='Minor Fouls (2 pts)'
+                        />
+                        <Counter
+                            value={foulsMajor}
+                            onChange={setFoulsMajor}
+                            label='Major Fouls (5 pts)'
+                        />
+                    </div>
+                </section>
+
+                <section className='rounded-lg bg-[#2f3646] p-6'>
+                    <h2 className='text-xl font-semibold text-[#48c55c]'>
+                        Totals
+                    </h2>
+                    <div className='mt-3 grid gap-2 text-sm text-gray-200'>
+                        <p>Auto Fuel Points: {autoFuelScore}</p>
+                        <p>Auto Tower Points: {autoTowerScore}</p>
+                        <p>Tele Fuel Points: {teleFuelScore}</p>
+                        <p>Tele Tower Points: {teleTowerScore}</p>
+                        <p>Foul Points: {foulScore}</p>
+                        <p className='mt-2 text-lg font-semibold text-white'>
+                            Total Score: {totalScore}
+                        </p>
+                    </div>
+                    <div className='mt-4 grid gap-2 text-sm text-gray-200'>
+                        <p>
+                            Energized RP ({rpThresholds.energized}):{' '}
+                            <span className={energized ? 'text-[#48c55c]' : 'text-red-300'}>
+                                {energized ? 'Yes' : 'No'}
+                            </span>
+                        </p>
+                        <p>
+                            Supercharged RP ({rpThresholds.supercharged}):{' '}
+                            <span
+                                className={supercharged ? 'text-[#48c55c]' : 'text-red-300'}>
+                                {supercharged ? 'Yes' : 'No'}
+                            </span>
+                        </p>
+                        <p>
+                            Traversal RP ({rpThresholds.traversal}):{' '}
+                            <span className={traversal ? 'text-[#48c55c]' : 'text-red-300'}>
+                                {traversal ? 'Yes' : 'No'}
+                            </span>
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </div>
     );
 }
 

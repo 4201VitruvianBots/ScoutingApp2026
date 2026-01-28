@@ -1,8 +1,12 @@
 //import React, { useState } from "react";
 import { Dispatch } from "react";
-import { SuperScores } from "../SuperApp";
 
-  type countKeys = keyof SuperScores;
+type HumanCounterScore = {
+  Success: number;
+  Failed: number;
+};
+
+  type countKeys = keyof HumanCounterScore;
 
   function HumanButton({
     // Declare a state variable to keep track of the count
@@ -16,7 +20,7 @@ import { SuperScores } from "../SuperApp";
     handleCount: (key: countKeys) => void;
     successKey: countKeys;
     failKey: countKeys;
-    count: SuperScores;
+    count: HumanCounterScore;
     className?:string;
   }){
    return (
@@ -60,9 +64,9 @@ function HumanCounter({
      
   }:{
     
-    count: SuperScores;
+    count: HumanCounterScore;
     className?:string;
-    setCount:Dispatch<SuperScores>;
+    setCount:Dispatch<HumanCounterScore>;
     
   }){
 

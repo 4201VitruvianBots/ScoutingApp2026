@@ -1,13 +1,24 @@
 import mongoose from 'mongoose';
 import { CommentValues, MatchData, PitFile, SuperData, ScouterData } from 'requests';
 
+const robotPositions = [
+    'red_1',
+    'red_2',
+    'red_3',
+    'red_4',
+    'blue_1',
+    'blue_2',
+    'blue_3',
+    'blue_4',
+] as const;
+
 const matchappsMetaDataSchema = {
     scouterName: String,
     matchNumber: Number,
     robotTeam: Number,
     robotPosition: {
         type: String,
-        enum: ['red_1', 'red_2', 'red_3', 'blue_1', 'blue_2', 'blue_3'],
+        enum: robotPositions,
     },
 };
 
@@ -17,119 +28,109 @@ const superappsMetaDataSchema = {
     robotTeam: Number,
     robotPosition: {
         type: String,
-        enum: ['red_1', 'red_2', 'red_3', 'blue_1', 'blue_2', 'blue_3'],
+        enum: robotPositions,
     },
 };
-
-const coral = {
-    L1: Number,
-    L2: Number,
-    L3: Number,
-    L4: Number
-};
-const algae = {
-    netRobot: Number,
-    processor: Number,
-    remove: Number
-};
-
-const StartingZone = {
-    start1: Boolean,
-    start2: Boolean,
-    start3: Boolean,
-}
-
-const pickup = {
-    source1: Boolean,
-    source2: Boolean,
-    ground1: Boolean,
-    ground2: Boolean,
-    ground3: Boolean
-}
-
-const placeLocation = {
-    deposit1: Boolean,
-    deposit2: Boolean,
-    deposit3: Boolean,
-    deposit4: Boolean,
-    deposit5: Boolean,
-    deposit6: Boolean,
-}
 
 const matchDataSchema = new mongoose.Schema<MatchData>({
     metadata: matchappsMetaDataSchema,
-    leftStartingZone: Boolean,
-    startingZone: StartingZone,
-    pickupLocation: pickup,
-    placement: placeLocation,
-    autoCoral: coral,
-    autoAlgae: algae,
-    teleCoral: coral, 
-    teleAlgae: algae,
-    climb: {
+    robotAbsent: Boolean,
+    autoStartingPosition: {
         type: String,
-        enum: ['shallow','deep', 'park', 'none', 'failed'],
+        enum: ['left', 'center', 'right', null],
+        default: null,
     },
+    autoMoved: Boolean,
+    autoFuelScored: Number,
+    autoTower: {
+        type: String,
+        enum: ['none', 'level1', 'failed'],
+    },
+    autoFuelWinner: {
+        type: String,
+        enum: ['red', 'blue', 'tie', 'unknown'],
+    },
+    shift1ActiveHubIfTie: {
+        type: String,
+        enum: ['red', 'blue', null],
+        default: null,
+    },
+    teleFuelBySegment: {
+        transition: Number,
+        shift1: Number,
+        shift2: Number,
+        shift3: Number,
+        shift4: Number,
+        endgame: Number,
+    },
+    teleTower: {
+        type: String,
+        enum: ['none', 'level1', 'level2', 'level3', 'failed'],
+    },
+    climbTimeBucket: {
+        type: String,
+        enum: ['early', 'mid', 'late', null],
+        default: null,
+    },
+    breakdown: {
+        type: String,
+        enum: ['none', 'stuck', 'tipped', 'comms', 'mechanism', 'other'],
+    },
+    driverQuality: {
+        type: String,
+        enum: ['great', 'good', 'ok', 'rough'],
+    },
+    freeText: String,
 });
 
 const superScoutDataSchema = new mongoose.Schema<SuperData>({
     metadata: superappsMetaDataSchema,
+    defenseProvided: {
+        type: String,
+        enum: ['none', 'some', 'heavy'],
+    },
+    defenseReceived: Boolean,
     fouls: {
-        insideRobot: Number,
-        protectedZone: Number,
         pinning: Number,
-        multiplePieces: Number,
-        cageFoul: Number,
+        towerContactInEndgame: Number,
+        outOfZoneShooting: Number,
+        ejectedFuel: Number,
         other: Number,
     },
-    break: {
-        mechanismDmg: Number,
-        batteryFall: Number,
-        commsFail: Number,
-        bumperFall: Number
+    breaks: {
+        mechanism: Number,
+        battery: Number,
+        comms: Number,
+        bumper: Number,
     },
-    defense: {
-        type: String,
-        enum: ['fullDef', 'someDef', 'noDef'],
-    },
-    defended: Boolean,
-    humanShooter: { 
-            Success: Number,
-            Failed: Number,
-    },
-    // Are you asking about this error?
-    // Currently the error is it's supposed to be a string array but it's only a string
-    // yeah I am
-    /*n different error now
-
-*/
     comments: [
         {
             type: String,
             enum: [
                 'great_driving',
                 'good_driving',
-                'source_only',
-                'clogging',
-                'effective_defense',
-                'okay_defense',
-                'knock_pieces',
-                'coral stuck',
-                'algae stuck',
-                'ineffective_defense',
-                'sturdy_build',
-                'weak_build',
-                'avoids_under_stage',
+                'ok_driving',
+                'rough_driving',
+                'fast_cycles',
+                'drops_fuel',
+                'accurate_shots',
+                'inaccurate_shots',
+                'aggressive_defense',
+                'smart_defense',
+                'defense_liability',
+                'fast_climb',
+                'slow_climb',
+                'no_climb',
             ] satisfies CommentValues[],
         },
     ],
+    humanPlayerFuelScored: Number,
 });
 
-const leaderboardDataSchema = new mongoose.Schema<ScouterData> ({
+const leaderboardDataSchema = new mongoose.Schema<ScouterData>({
     scouterName: String,
     accuracy: Number,
 });
-
 
 type PitDataSchemaType = {
     [K in keyof PitFile]: K extends 'photo' ? Buffer : PitFile[K];
@@ -138,13 +139,33 @@ type PitDataSchemaType = {
 const pitDataSchema = new mongoose.Schema<PitDataSchemaType>({
     scouterName: String,
     teamNumber: Number,
-    pitBatteryCount: Number,
-    hopperIntake: Boolean,
+    drivebase: {
+        type: String,
+        enum: ['tank', 'swerve', 'other'],
+    },
+    maxFuelStorageEstimate: { type: Number, default: null },
+    intakeSources: {
+        depot: Boolean,
+        outpostCorral: Boolean,
+        floorNeutral: Boolean,
+    },
+    scoringMethod: {
+        type: String,
+        enum: ['dump', 'low-shot', 'high-shot', 'other'],
+    },
+    preferredScoringSpot: {
+        type: String,
+        enum: ['nearHub', 'backOfZone', 'varies'],
+    },
+    towerCapabilityClaimed: {
+        type: String,
+        enum: ['level1', 'level2', 'level3', 'unknown'],
+    },
+    batteryCount: Number,
     photo: Buffer,
-    comments: String,
+    notes: String,
 });
 
-// const ssApp = ('ssApp', superScoutDataSchema);
 const pitApp = mongoose.model('pitApp', pitDataSchema);
 const matchApp = mongoose.model('matchApp', matchDataSchema);
 const superApp = mongoose.model('superApp', superScoutDataSchema);
@@ -159,5 +180,4 @@ export {
     superScoutDataSchema,
     leaderboardApp,
     leaderboardDataSchema,
-
 };

@@ -2,6 +2,7 @@ import { Dispatch, useEffect, useState } from 'react';
 import { RobotPosition, SuperPosition } from 'requests';
 import MultiButton from './MultiButton';
 import TextInput from './TextInput';
+import { getRobotPositions } from '../lib/gameConfig';
 
 function SignIn({
     scouterName,
@@ -78,45 +79,37 @@ function SignIn({
                             'bg-blue-500 text-white',
                         ]}
                     />
-                ) : pitScouting ? undefined : (
-                    <MultiButton
-                        onChange={onChangeRobotPosition}
-                        value={robotPosition}
-                        labels={[
-                            'Blue 1',
-                            'Blue 2',
-                            'Blue 3',
-                            'Red 1',
-                            'Red 2',
-                            'Red 3',
-                        ]}
-                        values={[
-                            'blue_1',
-                            'blue_2',
-                            'blue_3',
-                            'red_1',
-                            'red_2',
-                            'red_3',
-                        ]}
-                        className={'text-xl'}
-                        unSelectedClassName={[
-                            'text-blue-500 bg-gray-300',
-                            'text-blue-500 bg-gray-300',
-                            'text-blue-500 bg-gray-300',
-                            'text-red-500 bg-gray-300 ',
-                            'text-red-500 bg-gray-300',
-                            'text-red-500 bg-gray-300',
-                        ]}
-                        selectedClassName={[
-                            'bg-blue-500 text-white',
-                            'bg-blue-500 text-white',
-                            'bg-blue-500 text-white',
-                            'bg-red-500 text-white',
-                            'bg-red-500 text-white',
-                            'bg-red-500 text-white',
-                        ]}
-                    />
-                )}
+                ) : pitScouting ? undefined : (() => {
+                    const positions = getRobotPositions();
+                    const labels = positions.map(position => {
+                        const [alliance, slot] = position.split('_');
+                        return `${alliance.charAt(0).toUpperCase()}${alliance.slice(
+                            1
+                        )} ${slot}`;
+                    });
+                    const unSelectedClassName = positions.map(position =>
+                        position.startsWith('blue')
+                            ? 'text-blue-500 bg-gray-300'
+                            : 'text-red-500 bg-gray-300'
+                    );
+                    const selectedClassName = positions.map(position =>
+                        position.startsWith('blue')
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-red-500 text-white'
+                    );
+
+                    return (
+                        <MultiButton
+                            onChange={onChangeRobotPosition}
+                            value={robotPosition}
+                            labels={labels}
+                            values={positions}
+                            className={'text-xl'}
+                            unSelectedClassName={unSelectedClassName}
+                            selectedClassName={selectedClassName}
+                        />
+                    );
+                })()}
 
                 
 

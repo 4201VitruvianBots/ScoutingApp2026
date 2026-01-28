@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction } from 'react';
-import { MatchScores } from '../MatchApp';
 import MultiButton from '../../../components/MultiButton';
 
+type MatchScores = Record<string, number>;
 type countKeys = keyof MatchScores;
 
 function RegionButton({

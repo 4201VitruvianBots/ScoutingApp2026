@@ -2,8 +2,9 @@ import { useState } from "react";
 import { RobotPosition } from "requests";
 import CheckBoxMatch from './CheckBoxButton';
 import CoralSectionButton from "./CoralSectionButton";
-import bluesidematch from 'path/to/bluesidematch.png';
-import redsidematch from 'path/to/redsidematch.png';
+
+const bluesidematch = '/bluesidematch.png';
+const redsidematch = '/redsidematch.png';
 
 const FieldAutoButton = () => {
     const [robotPosition] = useState<RobotPosition>();

@@ -1,20 +1,17 @@
 import { Dispatch, SetStateAction } from 'react';
-import { MatchScores } from '../MatchApp';
-import { ClimbPosition } from 'requests';
+import { TeleTowerResult } from 'requests';
 import MultiButton from '../../../components/MultiButton';
 
 function EndgameButton({
     setClimb,
     climbPosition,
 }: {
-    setClimb: Dispatch<SetStateAction<ClimbPosition>>;
-    setCount: Dispatch<SetStateAction<MatchScores>>;
-    climbPosition: ClimbPosition;
-    count: MatchScores;
+    setClimb: Dispatch<SetStateAction<TeleTowerResult>>;
+    climbPosition: TeleTowerResult;
 }) {
     // const [alliance, setAlliance] = useState(false); //false=red, true=blue, null=hollow purple
 
-    const handleClimb = (newClimb: ClimbPosition) => {
+    const handleClimb = (newClimb: TeleTowerResult) => {
         setClimb(newClimb);
     };
 
@@ -27,11 +24,12 @@ function EndgameButton({
                 <MultiButton
                     onChange={handleClimb}
                     value={climbPosition}
-                    labels={['Deep', 'Shallow']}
-                    values={['deep', 'shallow']}
+                    labels={['Level 1', 'Level 2', 'Level 3']}
+                    values={['level1', 'level2', 'level3']}
                     className={[
-                        'h-[60px] w-[217px] text-4xl ',
-                        'h-[60px] w-[217px] text-4xl ',
+                        'h-[60px] w-[217px] text-3xl ',
+                        'h-[60px] w-[217px] text-3xl ',
+                        'h-[60px] w-[217px] text-3xl ',
                     ]}
                 />
                 </div>
@@ -40,12 +38,11 @@ function EndgameButton({
                 <MultiButton
                     onChange={handleClimb}
                     value={climbPosition}
-                    labels={['Failed', 'None', 'Parked']}
-                    values={['failed', 'none', 'park']}
+                    labels={['Failed', 'None']}
+                    values={['failed', 'none']}
                     className={[
-                        'h-[60px] w-[217px] text-4xl ',
-                        'h-[60px] w-[217px] text-4xl ',
-                        'flex-column h-[60px] w-[200px] gap-4 text-4xl  ',
+                        'h-[60px] w-[217px] text-3xl ',
+                        'h-[60px] w-[217px] text-3xl ',
                     ]}
                 />
             </div>

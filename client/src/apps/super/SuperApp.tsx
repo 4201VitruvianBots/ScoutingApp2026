@@ -1,153 +1,147 @@
 import { MaterialSymbol } from 'react-material-symbols';
 import LinkButton from '../../components/LinkButton';
 import SignIn from '../../components/SignIn';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Dialog from '../../components/Dialog';
-import {
-    Foul,
-    SuperPosition,
-    Break,
-    MatchSchedule,
-    SuperData,
-    RobotPosition,
-} from 'requests';
-import SuperTeam from './components/SuperTeam';
-import { SuperTeamState } from './components/SuperTeam';
+import { MatchSchedule, SuperData, SuperPosition } from 'requests';
+import SuperTeam, { SuperTeamState } from './components/SuperTeam';
 import NumberInput from '../../components/NumberInput';
 import MultiButton from '../../components/MultiButton';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import scheduleFile from '../../assets/matchSchedule.json';
 import { usePreventUnload } from '../../lib/usePreventUnload';
-import HumanCounter from './components/HumanNetCounter';
-// import Human from './components/HumanNetCounter';
+import { gameConfig, getAlliancePositions } from '../../lib/gameConfig';
 
 const schedule = scheduleFile as MatchSchedule;
 
-const foulTypes: Foul[] = [
-    'insideRobot',
-    'protectedZone',
-    'pinning',
-    'multiplePieces',
-    'other',
-];
-
-interface SuperScores {
-    Success: number;
-    Failed: number;
-}
-
-const defaultScore: SuperScores = {
-    Success: 0,
-    Failed: 0,
-};
-
-const breakTypes: Break[] = ['mechanismDmg', 'batteryFall', 'commsFail'];
-
 const defaultSuperTeamState: SuperTeamState = {
-    foulCounts: Object.fromEntries(foulTypes.map(e => [e, 0])) as Record<
-        Foul, number
-    >,
-    breakCount: Object.fromEntries(breakTypes.map(e => [e, 0])) as Record<
-        Break, number
-    >,
-    defenseRank: 'noDef',
-    wasDefended: false,
+    fouls: {
+        pinning: 0,
+        towerContactInEndgame: 0,
+        outOfZoneShooting: 0,
+        ejectedFuel: 0,
+        other: 0,
+    },
+    breaks: {
+        mechanism: 0,
+        battery: 0,
+        comms: 0,
+        bumper: 0,
+    },
+    defenseProvided: 'none',
+    defenseReceived: false,
     teamNumber: undefined,
-    cannedComments: [],
+    comments: [],
 };
+
+function cloneTeamState(team: SuperTeamState): SuperTeamState {
+    return {
+        ...team,
+        fouls: { ...team.fouls },
+        breaks: { ...team.breaks },
+        comments: [...team.comments],
+    };
+}
 
 function SuperApp() {
     usePreventUnload();
     const [scouterName, setScouterName] = useState('');
     const [superPosition, setSuperPosition] = useState<SuperPosition>();
-    const [team1, setTeam1] = useState(defaultSuperTeamState);
-    const [team2, setTeam2] = useState(defaultSuperTeamState);
-    const [team3, setTeam3] = useState(defaultSuperTeamState);
-    const [count, setCount] = useState<SuperScores>(defaultScore);
-    const [shooterPlayerTeam, setShooterPlayerTeam] = useState<number>();
-    const [sendQueue, sendAll, queue, sending] = useQueue();
     const [matchNumber, setMatchNumber] = useState<number>();
     const [showCheck, setShowCheck] = useState(false);
-    const [history, setHistory] = useState< { 1: SuperTeamState; 2: SuperTeamState; 3: SuperTeamState; 4: SuperScores  }[] >([]);
+    const [sendQueue, sendAll, queue, sending] = useQueue();
+
+    const allianceSize = gameConfig.allianceSizeRobots.default;
+    const [teams, setTeams] = useState<SuperTeamState[]>(
+        Array.from({ length: allianceSize }, () => cloneTeamState(defaultSuperTeamState))
+    );
+    const [humanPlayerFuelScored, setHumanPlayerFuelScored] = useState(0);
+    const [humanPlayerIndex, setHumanPlayerIndex] = useState<number | null>(null);
+    const [history, setHistory] = useState<
+        Array<{
+            teams: SuperTeamState[];
+            humanPlayerFuelScored: number;
+            humanPlayerIndex: number | null;
+        }>
+    >([]);
+
     useStatus(superPosition, matchNumber, scouterName);
 
+    const alliancePositions = useMemo(() => {
+        if (!superPosition) return [];
+        return getAlliancePositions(
+            superPosition === 'blue_ss' ? 'blue' : 'red'
+        );
+    }, [superPosition]);
+
     const saveHistory = () => {
-        setHistory([
-            ...history,
+        setHistory(prev => [
+            ...prev,
             {
-                1: team1,
-                2: team2,
-                3: team3,
-                4: count 
+                teams: teams.map(cloneTeamState),
+                humanPlayerFuelScored,
+                humanPlayerIndex,
             },
         ]);
     };
-    const handleTeam1 = (teamValue: SuperTeamState) => {
-        setTeam1(teamValue);
+
+    const updateTeam = (index: number, nextState: SuperTeamState) => {
         saveHistory();
+        setTeams(prev => {
+            const updated = [...prev];
+            updated[index] = nextState;
+            return updated;
+        });
     };
-    const handleTeam2 = (teamValue: SuperTeamState) => {
-        setTeam2(teamValue);
+
+    const handleHumanFuelChange = (delta: number) => {
         saveHistory();
+        setHumanPlayerFuelScored(prev => Math.max(0, prev + delta));
     };
-    const handleTeam3 = (teamValue: SuperTeamState) => {
-        setTeam3(teamValue);
-        saveHistory();
-    };
-    const handleCount = (scoreValue: SuperScores) => {
-        setCount(scoreValue);
-        saveHistory();
-    }
 
     const handleSubmit = async () => {
-        if (
-            scouterName === undefined ||
-            superPosition === undefined ||
-            matchNumber === undefined ||
-            team1.teamNumber === undefined ||
-            team2.teamNumber === undefined ||
-            team3.teamNumber === undefined
-        ) {
-            alert('data is missing! :(');
+        if (!scouterName || !superPosition || matchNumber == undefined) {
+            alert('Missing scouter name, position, or match number.');
+            return;
+        }
+        if (teams.some(team => team.teamNumber === undefined)) {
+            alert('Missing team numbers.');
             return;
         }
 
-        const data = [team1, team2, team3].map(
+        const humanTeamNumber =
+            humanPlayerIndex != null ? teams[humanPlayerIndex]?.teamNumber : undefined;
+
+        const data = teams.map(
             (team, index) =>
                 ({
                     metadata: {
                         scouterName,
                         matchNumber,
                         robotTeam: team.teamNumber!,
-                        robotPosition: (
-                            (superPosition === 'blue_ss'
-                                ? ['blue_1', 'blue_2', 'blue_3']
-                                : ['red_1', 'red_2', 'red_3',]) satisfies RobotPosition[]
-                        )[index],
+                        robotPosition: alliancePositions[index],
                     },
-                    fouls: team.foulCounts,
-                    break: team.breakCount,
-                    defense: team.defenseRank,
-                    defended: team.wasDefended,
-                    humanShooter:
-                        shooterPlayerTeam === team.teamNumber
-                            ? {
-                                    Success: count.Success,
-                                    Failed: count.Failed,
-                              }
-                            : undefined,
-                    comments: team.cannedComments.map(option => option.value),
+                    fouls: team.fouls,
+                    breaks: team.breaks,
+                    defenseProvided: team.defenseProvided,
+                    defenseReceived: team.defenseReceived,
+                    comments: team.comments.map(option => option.value),
+                    humanPlayerFuelScored:
+                        team.teamNumber === humanTeamNumber
+                            ? humanPlayerFuelScored
+                            : 0,
                 }) satisfies SuperData
         );
 
-        console.log(data);
-
-        data.map(e => sendQueue('/data/super', e));
-        setTeam1(defaultSuperTeamState);
-        setTeam2(defaultSuperTeamState);
-        setTeam3(defaultSuperTeamState);
-        setCount(defaultScore);
+        data.forEach(entry => sendQueue('/data/super', entry));
+        setTeams(
+            Array.from({ length: allianceSize }, () =>
+                cloneTeamState(defaultSuperTeamState)
+            )
+        );
+        setHumanPlayerFuelScored(0);
+        setHumanPlayerIndex(null);
         setHistory([]);
         setMatchNumber(matchNumber + 1);
         setShowCheck(true);
@@ -158,43 +152,32 @@ function SuperApp() {
 
     useEffect(() => {
         if (!schedule || !superPosition || !matchNumber) {
-            setTeam1(team1 => ({ ...team1, teamNumber: undefined }));
-            setTeam2(team2 => ({ ...team2, teamNumber: undefined }));
-            setTeam3(team3 => ({ ...team3, teamNumber: undefined }));
+            setTeams(prev =>
+                prev.map(team => ({ ...team, teamNumber: undefined }))
+            );
             return;
         }
         const blueAlliance = superPosition === 'blue_ss';
-        setTeam1(team1 => ({
-            ...team1,
-            teamNumber:
-                schedule[matchNumber]?.[blueAlliance ? 'blue_1' : 'red_1'],
-        }));
-        setTeam2(team2 => ({
-            ...team2,
-            teamNumber:
-                schedule[matchNumber]?.[blueAlliance ? 'blue_2' : 'red_2'],
-        }));
-        setTeam3(team3 => ({
-            ...team3,
-            teamNumber:
-                schedule[matchNumber]?.[blueAlliance ? 'blue_3' : 'red_3'],
-        }));
+        const positions = getAlliancePositions(blueAlliance ? 'blue' : 'red');
+        setTeams(prev =>
+            prev.map((team, index) => ({
+                ...team,
+                teamNumber: schedule[matchNumber]?.[positions[index]],
+            }))
+        );
     }, [matchNumber, superPosition]);
 
     const undoHistoryCount = () => {
-        if (history.length > 0) {
-            setHistory(prevHistory => prevHistory.slice(0, -1));
-            const last = history.at(-1)!;
-            setTeam1(last[1]);
-            setTeam2(last[2]);
-            setTeam3(last[3]);
-            setCount(last[4]);
-        }
+        if (history.length === 0) return;
+        const last = history.at(-1)!;
+        setTeams(last.teams.map(cloneTeamState));
+        setHumanPlayerFuelScored(last.humanPlayerFuelScored);
+        setHumanPlayerIndex(last.humanPlayerIndex);
+        setHistory(prev => prev.slice(0, -1));
     };
 
-
     return (
-        <main className='bg-[#171c26] text-center h-full'>
+        <main className='min-h-screen bg-[#171c26] text-center text-white'>
             {showCheck && (
                 <MaterialSymbol
                     icon='check'
@@ -217,7 +200,6 @@ function SuperApp() {
                         fill
                         grade={200}
                         color='green'
-                       
                     />
                 </LinkButton>
 
@@ -230,7 +212,7 @@ function SuperApp() {
                                 size={60}
                                 fill
                                 grade={200}
-                                className={` ${
+                                className={`${
                                     scouterName && superPosition
                                         ? 'text-green-400'
                                         : 'text-gray-400'
@@ -252,68 +234,72 @@ function SuperApp() {
 
                 <button
                     onClick={undoHistoryCount}
-                    className='z-10 aspect-square rounded bg-[#f07800]  p-1  font-bold text-black '>
+                    className='z-10 aspect-square rounded bg-[#f07800] p-1 font-bold text-black'>
                     <MaterialSymbol
                         icon='undo'
                         size={60}
                         fill
                         grade={200}
                         color='black'
-                      
                     />
                 </button>
             </div>
-        <div>
-            <p className='text-xl text-white'>Match Number</p>
-            <NumberInput
-                onChange={setMatchNumber}
-                value={matchNumber}
-                className='m-2 p-2 text-xl text-black'
-            />
-        </div>
-        <p
-            className={'mt-10  text-white text-2xl'}>
-                Human Player Points
-            </p>
-            
-               <HumanCounter
-                count={count}
-                className='mt-10 mb-5 p-10 mx-4 bg-green-500 text-white text-2xl rounded' 
-                setCount={handleCount} >        
-                </HumanCounter> 
 
-                
-                <div/>
-       <p className='text-white pt-5 text-2xl'>Human Player</p>     
-        <div className='grid grid-cols-3 justify-items-center gap-10 px-10'>
-            <MultiButton
-                className='mx-10 mt-10 w-full max-w-40 outline-black'
-                onChange={setShooterPlayerTeam}
-                values={[
-                    team1.teamNumber ?? -1,
-                    team2.teamNumber ?? -2,
-                    team3.teamNumber ?? -3,
-                ]} // ugly hack hehe 
-                labels={[
-                    team1.teamNumber ?? 'Team 1',
-                    team2.teamNumber ?? 'Team 2',
-                    team3.teamNumber ?? 'Team 3',
-                ].map(e => e.toString())}
-                value={shooterPlayerTeam}
-                selectedClassName='bg-[#48c55c]'
-                unSelectedClassName='bg-white'
-            />
-                <SuperTeam teamState={team1} setTeamState={handleTeam1} bgClass={`${shooterPlayerTeam == -1 ? 'bg-[#003805] rounded-lg p-5' : ''} `}/>
-                <SuperTeam teamState={team2} setTeamState={handleTeam2} bgClass={`${shooterPlayerTeam == -2 ? 'bg-[#003805] rounded-lg p-5' : ''} `}/>
-                <SuperTeam teamState={team3} setTeamState={handleTeam3} bgClass={`${shooterPlayerTeam == -3 ? 'bg-[#003805] rounded-lg p-5' : ''} `}/>
-                
-        </div>  
+            <div>
+                <p className='text-xl text-white'>Match Number</p>
+                <NumberInput
+                    onChange={setMatchNumber}
+                    value={matchNumber}
+                    className='m-2 p-2 text-xl text-black'
+                />
+            </div>
+
+            <p className='mt-10 text-2xl text-white'>Human Player Fuel</p>
+            <div className='mx-auto mt-4 flex w-full max-w-md flex-col gap-3 rounded-lg bg-[#2f3646] p-4'>
+                <div className='flex justify-between gap-2'>
+                    <button
+                        className='flex-1 rounded bg-gray-600 px-4 py-3 text-2xl'
+                        onClick={() => handleHumanFuelChange(-1)}>
+                        -1
+                    </button>
+                    <button
+                        className='flex-1 rounded bg-[#48c55c] px-4 py-3 text-2xl text-black'
+                        onClick={() => handleHumanFuelChange(1)}>
+                        +1
+                    </button>
+                </div>
+                <p className='text-xl'>Total: {humanPlayerFuelScored}</p>
+            </div>
+
+            <p className='pt-5 text-2xl text-white'>Human Player Team</p>
+            <div className='mx-auto mt-2 flex flex-wrap justify-center gap-2'>
+                <MultiButton
+                    className='w-full max-w-40'
+                    onChange={setHumanPlayerIndex}
+                    values={teams.map((_team, index) => index)}
+                    labels={teams.map(
+                        (team, index) =>
+                            team.teamNumber ?? `Team ${index + 1}`
+                    ).map(label => label.toString())}
+                    value={humanPlayerIndex ?? undefined}
+                    selectedClassName='bg-[#48c55c] text-black'
+                    unSelectedClassName='bg-white text-black'
+                />
+            </div>
+
+            <div className='grid grid-cols-1 gap-10 px-6 py-6 md:grid-cols-3'>
+                {teams.map((team, index) => (
+                    <SuperTeam
+                        key={index}
+                        teamState={team}
+                        setTeamState={value => updateTeam(index, value)}
+                    />
+                ))}
+            </div>
+
             <button
-                onClick={() => {
-                    handleSubmit();
-                    
-                }}
-                className='m-5 w-full max-w-80 rounded-md bg-[#48c55c] px-4 py-2 text-lg'>
+                onClick={handleSubmit}
+                className='m-5 w-full max-w-80 rounded-md bg-[#48c55c] px-4 py-2 text-lg text-black'>
                 Submit
             </button>
 
@@ -329,5 +315,4 @@ function SuperApp() {
     );
 }
 
-export type { SuperScores };
 export default SuperApp;

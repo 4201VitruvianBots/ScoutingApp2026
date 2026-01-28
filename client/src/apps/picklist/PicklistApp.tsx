@@ -1,5 +1,5 @@
 import { AnalysisEntry, WindowData } from './data';
-import { PitResult, TeamData } from 'requests';
+import { MatchDataAggregations, PitResult, SuperDataAggregations, TeamData } from 'requests';
 import Workspace from '../../components/workspace/Workspace';
 import { useWorkspaceState } from '../../components/workspace/useWorkspaceState';
 import StatTable from './components/StatTable';
@@ -79,8 +79,11 @@ function generateWindow(
 }
 
 function PicklistApp() {
-    const [analyzedData, reloadData] = useFetchJson<AnalysisEntry[]>(
-        '/output_analysis.json'
+    const [matchAgg, reloadMatchAgg] = useFetchJson<MatchDataAggregations[]>(
+        '/data/retrieve'
+    );
+    const [superAgg, reloadSuperAgg] = useFetchJson<SuperDataAggregations[]>(
+        '/data/retrieve/super'
     );
     const [pitData, reloadPitData] = useFetchJson<PitResult>('/data/pit');
     const [teamInfo] = useFetchJson<TeamData>('/team_info.json');
@@ -89,6 +92,53 @@ function PicklistApp() {
         useWorkspaceState<WindowData>();
 
     const [finalPicklist, setFinalPicklist] = useState<number[]>([]);
+    const analyzedData: AnalysisEntry[] = [];
+
+    const superByTeam = new Map(
+        (superAgg || []).map(entry => [entry._id.teamNumber, entry])
+    );
+    const allTeams = new Set<number>();
+    (matchAgg || []).forEach(entry => allTeams.add(entry._id.teamNumber));
+    (superAgg || []).forEach(entry => allTeams.add(entry._id.teamNumber));
+
+    allTeams.forEach(teamNumber => {
+        const matchEntry = matchAgg?.find(
+            entry => entry._id.teamNumber === teamNumber
+        );
+        const superEntry = superByTeam.get(teamNumber);
+        analyzedData.push({
+            teamNumber,
+            avgAutoFuel: matchEntry?.avgAutoFuel ?? 0,
+            avgTeleFuelTransition: matchEntry?.avgTeleFuelTransition ?? 0,
+            avgTeleFuelShift1: matchEntry?.avgTeleFuelShift1 ?? 0,
+            avgTeleFuelShift2: matchEntry?.avgTeleFuelShift2 ?? 0,
+            avgTeleFuelShift3: matchEntry?.avgTeleFuelShift3 ?? 0,
+            avgTeleFuelShift4: matchEntry?.avgTeleFuelShift4 ?? 0,
+            avgTeleFuelEndgame: matchEntry?.avgTeleFuelEndgame ?? 0,
+            avgTeleFuelActiveComputed: matchEntry?.avgTeleFuelActiveComputed ?? 0,
+            avgTeleFuelWastedComputed: matchEntry?.avgTeleFuelWastedComputed ?? 0,
+            climbRateLevel1: matchEntry?.climbRateLevel1 ?? 0,
+            climbRateLevel2: matchEntry?.climbRateLevel2 ?? 0,
+            climbRateLevel3: matchEntry?.climbRateLevel3 ?? 0,
+            climbFailRate: matchEntry?.climbFailRate ?? 0,
+            breakdownRate: matchEntry?.breakdownRate ?? 0,
+            matchCount: matchEntry?.matchCount ?? 0,
+            avgFoulsTotal: superEntry?.avgFoulsTotal ?? 0,
+            foulRatePinning: superEntry?.foulRatePinning ?? 0,
+            foulRateTowerContactInEndgame:
+                superEntry?.foulRateTowerContactInEndgame ?? 0,
+            foulRateOutOfZoneShooting:
+                superEntry?.foulRateOutOfZoneShooting ?? 0,
+            foulRateEjectedFuel: superEntry?.foulRateEjectedFuel ?? 0,
+            foulRateOther: superEntry?.foulRateOther ?? 0,
+            avgHumanPlayerFuelScored: superEntry?.avgHumanPlayerFuelScored ?? 0,
+            defenseHeavyRate: superEntry?.defenseHeavyRate ?? 0,
+            defenseSomeRate: superEntry?.defenseSomeRate ?? 0,
+            defenseReceivedRate: superEntry?.defenseReceivedRate ?? 0,
+            superMatchCount: superEntry?.matchCount ?? 0,
+            Comments: superEntry?.commentCounts ?? {},
+        });
+    });
 
     return (
         <main className='relative grid h-screen grid-rows-[auto_1fr] overflow-hidden'>
@@ -109,7 +159,8 @@ function PicklistApp() {
                 <button
                     className='flex snap-none items-center justify-center px-2'
                     onClick={() => {
-                        reloadData();
+                        reloadMatchAgg();
+                        reloadSuperAgg();
                         reloadPitData();
                     }}
                     title='Refresh Data'>

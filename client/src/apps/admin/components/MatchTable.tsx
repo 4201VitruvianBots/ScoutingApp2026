@@ -1,19 +1,30 @@
 import { StatusRecieve } from 'requests';
 import MatchRow from './MatchRow';
+import { getAlliancePositions } from '../../../lib/gameConfig';
 
 function MatchTable({ matches }: { matches: StatusRecieve['matches'] }) {
+    const redPositions = getAlliancePositions('red');
+    const bluePositions = getAlliancePositions('blue');
     return (
         <table className='match-status h-72 overflow-auto'>
             <thead>
                 <tr>
                     <th>Match</th>
-                    <th className='status-red col-span-1'>Red 1</th>
-                    <th className='status-red col-span-1'>Red 2</th>
-                    <th className='status-red col-span-1'>Red 3</th>
+                    {redPositions.map((_, index) => (
+                        <th
+                            key={`red-${index}`}
+                            className='status-red col-span-1'>
+                            Red {index + 1}
+                        </th>
+                    ))}
                     <th className='status-red col-span-1'>Red SS</th>
-                    <th className='status-blue col-span-1'>Blue 1</th>
-                    <th className='status-blue col-span-1'>Blue 2</th>
-                    <th className='status-blue col-span-1'>Blue 3</th>
+                    {bluePositions.map((_, index) => (
+                        <th
+                            key={`blue-${index}`}
+                            className='status-blue col-span-1'>
+                            Blue {index + 1}
+                        </th>
+                    ))}
                     <th className='status-blue col-span-1'>Blue SS</th>
                 </tr>
             </thead>

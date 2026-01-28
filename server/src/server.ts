@@ -60,21 +60,14 @@ app.post('/data/super', async (req, res) => {
 app.post('/data/pit', async (req, res) => {
     const body = req.body as PitFile;
     try {
-        let PitApp;
-        if (body.photo == '') {
-            PitApp = new pitApp({
-                ...body,
-                photo: Buffer.from([])
-            })
-        } else {
-        PitApp = new pitApp({
-            ...body,
-            photo: Buffer.from(dataUriToBuffer(body.photo).buffer),
-        });
-        }
-        // const aPitApp =
+        const photo =
+            body.photo === ''
+                ? Buffer.from([])
+                : Buffer.from(dataUriToBuffer(body.photo).buffer);
 
-        await PitApp.save();
+        await pitApp
+            .replaceOne({ teamNumber: body.teamNumber }, { ...body, photo })
+            .setOptions({ upsert: true });
 
         console.log(chalk.gray(`Pit data recieved for ${body.teamNumber}`));
 

@@ -1,33 +1,54 @@
 import { Dispatch } from 'react';
-import { Foul, Break, DefenseRank, CommentValues} from 'requests';
+import {
+    CommentValues,
+    DefenseProvided,
+    SuperBreaks,
+    SuperFouls,
+} from 'requests';
 import MultiButton from '../../../components/MultiButton';
 import Checkbox from '../../../components/Checkbox';
 import TeamDropdown from '../../../components/TeamDropdown';
 import CannedCommentBox, { SelectOption } from './CannedComments';
 
 export interface SuperTeamState {
-    foulCounts: Record<Foul, number>;
-    breakCount: Record<Break, number>;
-    defenseRank: DefenseRank;
-    wasDefended: boolean;
+    fouls: SuperFouls;
+    breaks: SuperBreaks;
+    defenseProvided: DefenseProvided;
+    defenseReceived: boolean;
     teamNumber: number | undefined;
-    cannedComments: SelectOption<CommentValues>[];
+    comments: SelectOption<CommentValues>[];
 }
+
+const foulLabels: Array<{ key: keyof SuperFouls; label: string }> = [
+    { key: 'pinning', label: 'Pinning' },
+    { key: 'towerContactInEndgame', label: 'Tower Contact (Endgame)' },
+    { key: 'outOfZoneShooting', label: 'Out-of-Zone Shooting' },
+    { key: 'ejectedFuel', label: 'Ejected Fuel' },
+    { key: 'other', label: 'Other' },
+];
+
+const breakLabels: Array<{ key: keyof SuperBreaks; label: string }> = [
+    { key: 'mechanism', label: 'Mechanism' },
+    { key: 'battery', label: 'Battery' },
+    { key: 'comms', label: 'Comms' },
+    { key: 'bumper', label: 'Bumper' },
+];
 
 function SuperTeam({
     teamState,
     setTeamState,
-    bgClass
+    bgClass,
 }: {
     teamState: SuperTeamState;
     setTeamState: Dispatch<SuperTeamState>;
     bgClass?: string;
 }) {
-    const handleDefense = (newDefense: DefenseRank) => {
-        setTeamState({ ...teamState, defenseRank: newDefense });
+    const handleDefense = (newDefense: DefenseProvided) => {
+        setTeamState({ ...teamState, defenseProvided: newDefense });
     };
+
     const handleWasDefended = (newDefended: boolean) => {
-        setTeamState({ ...teamState, wasDefended: newDefended });
+        setTeamState({ ...teamState, defenseReceived: newDefended });
     };
 
     const handleChangeTeam = (newChangeTeam: number) => {
@@ -35,53 +56,55 @@ function SuperTeam({
     };
 
     const handleAddComment = (comments: SelectOption<CommentValues>[]) => {
-        setTeamState({ ...teamState, cannedComments: comments });
+        setTeamState({ ...teamState, comments });
     };
-    const handleIncreaseFoul = (
-        foulType: keyof typeof teamState.foulCounts
-    ) => {
-        const updatedFoulCounts = { ...teamState.foulCounts };
-        updatedFoulCounts[foulType] = (updatedFoulCounts[foulType] || 0) + 1;
-        setTeamState({ ...teamState, foulCounts: updatedFoulCounts });
-    };
-    const handleDecreaseFoul = (
-        foulType: keyof typeof teamState.foulCounts
-    ) => {
-        const updatedFoulCounts = { ...teamState.foulCounts };
-        if (updatedFoulCounts[foulType] > 0) {
-            updatedFoulCounts[foulType] -= 1;
-        }
-        setTeamState({ ...teamState, foulCounts: updatedFoulCounts });
-    };
-    const handleIncreaseBreak = (
-        breakType: keyof typeof teamState.breakCount
-    ) => {
-        const updatedBreakCounts = { ...teamState.breakCount };
-        updatedBreakCounts[breakType] =
-            (updatedBreakCounts[breakType] || 0) + 1;
-        setTeamState({ ...teamState, breakCount: updatedBreakCounts });
-    };
-    const handleDecreaseBreak = (
-        breakType: keyof typeof teamState.breakCount
-    ) => {
-        const updatedBreakCounts = { ...teamState.breakCount };
-        if (updatedBreakCounts[breakType] > 0) {
-            updatedBreakCounts[breakType] -= 1;
-        }
-        setTeamState({ ...teamState, breakCount: updatedBreakCounts });
-    };
-    
-    
 
-    //many divs, kinda ugly
+    const handleIncreaseFoul = (foulType: keyof SuperFouls) => {
+        setTeamState({
+            ...teamState,
+            fouls: {
+                ...teamState.fouls,
+                [foulType]: teamState.fouls[foulType] + 1,
+            },
+        });
+    };
 
-    // saves all the other inputs, ovverrides the one in setTeamState({... comments, X})
+    const handleDecreaseFoul = (foulType: keyof SuperFouls) => {
+        if (teamState.fouls[foulType] === 0) return;
+        setTeamState({
+            ...teamState,
+            fouls: {
+                ...teamState.fouls,
+                [foulType]: teamState.fouls[foulType] - 1,
+            },
+        });
+    };
+
+    const handleIncreaseBreak = (breakType: keyof SuperBreaks) => {
+        setTeamState({
+            ...teamState,
+            breaks: {
+                ...teamState.breaks,
+                [breakType]: teamState.breaks[breakType] + 1,
+            },
+        });
+    };
+
+    const handleDecreaseBreak = (breakType: keyof SuperBreaks) => {
+        if (teamState.breaks[breakType] === 0) return;
+        setTeamState({
+            ...teamState,
+            breaks: {
+                ...teamState.breaks,
+                [breakType]: teamState.breaks[breakType] - 1,
+            },
+        });
+    };
 
     return (
         <div className={bgClass}>
-        
-            <div className='mx-auto flex  flex-col content-center items-center justify-center p-5 '>
-                <p className=' pt-3 text-lg text-zinc-100 underline'>
+            <div className='mx-auto flex flex-col content-center items-center justify-center p-5'>
+                <p className='pt-3 text-lg text-zinc-100 underline'>
                     Team Number
                 </p>
                 <TeamDropdown
@@ -92,153 +115,64 @@ function SuperTeam({
 
                 <p className='pt-3 text-lg text-zinc-100 underline'>Notes</p>
                 <CannedCommentBox
-                    value={teamState.cannedComments}
+                    value={teamState.comments}
                     onChange={handleAddComment}
                 />
             </div>
 
-            <p className='mt-5 text-4xl text-zinc-100 underline'>Fouls</p>
-
-            <div className=' flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseFoul('insideRobot')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseFoul('insideRobot')}>
-                    +Inside Robot: {teamState.foulCounts.insideRobot || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseFoul('protectedZone')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseFoul('protectedZone')}>
-                    +Protected Zone: {teamState.foulCounts.protectedZone || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseFoul('pinning')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseFoul('pinning')}>
-                    +Pinning: {teamState.foulCounts.pinning || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseFoul('multiplePieces')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseFoul('multiplePieces')}>
-                    +Multiple Pieces: {teamState.foulCounts.multiplePieces || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseFoul('cageFoul')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseFoul('cageFoul')}>
-                    +Cage Foul: {teamState.foulCounts.cageFoul || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseFoul('other')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseFoul('other')}>
-                    +Other: {teamState.foulCounts.other || 0}
-                </button>
-            </div>
-
-            <p className='mt-7 text-4xl text-zinc-100 underline'>Breaks</p>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseBreak('mechanismDmg')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseBreak('mechanismDmg')}>
-                    +Mechanism Dmg: {teamState.breakCount.mechanismDmg || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseBreak('batteryFall')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseBreak('batteryFall')}>
-                    +Battery Fall: {teamState.breakCount.batteryFall || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseBreak('commsFail')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseBreak('commsFail')}>
-                    +Comms Fail: {teamState.breakCount.commsFail || 0}
-                </button>
-            </div>
-            <div className='flex justify-center my-4'>
-                <button
-                    className='mt-3 rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleDecreaseBreak('bumperFall')}>
-                    -
-                </button>
-                <button
-                    className='mt-3 w-44 rounded-md border bg-slate-600 px-3 py-2 text-lg text-zinc-100'
-                    onClick={() => handleIncreaseBreak('bumperFall')}>
-                    +Bumper Fall: {teamState.breakCount.bumperFall || 0}
-                </button>
-            </div>
-
+            <p className='mt-5 text-2xl text-zinc-100 underline'>Defense</p>
             <MultiButton
                 onChange={handleDefense}
-                value={teamState.defenseRank}
-                labels={['Full Defense', 'Some Defense', 'No Defense']}
-                values={['fullDef', 'someDef', 'noDef']}
-                className='h-80% min-h-60% my-2 w-full text-black'
+                value={teamState.defenseProvided}
+                labels={['None', 'Some', 'Heavy']}
+                values={['none', 'some', 'heavy']}
+                className='my-2 w-full text-black'
+                selectedClassName='bg-[#48c55c] text-black'
+                unSelectedClassName='bg-gray-300 text-black'
             />
             <div>
                 <Checkbox
-                    className='text-3xl text-white'
+                    className='text-lg text-white'
                     boxClassName='size-5'
-                    checked={teamState.wasDefended}
+                    checked={teamState.defenseReceived}
                     onChange={handleWasDefended}>
-                    {' '}
                     Was Defended?
                 </Checkbox>
             </div>
+
+            <p className='mt-6 text-2xl text-zinc-100 underline'>Fouls</p>
+            {foulLabels.map(foul => (
+                <div className='flex justify-center gap-2 py-2' key={foul.key}>
+                    <button
+                        className='rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
+                        onClick={() => handleDecreaseFoul(foul.key)}>
+                        -
+                    </button>
+                    <button
+                        className='w-64 rounded-md border bg-slate-600 px-3 py-2 text-left text-lg text-zinc-100'
+                        onClick={() => handleIncreaseFoul(foul.key)}>
+                        + {foul.label}: {teamState.fouls[foul.key]}
+                    </button>
+                </div>
+            ))}
+
+            <p className='mt-6 text-2xl text-zinc-100 underline'>Breaks</p>
+            {breakLabels.map(breakEntry => (
+                <div
+                    className='flex justify-center gap-2 py-2'
+                    key={breakEntry.key}>
+                    <button
+                        className='rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
+                        onClick={() => handleDecreaseBreak(breakEntry.key)}>
+                        -
+                    </button>
+                    <button
+                        className='w-64 rounded-md border bg-slate-600 px-3 py-2 text-left text-lg text-zinc-100'
+                        onClick={() => handleIncreaseBreak(breakEntry.key)}>
+                        + {breakEntry.label}: {teamState.breaks[breakEntry.key]}
+                    </button>
+                </div>
+            ))}
         </div>
     );
 }

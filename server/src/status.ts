@@ -9,9 +9,20 @@ import {
 } from 'requests';
 import { matchApp, superApp } from './Schema.js';
 import fs from 'fs';
+import { gameConfig } from './gameConfig.js';
 
-const bluePositions: RobotPosition[] = ['blue_1', 'blue_2', 'blue_3'];
-const redPositions: RobotPosition[] = ['red_1', 'red_2', 'red_3'];
+const bluePositions: RobotPosition[] = [
+    'blue_1',
+    'blue_2',
+    'blue_3',
+    'blue_4',
+].slice(0, gameConfig.allianceSizeRobots.default);
+const redPositions: RobotPosition[] = [
+    'red_1',
+    'red_2',
+    'red_3',
+    'red_4',
+].slice(0, gameConfig.allianceSizeRobots.default);
 
 const scheduleFile = '../client/src/assets/matchSchedule.json';
 
@@ -53,14 +64,7 @@ async function updateMatchStatus() {
                 // Normal scouters
                 ...Object.fromEntries(
                     (
-                        [
-                            'red_1',
-                            'red_2',
-                            'red_3',
-                            'blue_1',
-                            'blue_2',
-                            'blue_3',
-                        ] satisfies RobotPosition[]
+                        [...redPositions, ...bluePositions] satisfies RobotPosition[]
                     ).map(robotPosition => [
                         robotPosition,
                         {

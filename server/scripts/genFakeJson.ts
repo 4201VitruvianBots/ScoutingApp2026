@@ -1,11 +1,8 @@
 import fs from 'fs';
+import { CommentValues } from 'requests';
 
 function randint(max: number, min = 0) {
     return Math.floor(randfloat(max, min));
-}
-
-function choose<T>(array: T[]) {
-    return array[randint(array.length)];
 }
 
 function randfloat(max: number, min = 0) {
@@ -20,8 +17,8 @@ const teams: number[] = `4
 1148
 1159
 1165
-1197'
-1572'
+1197
+1572
 2102
 2429
 2485
@@ -65,36 +62,59 @@ const teams: number[] = `4
     .split('\n')
     .map(str => parseInt(str));
 
-const data = teams.map(team => ({
-    teamNumber: team,
-    scouterName: 'Nate',
-    autoAmpNotes: randint(5),
-    autoSpeakerNear: randint(5),
-    autoSpeakerMid: randint(5),
-    autoSpeakerFar: randint(5),
-    climb: choose(['amp', 'center', 'failed', 'none', 'park', 'source']),
-    highNotes: randint(5),
-    leftStartingZone: Math.random() > 0.5,
-    teleAmpedSpeakerFar: randint(5),
-    teleAmpedSpeakerMid: randint(5),
-    teleAmpedSpeakerNear: randint(5),
-    teleAmpNotes: randint(5),
-    teleNonAmpedSpeakerFar: randint(5),
-    teleNonAmpedSpeakerMid: randint(5),
-    teleNonAmpedSpeakerNear: randint(5),
-    trapNotes: randint(2),
-    Comments: {
-        great_driving: randint(5),
-        good_driving: randint(5),
-        source_only: randint(5),
-        clogging: randint(5),
-        effective_defense: randint(5),
-        okay_defense: randint(5),
-        ineffective_defense: randint(5),
-        sturdy_build: randint(5),
-        weak_build: randint(5),
-        avoids_under_stage: randint(5),
-    },
-}));
+const commentValues: CommentValues[] = [
+    'great_driving',
+    'good_driving',
+    'ok_driving',
+    'rough_driving',
+    'fast_cycles',
+    'drops_fuel',
+    'accurate_shots',
+    'inaccurate_shots',
+    'aggressive_defense',
+    'smart_defense',
+    'defense_liability',
+    'fast_climb',
+    'slow_climb',
+    'no_climb',
+];
+
+const data = teams.map(team => {
+    const matchCount = randint(12, 4);
+    const superMatchCount = randint(12, 4);
+
+    return {
+        teamNumber: team,
+        avgAutoFuel: randfloat(20),
+        avgTeleFuelTransition: randfloat(10),
+        avgTeleFuelShift1: randfloat(15),
+        avgTeleFuelShift2: randfloat(15),
+        avgTeleFuelShift3: randfloat(15),
+        avgTeleFuelShift4: randfloat(15),
+        avgTeleFuelEndgame: randfloat(20),
+        avgTeleFuelActiveComputed: randfloat(40),
+        avgTeleFuelWastedComputed: randfloat(10),
+        climbRateLevel1: randfloat(1),
+        climbRateLevel2: randfloat(1),
+        climbRateLevel3: randfloat(1),
+        climbFailRate: randfloat(1),
+        breakdownRate: randfloat(0.4),
+        matchCount,
+        avgFoulsTotal: randfloat(4),
+        foulRatePinning: randfloat(1),
+        foulRateTowerContactInEndgame: randfloat(1),
+        foulRateOutOfZoneShooting: randfloat(1),
+        foulRateEjectedFuel: randfloat(1),
+        foulRateOther: randfloat(1),
+        avgHumanPlayerFuelScored: randfloat(5),
+        defenseHeavyRate: randfloat(1),
+        defenseSomeRate: randfloat(1),
+        defenseReceivedRate: randfloat(1),
+        superMatchCount,
+        Comments: Object.fromEntries(
+            commentValues.map(comment => [comment, randint(6)])
+        ),
+    };
+});
 
 fs.writeFileSync('static/output_analysis.json', JSON.stringify(data));

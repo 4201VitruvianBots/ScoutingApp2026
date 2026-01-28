@@ -2,9 +2,9 @@ import { CommentValues } from 'requests';
 import { TabBase } from '../../components/workspace/workspaceData';
 
 export interface AnalysisEntry
-    extends Record<string, string | number | boolean> {
+    extends Record<string, string | number | boolean | undefined> {
     teamNumber: number;
-    Comments: Record<CommentValues, number>;
+    Comments?: Partial<Record<CommentValues, number>>;
 }
 
 export interface StatTableData extends TabBase {

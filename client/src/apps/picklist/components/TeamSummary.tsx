@@ -7,20 +7,26 @@ import { snakeToSpaced } from '../../../lib/snakeCaseConvert';
 
 function commentToColor(comment: string) {
     switch (comment) {
-        case 'good_driving':
-        case 'okay_defense':
-            return 'bg-[#50a1c7]';
-        case 'clogging':
-        case 'source_only':
-        case 'avoids_under_stage':
-            return 'bg-[#c78450]';
-        case 'weak_build':
-        case 'ineffective_defense':
-            return 'bg-[#c75050]';
-        case 'sturdy_build':
         case 'great_driving':
-        case 'effective_defense':
+        case 'fast_cycles':
+        case 'accurate_shots':
+        case 'smart_defense':
+        case 'fast_climb':
             return 'bg-[#5ac750]';
+        case 'good_driving':
+            return 'bg-[#50a1c7]';
+        case 'ok_driving':
+        case 'slow_climb':
+            return 'bg-[#c78450]';
+        case 'drops_fuel':
+        case 'inaccurate_shots':
+        case 'defense_liability':
+        case 'no_climb':
+            return 'bg-[#c78450]';
+        case 'aggressive_defense':
+            return 'bg-[#c107f0]';
+        case 'rough_driving':
+            return 'bg-[#c75050]';
         default:
             return 'bg-gray-500';
     }
@@ -120,8 +126,9 @@ function TeamSummary({
                         if (
                             e !== 'teamNumber' &&
                             e !== 'scouterName' &&
-                            e !== 'climb' &&
-                            e !== 'Comments'
+                            e !== 'Comments' &&
+                            e !== 'matchCount' &&
+                            e !== 'superMatchCount'
                         ) {
                             return (
                                 <p key={e}>
@@ -133,11 +140,30 @@ function TeamSummary({
             </div>
             <div>
                 <h2 className='pb-2 text-2xl'>Pit Scout Info</h2>
+                <p className='indent-3'>Batteries: {teamPitData?.batteryCount}</p>
+                <p className='indent-3'>Drivebase: {teamPitData?.drivebase}</p>
                 <p className='indent-3'>
-                    {' '}
-                    Batteries: {teamPitData?.pitBatteryCount}
+                    Max Fuel Storage: {teamPitData?.maxFuelStorageEstimate ?? 'N/A'}
                 </p>
-                <p className='indent-3'> Notes: {teamPitData?.comments}</p>
+                <p className='indent-3'>
+                    Intake Sources:{' '}
+                    {teamPitData?.intakeSources
+                        ? Object.entries(teamPitData.intakeSources)
+                              .filter(([, value]) => value)
+                              .map(([key]) => snakeToSpaced(key))
+                              .join(', ') || 'None'
+                        : 'N/A'}
+                </p>
+                <p className='indent-3'>
+                    Scoring Method: {teamPitData?.scoringMethod}
+                </p>
+                <p className='indent-3'>
+                    Preferred Spot: {teamPitData?.preferredScoringSpot}
+                </p>
+                <p className='indent-3'>
+                    Tower Capability: {teamPitData?.towerCapabilityClaimed}
+                </p>
+                <p className='indent-3'>Notes: {teamPitData?.notes}</p>
 
 
                 {/* <p className='text-lg font-semibold text-green-800 pt-2'>More Info</p> */}

@@ -1,71 +1,75 @@
-export type ClimbPosition = 'level-1'| 'level-2' | 'level-3' | 'none' | 'failed';
-export type teamRoles = 'scoring' | 'defense' | 'support' | 'all-round';
-export type drivebase = 'tank' | 'swerve' | 'MECANUM' | 'other';
+export type AllianceColor = 'red' | 'blue';
 
 export type RobotPosition =
     | 'red_1'
     | 'red_2'
     | 'red_3'
+    | 'red_4'
     | 'blue_1'
     | 'blue_2'
-    | 'blue_3';
-export type Foul =
-    | 'insideRobot'
-    | 'protectedZone'
-    | 'pinning'
-    | 'other';
-export type Break = 'mechanismDmg' | 'batteryFall' | 'commsFail' | 'bumperFall';
-export type DefenseRank = 'fullDef' | 'someDef' | 'noDef';
-export type CommentValues =
-    | 'great_driving'
-    | 'good_driving'
-    | 'outpost_only'
-    | 'clogging'
-    | 'effective_defense'
-    | 'okay_defense'
-    | 'ineffective_defense'
-    | 'sturdy_build'
-    | 'weak_build'
-    | 'avoids_under_trench';
-
-
-interface capabilities {
-}
-
-
-interface preference {
-}
+    | 'blue_3'
+    | 'blue_4';
 
 export type SuperPosition = 'red_ss' | 'blue_ss';
-// export type ScoringLocation = 'A' | 'B';
-
 export type ScouterPosition = 'red_right' | 'blue_right';
 
-export interface MatchDataAggregations {
-    _id: { teamNumber: number};
+export type MatchSegmentId =
+    | 'auto'
+    | 'transition'
+    | 'shift1'
+    | 'shift2'
+    | 'shift3'
+    | 'shift4'
+    | 'endgame';
+
+export type TeleSegmentId =
+    | 'transition'
+    | 'shift1'
+    | 'shift2'
+    | 'shift3'
+    | 'shift4'
+    | 'endgame';
+
+export interface GameSegment {
+    id: MatchSegmentId;
+    label: string;
+    startSec: number;
+    endSec: number;
 }
 
-export interface matchOutliersAggregation {
-    _id: { teamNumber: number };
-}
-
-export interface SuperDataAggregations {
-    _id: { teamNumber: number };
-    avgFouls: number;
-    maxFouls: number;
-    humanAccuracy: number;
-}
-
-export interface SuperFoulAggregationsData{
-    _id: { teamNumber: number, matchNumber: number };
-    totalInsideRobot: number;
-    totalProtectedZone: number;
-    totalPinning: number;
-    totalOther: number;
-}
-
-export interface MatchIndividualDataAggregations {
-    _id: { teamNumber: number, matchNumber: number, robotPosition: RobotPosition };
+export interface GameConfig2026 {
+    season: 2026;
+    game: 'REBUILT';
+    matchDurationSec: number;
+    segments: GameSegment[];
+    hubRule: {
+        bothActiveSegments: MatchSegmentId[];
+        shiftOrder: MatchSegmentId[];
+        firstShiftDependsOnAutoWinner: boolean;
+        alternateEachShift: boolean;
+    };
+    scoring: {
+        fuelPointsActive: number;
+        towerAuto: {
+            level1: number;
+            maxRobots: number;
+        };
+        towerTele: {
+            level1: number;
+            level2: number;
+            level3: number;
+        };
+        rpThresholds: {
+            energized: number;
+            supercharged: number;
+            traversal: number;
+            allowOverride: boolean;
+        };
+    };
+    allianceSizeRobots: {
+        default: number;
+        allowed: number[];
+    };
 }
 
 export interface MetaData {
@@ -75,54 +79,186 @@ export interface MetaData {
     robotPosition: RobotPosition;
 }
 
-interface StartingZone {
-    start1: boolean;
-    start2: boolean;
-    start3: boolean;
+export type AutoStartingPosition = 'left' | 'center' | 'right';
+export type AutoTowerResult = 'none' | 'level1' | 'failed';
+export type TeleTowerResult = 'none' | 'level1' | 'level2' | 'level3' | 'failed';
+export type AutoFuelWinner = AllianceColor | 'tie' | 'unknown';
+
+export interface TeleFuelBySegment {
+    transition: number;
+    shift1: number;
+    shift2: number;
+    shift3: number;
+    shift4: number;
+    endgame: number;
 }
 
+export type BreakdownType =
+    | 'none'
+    | 'stuck'
+    | 'tipped'
+    | 'comms'
+    | 'mechanism'
+    | 'other';
 
-// - `POST` `/data/match`
+export type DriverQuality = 'great' | 'good' | 'ok' | 'rough';
 
 export interface MatchData {
     metadata: MetaData;
-    // No competition info
-    startingZone: StartingZone;
+    robotAbsent: boolean;
+    autoStartingPosition: AutoStartingPosition | null;
+    autoMoved: boolean;
+    autoFuelScored: number;
+    autoTower: AutoTowerResult;
+    autoFuelWinner: AutoFuelWinner;
+    shift1ActiveHubIfTie: AllianceColor | null;
+    teleFuelBySegment: TeleFuelBySegment;
+    teleTower: TeleTowerResult;
+    climbTimeBucket: 'early' | 'mid' | 'late' | null;
+    breakdown: BreakdownType;
+    driverQuality: DriverQuality;
+    freeText: string;
 }
 
-// - `POST` `/data/super`
+export type DefenseProvided = 'none' | 'some' | 'heavy';
+
+export interface SuperFouls {
+    pinning: number;
+    towerContactInEndgame: number;
+    outOfZoneShooting: number;
+    ejectedFuel: number;
+    other: number;
+}
+
+export interface SuperBreaks {
+    mechanism: number;
+    battery: number;
+    comms: number;
+    bumper: number;
+}
+
+export type CommentValues =
+    | 'great_driving'
+    | 'good_driving'
+    | 'ok_driving'
+    | 'rough_driving'
+    | 'fast_cycles'
+    | 'drops_fuel'
+    | 'accurate_shots'
+    | 'inaccurate_shots'
+    | 'aggressive_defense'
+    | 'smart_defense'
+    | 'defense_liability'
+    | 'fast_climb'
+    | 'slow_climb'
+    | 'no_climb';
 
 export interface SuperData {
     metadata: MetaData;
-    fouls: Record<Foul, number>;
-    break: Record<Break, number>;
-    defense: DefenseRank;
-    defended: boolean;
+    defenseProvided: DefenseProvided;
+    defenseReceived: boolean;
+    fouls: SuperFouls;
+    breaks: SuperBreaks;
     comments: CommentValues[];
+    humanPlayerFuelScored: number;
 }
 
-// - `POST` `/data/pits`
-// `<form>` files?
-
-export interface ScouterData {
-    scouterName: string;
-    accuracy: number;
-    
-}
-// find me
+export type Drivebase = 'tank' | 'swerve' | 'other';
+export type ScoringMethod = 'dump' | 'low-shot' | 'high-shot' | 'other';
+export type PreferredScoringSpot = 'nearHub' | 'backOfZone' | 'varies';
+export type TowerCapabilityClaimed =
+    | 'level1'
+    | 'level2'
+    | 'level3'
+    | 'unknown';
 
 export interface PitFile {
     scouterName: string;
     teamNumber: number;
-    pitBatteryCount: number;
-    comments: string;
+    drivebase: Drivebase;
+    maxFuelStorageEstimate: number | null;
+    intakeSources: {
+        depot: boolean;
+        outpostCorral: boolean;
+        floorNeutral: boolean;
+    };
+    scoringMethod: ScoringMethod;
+    preferredScoringSpot: PreferredScoringSpot;
+    towerCapabilityClaimed: TowerCapabilityClaimed;
+    batteryCount: number;
     photo: string;
+    notes: string;
 }
 
 export type PitResult = Partial<Record<number, Omit<PitFile, 'photo'>>>;
 
-// - `WebSocket` `/status/report`
-// client -> server
+export interface ScouterData {
+    scouterName: string;
+    accuracy: number;
+}
+
+export interface MatchDataAggregations {
+    _id: { teamNumber: number };
+    avgAutoFuel: number;
+    avgTeleFuelTransition: number;
+    avgTeleFuelShift1: number;
+    avgTeleFuelShift2: number;
+    avgTeleFuelShift3: number;
+    avgTeleFuelShift4: number;
+    avgTeleFuelEndgame: number;
+    avgTeleFuelActiveComputed: number;
+    avgTeleFuelWastedComputed: number;
+    climbRateLevel1: number;
+    climbRateLevel2: number;
+    climbRateLevel3: number;
+    climbFailRate: number;
+    breakdownRate: number;
+    matchCount: number;
+}
+
+export interface MatchIndividualDataAggregations {
+    _id: { teamNumber: number; matchNumber: number; robotPosition: RobotPosition };
+    robotAbsent: boolean;
+    autoFuelScored: number;
+    autoFuelWinner: AutoFuelWinner;
+    shift1ActiveHubIfTie: AllianceColor | null;
+    teleFuelBySegment: TeleFuelBySegment;
+    teleFuelActiveComputed: number;
+    teleFuelWastedComputed: number;
+    autoTower: AutoTowerResult;
+    teleTower: TeleTowerResult;
+    breakdown: BreakdownType;
+    driverQuality: DriverQuality;
+}
+
+export interface SuperDataAggregations {
+    _id: { teamNumber: number };
+    avgFoulsTotal: number;
+    foulRatePinning: number;
+    foulRateTowerContactInEndgame: number;
+    foulRateOutOfZoneShooting: number;
+    foulRateEjectedFuel: number;
+    foulRateOther: number;
+    avgHumanPlayerFuelScored: number;
+    defenseHeavyRate: number;
+    defenseSomeRate: number;
+    defenseReceivedRate: number;
+    matchCount: number;
+    commentCounts: Partial<Record<CommentValues, number>>;
+}
+
+export interface SuperFoulAggregationsData {
+    _id: { teamNumber: number; matchNumber: number };
+    pinning: number;
+    towerContactInEndgame: number;
+    outOfZoneShooting: number;
+    ejectedFuel: number;
+    other: number;
+}
+
+export interface matchOutliersAggregation {
+    _id: { teamNumber: number };
+}
 
 export interface StatusReport {
     robotPosition: RobotPosition | SuperPosition | undefined;
@@ -131,9 +267,6 @@ export interface StatusReport {
     battery: number | undefined;
 }
 
-// - `WebSocket` `/status/recieve`
-// server -> client
-
 export interface StatusRecieve {
     scouters: StatusReport[];
     matches: MatchStatus;
@@ -141,12 +274,14 @@ export interface StatusRecieve {
 
 export type MatchStatus = Record<
     number,
-    Record<RobotPosition, { schedule: number; real: number[] }> &
+    Record<RobotPosition, { schedule: number | undefined; real: number[] }> &
         Record<SuperPosition, boolean>
 >;
-// - `GET` `/data/schedule.json`
 
-export type MatchSchedule = Record<number, Record<RobotPosition, number>>;
+export type MatchSchedule = Record<
+    number,
+    Partial<Record<RobotPosition, number>>
+>;
 
 export interface TeamInfo {
     address: null;
