@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useState } from 'react';
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from 'react';
 import LinkButton from '../../components/LinkButton';
 import { MaterialSymbol } from 'react-material-symbols';
 import { gameConfig } from '../../lib/gameConfig';
@@ -16,13 +16,79 @@ function Counter({
     min?: number;
     max?: number;
 }) {
+    const holdTimeoutRef = useRef<number | null>(null);
+    const holdIntervalRef = useRef<number | null>(null);
+    const ignoreClickRef = useRef(false);
+
+    useEffect(() => {
+        return () => {
+            if (holdTimeoutRef.current !== null) {
+                window.clearTimeout(holdTimeoutRef.current);
+            }
+            if (holdIntervalRef.current !== null) {
+                window.clearInterval(holdIntervalRef.current);
+            }
+        };
+    }, []);
+
+    const clampValue = (next: number) => {
+        const clamped = Math.max(min, next);
+        return max != undefined ? Math.min(max, clamped) : clamped;
+    };
+
+    const applyDelta = (delta: number) => {
+        onChange(prev => clampValue(prev + delta));
+    };
+
+    const clearHoldTimers = () => {
+        if (holdTimeoutRef.current !== null) {
+            window.clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = null;
+        }
+        if (holdIntervalRef.current !== null) {
+            window.clearInterval(holdIntervalRef.current);
+            holdIntervalRef.current = null;
+        }
+    };
+
+    const startHold = (delta: number) => {
+        ignoreClickRef.current = true;
+        applyDelta(delta);
+        clearHoldTimers();
+        holdTimeoutRef.current = window.setTimeout(() => {
+            holdIntervalRef.current = window.setInterval(() => {
+                applyDelta(delta);
+            }, 70);
+        }, 300);
+    };
+
+    const stopHold = () => {
+        clearHoldTimers();
+        window.setTimeout(() => {
+            ignoreClickRef.current = false;
+        }, 0);
+    };
+
+    const handleClick = (delta: number) => {
+        if (ignoreClickRef.current) {
+            ignoreClickRef.current = false;
+            return;
+        }
+        applyDelta(delta);
+    };
+
     return (
         <div className='flex flex-col items-center gap-2 rounded-lg bg-[#2f3646] p-4'>
             <p className='text-sm text-gray-200'>{label}</p>
             <div className='flex items-center gap-2'>
                 <button
                     className='rounded bg-red-400 px-4 py-2 text-lg text-white'
-                    onClick={() => onChange(Math.max(min, value - 1))}>
+                    type='button'
+                    onPointerDown={() => startHold(-1)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onClick={() => handleClick(-1)}>
                     -
                 </button>
                 <div className='min-w-[50px] text-center text-2xl font-bold text-white'>
@@ -30,10 +96,12 @@ function Counter({
                 </div>
                 <button
                     className='rounded bg-[#48c55c] px-4 py-2 text-lg text-black'
-                    onClick={() => {
-                        const next = value + 1;
-                        onChange(max != undefined ? Math.min(max, next) : next);
-                    }}>
+                    type='button'
+                    onPointerDown={() => startHold(1)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onClick={() => handleClick(1)}>
                     +
                 </button>
             </div>
