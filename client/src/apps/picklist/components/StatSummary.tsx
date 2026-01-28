@@ -20,10 +20,24 @@ function StatSummary({
     ]);
     const sortedEntries = entries.sort((a, b) => a[1] - b[1]);
 
+    if (!sortedEntries.length) {
+        return <p>No data available for this metric.</p>;
+    }
+
     const sortedEntryTeamNumbers = sortedEntries.map(entry =>
         entry[0].toString()
     );
     const sortedEntryDataPoints = sortedEntries.map(entry => entry[1]);
+
+    const mean =
+        sortedEntryDataPoints.reduce((sum, value) => sum + value, 0) /
+        sortedEntryDataPoints.length;
+    const variance =
+        sortedEntryDataPoints.reduce(
+            (sum, value) => sum + (value - mean) ** 2,
+            0
+        ) / sortedEntryDataPoints.length;
+    const standardDeviation = Math.sqrt(variance);
 
     // Create a list of the avatar data for each team based on the base64 images stored under the key 'avatar' in the team_info.json file
     const lowTeamNumber = sortedEntryTeamNumbers[0];
@@ -52,30 +66,10 @@ function StatSummary({
             <br />
 
             <div className='flex space-x-4'>
-                <p>
-                    Mean:{' '}
-                    {(
-                        sortedEntryDataPoints.reduce((a, b) => a + b, 0) /
-                        sortedEntryDataPoints.length
-                    ).toFixed(3)}
-                </p>
-                <p>
-                    Standard Deviation:{' '}
-                    {Math.sqrt(
-                        sortedEntryDataPoints.reduce(
-                            (a, b) =>
-                                a +
-                                (b -
-                                    sortedEntryDataPoints.reduce(
-                                        (a, b) => a + b,
-                                        0
-                                    ) /
-                                        sortedEntryDataPoints.length) **
-                                    2,
-                            0
-                        ) / sortedEntryDataPoints.length
-                    ).toFixed(3)}
-                </p>
+                <p>Mean: {mean.toFixed(3)}</p>
+                <p>Standard Deviation: {standardDeviation.toFixed(3)}</p>
+                <p>Min: {sortedEntryDataPoints[0]}</p>
+                <p>Max: {sortedEntryDataPoints[sortedEntryDataPoints.length - 1]}</p>
             </div>
 
             <br />

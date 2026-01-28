@@ -30,12 +30,16 @@ function BarGraphDialog({
 
     const handleSubmit = () => {
         if (column) {
+            const parsedTop = Number.parseInt(top, 10);
             onSubmit({
                 title: title || camelToSpaced(column || ''),
                 column,
                 ascending,
                 type: 'BarGraph',
-                top: parseInt(top),
+                top:
+                    showAll || !Number.isFinite(parsedTop)
+                        ? undefined
+                        : parsedTop,
             });
             onClose?.();
         }

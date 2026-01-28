@@ -22,19 +22,16 @@ function TeamItem({
         });
     }
 
+    const avatar = teamInfoJson[teamNumber]?.avatar;
+
     return (
         <>
-            {teamInfoJson[teamNumber] && (
-                <td>
-                    <img
-                        src={
-                            teamInfoJson[teamNumber]?.avatar
-                                ? `data:image/png;base64,${teamInfoJson[teamNumber]?.avatar}`
-                                : blankImage
-                        }
-                    />
-                </td>
-            )}
+            <td>
+                <img
+                    src={avatar ? `data:image/png;base64,${avatar}` : blankImage}
+                    alt=''
+                />
+            </td>
             <td>
                 {teamNumber}
                 {

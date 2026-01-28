@@ -19,7 +19,7 @@ export interface StatTableData extends TabBase {
 export interface BarGraphData extends TabBase {
     column: string;
     ascending: boolean;
-    top: number;
+    top?: number;
     type: 'BarGraph';
 }
 

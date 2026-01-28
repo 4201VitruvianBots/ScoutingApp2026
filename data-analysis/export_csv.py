@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import statistics
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -31,6 +32,97 @@ COMMENT_VALUES = [
     "slow_climb",
     "no_climb",
 ]
+
+ID_FIELDS = {"teamNumber", "matchNumber", "robotTeam"}
+
+
+def to_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return 1.0 if value else 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def summarize_rows(
+    rows: List[Dict[str, Any]],
+    dataset: str,
+    exclude: set[str] | None = None,
+) -> List[Dict[str, Any]]:
+    exclude = exclude or set()
+    keys = sorted(
+        {
+            key
+            for row in rows
+            for key, value in row.items()
+            if to_number(value) is not None and key not in exclude
+        }
+    )
+
+    summary: List[Dict[str, Any]] = []
+    for key in keys:
+        values = [
+            to_number(row.get(key))
+            for row in rows
+            if to_number(row.get(key)) is not None
+        ]
+        if not values:
+            continue
+        mean_value = sum(values) / len(values)
+        summary.append(
+            {
+                "dataset": dataset,
+                "metric": key,
+                "count": len(values),
+                "mean": mean_value,
+                "min": min(values),
+                "max": max(values),
+                "stdev": statistics.pstdev(values) if len(values) > 1 else 0.0,
+            }
+        )
+
+    return summary
+
+
+def clamp(value: float, min_value: float, max_value: float) -> float:
+    return max(min_value, min(max_value, value))
+
+
+def safe_div(value: float, count: float) -> float:
+    return value / count if count else 0.0
+
+
+def add_custom_metrics(row: Dict[str, Any]) -> None:
+    tele_total = sum(
+        [
+            row.get("avgTeleFuelTransition", 0) or 0,
+            row.get("avgTeleFuelShift1", 0) or 0,
+            row.get("avgTeleFuelShift2", 0) or 0,
+            row.get("avgTeleFuelShift3", 0) or 0,
+            row.get("avgTeleFuelShift4", 0) or 0,
+            row.get("avgTeleFuelEndgame", 0) or 0,
+        ]
+    )
+    auto_fuel = row.get("avgAutoFuel", 0) or 0
+    active = row.get("avgTeleFuelActiveComputed", 0) or 0
+    wasted = row.get("avgTeleFuelWastedComputed", 0) or 0
+    fouls = row.get("avgFoulsTotal", 0) or 0
+
+    row["avgTeleFuelTotal"] = tele_total
+    row["avgFuelTotal"] = auto_fuel + tele_total
+    row["teleFuelActiveRate"] = safe_div(active, tele_total)
+    row["teleFuelEfficiency"] = safe_div(active, active + wasted)
+    row["climbSuccessRate"] = clamp(1 - (row.get("climbFailRate", 0) or 0), 0, 1)
+    row["climbLevel2PlusRate"] = (
+        (row.get("climbRateLevel2", 0) or 0)
+        + (row.get("climbRateLevel3", 0) or 0)
+    )
+    row["defenseAggressionScore"] = (
+        (row.get("defenseHeavyRate", 0) or 0) * 2
+        + (row.get("defenseSomeRate", 0) or 0)
+    )
+    row["reliabilityScore"] = clamp(1 - (row.get("breakdownRate", 0) or 0), 0, 1)
+    row["disciplineScore"] = clamp(1 - safe_div(fouls, 6), 0, 1)
 
 
 def get_alliance(robot_position: str) -> str:
@@ -336,6 +428,7 @@ def main() -> None:
             ),
             "superMatchCount": super_count,
         }
+        add_custom_metrics(row)
         comment_counts = super_team.get("commentCounts", {})
         for comment in COMMENT_VALUES:
             row[f"comment_{comment}"] = comment_counts.get(comment, 0)
@@ -415,11 +508,18 @@ def main() -> None:
         "avgTeleFuelEndgame",
         "avgTeleFuelActiveComputed",
         "avgTeleFuelWastedComputed",
+        "avgTeleFuelTotal",
+        "avgFuelTotal",
+        "teleFuelActiveRate",
+        "teleFuelEfficiency",
         "climbRateLevel1",
         "climbRateLevel2",
         "climbRateLevel3",
         "climbFailRate",
+        "climbSuccessRate",
+        "climbLevel2PlusRate",
         "breakdownRate",
+        "reliabilityScore",
         "matchCount",
         "avgFoulsTotal",
         "foulRatePinning",
@@ -431,6 +531,8 @@ def main() -> None:
         "defenseHeavyRate",
         "defenseSomeRate",
         "defenseReceivedRate",
+        "defenseAggressionScore",
+        "disciplineScore",
         "superMatchCount",
     ] + [f"comment_{comment}" for comment in COMMENT_VALUES]
 
@@ -439,7 +541,22 @@ def main() -> None:
     write_csv(ROOT / "data-analysis" / "pit_2026.csv", pit_rows, pit_fields)
     write_csv(ROOT / "data-analysis" / "team_agg_2026.csv", team_rows, team_fields)
 
-    print("Wrote match_raw_2026.csv, super_raw_2026.csv, pit_2026.csv, team_agg_2026.csv")
+    summary_rows: List[Dict[str, Any]] = []
+    summary_rows += summarize_rows(match_rows, "match", ID_FIELDS)
+    summary_rows += summarize_rows(super_rows, "super", ID_FIELDS)
+    summary_rows += summarize_rows(pit_rows, "pit", ID_FIELDS)
+    summary_rows += summarize_rows(team_rows, "team", {"teamNumber"})
+
+    summary_fields = ["dataset", "metric", "count", "mean", "min", "max", "stdev"]
+    write_csv(
+        ROOT / "data-analysis" / "metric_summary_2026.csv",
+        summary_rows,
+        summary_fields,
+    )
+
+    print(
+        "Wrote match_raw_2026.csv, super_raw_2026.csv, pit_2026.csv, team_agg_2026.csv, metric_summary_2026.csv"
+    )
 
 
 if __name__ == "__main__":
