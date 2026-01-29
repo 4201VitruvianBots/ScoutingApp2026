@@ -25,6 +25,7 @@ import { usePreventUnload } from '../../lib/usePreventUnload';
 import MultiButton from '../../components/MultiButton';
 import Checkbox from '../../components/Checkbox';
 import TextInput from '../../components/TextInput';
+import HoldButton from '../../components/HoldButton';
 import {
     formatMatchTime,
     gameConfig,
@@ -117,6 +118,8 @@ function MatchApp() {
     const fuelHistory = useRef<{ segment: 'auto' | TeleSegmentId; amount: number }[]>(
         []
     );
+    const sectionClass =
+        'rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20';
 
     const currentSegment = getSegmentForRemaining(remainingSec);
     const activeSegment = isRunning ? currentSegment : manualSegment;
@@ -278,8 +281,8 @@ function MatchApp() {
     };
 
     return (
-        <div className='min-h-screen bg-[#171c26] pb-10 text-white'>
-            <main className='mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 pb-12 pt-8'>
+        <div className='min-h-screen bg-gradient-to-b from-[#171c26] via-[#161b22] to-[#12151d] pb-10 text-white'>
+            <main className='mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 pb-16 pt-8'>
                 {showCheck && (
                     <MaterialSymbol
                         icon='check'
@@ -287,10 +290,10 @@ function MatchApp() {
                         fill
                         grade={200}
                         color='#48c55c'
-                        className='fixed right-6 top-6'
+                        className='fixed right-6 top-6 drop-shadow-[0_0_12px_rgba(72,197,92,0.5)]'
                     />
                 )}
-                <div className='flex items-center justify-between'>
+                <div className='flex flex-wrap items-center justify-between gap-4'>
                     <div className='flex items-center gap-3'>
                         <LinkButton link='/' className='snap-none'>
                             <MaterialSymbol
@@ -331,7 +334,7 @@ function MatchApp() {
                         </Dialog>
                         <button
                             onClick={handleUndoFuel}
-                            className='rounded bg-[#f07800] px-3 py-2 text-black'>
+                            className='rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]'>
                             <MaterialSymbol
                                 icon='undo'
                                 size={32}
@@ -352,7 +355,7 @@ function MatchApp() {
                     </div>
                 </div>
 
-                <section className='rounded-xl bg-[#2f3646] p-4'>
+                <section className={sectionClass}>
                     <div className='flex flex-wrap items-center justify-between gap-4'>
                         <div>
                             <p className='text-sm uppercase text-gray-300'>
@@ -378,12 +381,12 @@ function MatchApp() {
                                     setManualSegment('auto');
                                     previousSegment.current = 'auto';
                                 }}
-                                className='rounded bg-[#48c55c] px-4 py-2 font-semibold text-black'>
+                                className='rounded-lg bg-[#48c55c] px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                                 Start Match
                             </button>
                             <button
                                 onClick={() => setIsRunning(false)}
-                                className='rounded bg-gray-500 px-4 py-2 font-semibold text-white'>
+                                className='rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition hover:bg-gray-500 active:scale-[0.98]'>
                                 Pause
                             </button>
                             <button
@@ -392,7 +395,7 @@ function MatchApp() {
                                     setRemainingSec(gameConfig.matchDurationSec);
                                     setManualSegment('auto');
                                 }}
-                                className='rounded border border-gray-400 px-4 py-2 font-semibold text-white'>
+                                className='rounded-lg border border-white/20 px-4 py-2 font-semibold text-white transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
                                 Reset Timer
                             </button>
                         </div>
@@ -412,93 +415,127 @@ function MatchApp() {
                                 }}
                                 className={`rounded-full px-3 py-1 text-sm ${
                                     activeSegment === segment.id
-                                        ? 'bg-[#48c55c] text-black'
-                                        : 'bg-gray-700 text-gray-200'
-                                }`}>
+                                        ? 'bg-[#48c55c] text-black shadow shadow-black/30'
+                                        : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                } font-medium transition`}
+                            >
                                 {segment.label}
                             </button>
                         ))}
                     </div>
                 </section>
 
-                <section className='grid gap-4 rounded-xl bg-[#2f3646] p-4 sm:grid-cols-2'>
+                <section className={`${sectionClass} grid gap-4 sm:grid-cols-2`}>
                     <div>
                         <p className='text-sm uppercase text-gray-300'>
                             Match Number
                         </p>
-                        <NumberInput onChange={setMatchNumber} value={matchNumber} />
+                        <NumberInput
+                            onChange={setMatchNumber}
+                            value={matchNumber}
+                            className='mt-2 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
+                        />
                     </div>
                     <div>
                         <p className='text-sm uppercase text-gray-300'>
                             Team Number
                         </p>
-                        <TeamDropdown onChange={setTeamNumber} value={teamNumber} />
+                        <div className='mt-2'>
+                            <TeamDropdown
+                                onChange={setTeamNumber}
+                                value={teamNumber}
+                            />
+                        </div>
                     </div>
                     <div className='sm:col-span-2'>
                         <button
                             onClick={handleAbsentRobot}
-                            className='rounded bg-green-500 px-3 py-2 font-semibold text-black'>
+                            className='rounded-lg bg-green-500 px-3 py-2 font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
                             Robot Absent
                         </button>
                     </div>
                 </section>
 
-                <section className='rounded-xl bg-[#2f3646] p-4'>
+                <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>Fuel</h2>
                     <p className='text-sm text-gray-300'>
                         Tap to add fuel to the active segment. (Auto adds to
                         Auto fuel; Tele adds by segment.)
                     </p>
                     <div className='mt-3 flex flex-wrap gap-3'>
-                        <button
-                            onClick={() => handleFuelAdd(1)}
-                            className='rounded bg-[#48c55c] px-6 py-3 text-lg font-bold text-black'>
+                        <HoldButton
+                            onHold={() => handleFuelAdd(1)}
+                            ariaLabel='Add 1 fuel'
+                            className='rounded-lg bg-[#48c55c] px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                             +1
-                        </button>
-                        <button
-                            onClick={() => handleFuelAdd(5)}
-                            className='rounded bg-gray-700 px-6 py-3 text-lg font-bold text-white'>
+                        </HoldButton>
+                        <HoldButton
+                            onHold={() => handleFuelAdd(5)}
+                            ariaLabel='Add 5 fuel'
+                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
                             +5
-                        </button>
-                        <button
-                            onClick={() => handleFuelAdd(10)}
-                            className='rounded bg-gray-700 px-6 py-3 text-lg font-bold text-white'>
+                        </HoldButton>
+                        <HoldButton
+                            onHold={() => handleFuelAdd(10)}
+                            ariaLabel='Add 10 fuel'
+                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
                             +10
-                        </button>
+                        </HoldButton>
                     </div>
                     <div className='mt-4 grid gap-2 text-sm text-gray-200 sm:grid-cols-2'>
                         <div>
-                            Auto Fuel: <span className='font-semibold'>{autoFuelScored}</span>
+                            Auto Fuel:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {autoFuelScored}
+                            </span>
                         </div>
                         <div>
-                            Transition: <span className='font-semibold'>{teleFuelBySegment.transition}</span>
+                            Transition:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {teleFuelBySegment.transition}
+                            </span>
                         </div>
                         <div>
-                            Shift 1: <span className='font-semibold'>{teleFuelBySegment.shift1}</span>
+                            Shift 1:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {teleFuelBySegment.shift1}
+                            </span>
                         </div>
                         <div>
-                            Shift 2: <span className='font-semibold'>{teleFuelBySegment.shift2}</span>
+                            Shift 2:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {teleFuelBySegment.shift2}
+                            </span>
                         </div>
                         <div>
-                            Shift 3: <span className='font-semibold'>{teleFuelBySegment.shift3}</span>
+                            Shift 3:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {teleFuelBySegment.shift3}
+                            </span>
                         </div>
                         <div>
-                            Shift 4: <span className='font-semibold'>{teleFuelBySegment.shift4}</span>
+                            Shift 4:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {teleFuelBySegment.shift4}
+                            </span>
                         </div>
                         <div>
-                            Endgame: <span className='font-semibold'>{teleFuelBySegment.endgame}</span>
+                            Endgame:{' '}
+                            <span className='font-semibold tabular-nums'>
+                                {teleFuelBySegment.endgame}
+                            </span>
                         </div>
                     </div>
                 </section>
 
-                <section className='rounded-xl bg-[#2f3646] p-4'>
+                <section className={sectionClass}>
                     <div className='flex flex-wrap items-center justify-between gap-4'>
                         <h2 className='text-xl font-semibold text-[#48c55c]'>
                             AUTO
                         </h2>
                         <button
                             onClick={handleAutoEnd}
-                            className='rounded border border-gray-500 px-3 py-2 text-sm'>
+                            className='rounded-lg border border-white/20 px-3 py-2 text-sm transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
                             AUTO End
                         </button>
                     </div>
@@ -544,7 +581,7 @@ function MatchApp() {
                             </div>
                         </div>
                     </div>
-                    <div className='mt-4 flex items-center gap-3 text-sm text-gray-300'>
+                    <div className='mt-4 flex flex-wrap items-center gap-3 text-sm text-gray-300'>
                         <span>
                             Auto Fuel Winner:{' '}
                             <span className='font-semibold text-white'>
@@ -553,13 +590,13 @@ function MatchApp() {
                         </span>
                         <button
                             onClick={() => setShowAutoWinnerPrompt(true)}
-                            className='rounded border border-gray-500 px-2 py-1 text-xs'>
+                            className='rounded-lg border border-white/20 px-2 py-1 text-xs transition hover:border-white/40 hover:bg-white/5'>
                             Edit
                         </button>
                     </div>
 
                     {showAutoWinnerPrompt && (
-                        <div className='mt-6 rounded-lg border border-[#48c55c] p-4'>
+                        <div className='mt-6 rounded-lg border border-[#48c55c] bg-[#1f2432] p-4 shadow-lg shadow-black/20'>
                             <p className='text-sm text-gray-300'>
                                 Who won AUTO fuel?
                             </p>
@@ -590,8 +627,8 @@ function MatchApp() {
 
                 {autoFuelWinner === 'tie' && (
                     <section
-                        className={`rounded-xl bg-[#2f3646] p-4 ${
-                            showShift1Prompt ? 'border border-[#48c55c]' : ''
+                        className={`${sectionClass} ${
+                            showShift1Prompt ? 'ring-2 ring-[#48c55c]/60' : ''
                         }`}>
                         <p className='text-sm text-gray-300'>
                             Tie in AUTO: Which HUB is active in Shift 1?
@@ -615,7 +652,7 @@ function MatchApp() {
                     </section>
                 )}
 
-                <section className='rounded-xl bg-[#2f3646] p-4'>
+                <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>
                         TELEOP / ENDGAME
                     </h2>
@@ -686,31 +723,33 @@ function MatchApp() {
                     </div>
                 </section>
 
-                <section className='rounded-xl bg-[#2f3646] p-4'>
+                <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>
                         Notes
                     </h2>
                     <TextInput
-                        className='w-full text-black'
+                        className='mt-2 w-full rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                         value={freeText}
                         onChange={setFreeText}
                         placeholder='Short notes...'
                     />
                 </section>
 
-                <section className='flex flex-col gap-3 rounded-xl bg-[#2f3646] p-4'>
+                <section className={`${sectionClass} flex flex-col gap-3`}>
                     <button
                         onClick={() => {
                             handleSubmit();
                             scrollTo(0, 0);
                         }}
-                        className='rounded bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black'>
+                        className='rounded-lg bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                         Submit
                     </button>
-                    <div className='text-sm text-gray-300'>Queue: {queue.length}</div>
+                    <div className='text-sm text-gray-300'>
+                        Queue: <span className='font-semibold text-white'>{queue.length}</span>
+                    </div>
                     <button
                         onClick={sendAll}
-                        className='rounded bg-amber-500 px-4 py-2 text-sm font-semibold text-black'>
+                        className='rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
                         {sending ? 'Sending...' : 'Resend All'}
                     </button>
                 </section>

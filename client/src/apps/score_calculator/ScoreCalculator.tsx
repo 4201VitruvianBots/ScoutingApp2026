@@ -78,12 +78,13 @@ function Counter({
     };
 
     return (
-        <div className='flex flex-col items-center gap-2 rounded-lg bg-[#2f3646] p-4'>
+        <div className='flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>
             <p className='text-sm text-gray-200'>{label}</p>
             <div className='flex items-center gap-2'>
                 <button
-                    className='rounded bg-red-400 px-4 py-2 text-lg text-white'
                     type='button'
+                    aria-label={`Decrease ${label}`}
+                    className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
                     onPointerDown={() => startHold(-1)}
                     onPointerUp={stopHold}
                     onPointerLeave={stopHold}
@@ -91,12 +92,13 @@ function Counter({
                     onClick={() => handleClick(-1)}>
                     -
                 </button>
-                <div className='min-w-[50px] text-center text-2xl font-bold text-white'>
+                <div className='min-w-[50px] text-center text-2xl font-bold text-white tabular-nums'>
                     {value}
                 </div>
                 <button
-                    className='rounded bg-[#48c55c] px-4 py-2 text-lg text-black'
                     type='button'
+                    aria-label={`Increase ${label}`}
+                    className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
                     onPointerDown={() => startHold(1)}
                     onPointerUp={stopHold}
                     onPointerLeave={stopHold}
@@ -139,6 +141,8 @@ function ScoreCalculator() {
     const energized = totalScore >= rpThresholds.energized;
     const supercharged = totalScore >= rpThresholds.supercharged;
     const traversal = totalScore >= rpThresholds.traversal;
+    const sectionClass =
+        'rounded-xl border border-white/10 bg-[#2f3646] p-6 shadow-lg shadow-black/20';
 
     const resetAll = () => {
         setAutoFuelActive(0);
@@ -152,22 +156,28 @@ function ScoreCalculator() {
     };
 
     return (
-        <div className='min-h-screen bg-[#171c26] text-white'>
-            <div className='flex items-center justify-between bg-[#2f3646] px-6 py-4'>
+        <div className='min-h-screen bg-gradient-to-b from-[#171c26] via-[#161b22] to-[#12151d] text-white'>
+            <div className='sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#1f2432]/90 px-6 py-4 backdrop-blur'>
                 <LinkButton link='/' className='flex items-center'>
-                    <MaterialSymbol icon='home' size={40} fill grade={200} color='white' />
+                    <MaterialSymbol
+                        icon='home'
+                        size={40}
+                        fill
+                        grade={200}
+                        color='white'
+                    />
                 </LinkButton>
                 <h1 className='text-2xl font-bold text-[#48c55c]'>
                     Score Calculator
                 </h1>
                 <button
                     onClick={resetAll}
-                    className='rounded bg-gray-600 px-4 py-2 text-sm text-white'>
+                    className='rounded-lg bg-gray-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
                     Reset
                 </button>
             </div>
 
-            <div className='mx-auto grid w-full max-w-5xl gap-6 px-6 py-8'>
+            <div className='mx-auto grid w-full max-w-5xl gap-8 px-6 py-8'>
                 <section>
                     <h2 className='mb-3 text-xl font-semibold text-[#48c55c]'>
                         AUTO
@@ -233,37 +243,77 @@ function ScoreCalculator() {
                     </div>
                 </section>
 
-                <section className='rounded-lg bg-[#2f3646] p-6'>
+                <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>
                         Totals
                     </h2>
                     <div className='mt-3 grid gap-2 text-sm text-gray-200'>
-                        <p>Auto Fuel Points: {autoFuelScore}</p>
-                        <p>Auto Tower Points: {autoTowerScore}</p>
-                        <p>Tele Fuel Points: {teleFuelScore}</p>
-                        <p>Tele Tower Points: {teleTowerScore}</p>
-                        <p>Foul Points: {foulScore}</p>
-                        <p className='mt-2 text-lg font-semibold text-white'>
-                            Total Score: {totalScore}
+                        <p>
+                            Auto Fuel Points:{' '}
+                            <span className='font-semibold text-white tabular-nums'>
+                                {autoFuelScore}
+                            </span>
+                        </p>
+                        <p>
+                            Auto Tower Points:{' '}
+                            <span className='font-semibold text-white tabular-nums'>
+                                {autoTowerScore}
+                            </span>
+                        </p>
+                        <p>
+                            Tele Fuel Points:{' '}
+                            <span className='font-semibold text-white tabular-nums'>
+                                {teleFuelScore}
+                            </span>
+                        </p>
+                        <p>
+                            Tele Tower Points:{' '}
+                            <span className='font-semibold text-white tabular-nums'>
+                                {teleTowerScore}
+                            </span>
+                        </p>
+                        <p>
+                            Foul Points:{' '}
+                            <span className='font-semibold text-white tabular-nums'>
+                                {foulScore}
+                            </span>
+                        </p>
+                        <p className='mt-2 text-2xl font-semibold text-white'>
+                            Total Score:{' '}
+                            <span className='tabular-nums'>{totalScore}</span>
                         </p>
                     </div>
                     <div className='mt-4 grid gap-2 text-sm text-gray-200'>
                         <p>
                             Energized RP ({rpThresholds.energized}):{' '}
-                            <span className={energized ? 'text-[#48c55c]' : 'text-red-300'}>
+                            <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    energized
+                                        ? 'bg-[#48c55c]/20 text-[#48c55c]'
+                                        : 'bg-red-500/10 text-red-300'
+                                }`}>
                                 {energized ? 'Yes' : 'No'}
                             </span>
                         </p>
                         <p>
                             Supercharged RP ({rpThresholds.supercharged}):{' '}
                             <span
-                                className={supercharged ? 'text-[#48c55c]' : 'text-red-300'}>
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    supercharged
+                                        ? 'bg-[#48c55c]/20 text-[#48c55c]'
+                                        : 'bg-red-500/10 text-red-300'
+                                }`}>
                                 {supercharged ? 'Yes' : 'No'}
                             </span>
                         </p>
                         <p>
                             Traversal RP ({rpThresholds.traversal}):{' '}
-                            <span className={traversal ? 'text-[#48c55c]' : 'text-red-300'}>
+                            <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    traversal
+                                        ? 'bg-[#48c55c]/20 text-[#48c55c]'
+                                        : 'bg-red-500/10 text-red-300'
+                                }`}>
                                 {traversal ? 'Yes' : 'No'}
                             </span>
                         </p>

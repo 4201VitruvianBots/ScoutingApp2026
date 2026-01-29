@@ -7,6 +7,7 @@ import { MatchSchedule, SuperData, SuperPosition } from 'requests';
 import SuperTeam, { SuperTeamState } from './components/SuperTeam';
 import NumberInput from '../../components/NumberInput';
 import MultiButton from '../../components/MultiButton';
+import HoldButton from '../../components/HoldButton';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import scheduleFile from '../../assets/matchSchedule.json';
@@ -65,6 +66,8 @@ function SuperApp() {
             humanPlayerIndex: number | null;
         }>
     >([]);
+    const sectionClass =
+        'rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20';
 
     useStatus(superPosition, matchNumber, scouterName);
 
@@ -177,141 +180,175 @@ function SuperApp() {
     };
 
     return (
-        <main className='min-h-screen bg-[#171c26] text-center text-white'>
+        <div className='min-h-screen bg-[#171c26] text-white'>
             {showCheck && (
                 <MaterialSymbol
                     icon='check'
-                    size={150}
+                    size={120}
                     fill
                     grade={200}
-                    color='green'
-                    className='absolute right-10 top-0 ml-10'
+                    color='#48c55c'
+                    className='fixed right-6 top-6 z-30'
                 />
             )}
-            <h1 className='col-span-3 p-5 text-3xl font-bold text-[#48c55c]'>
-                Super Scouting App
-            </h1>
-
-            <div className='fixed left-4 top-4 z-20 flex flex-row gap-3 rounded-md bg-slate-200 p-1'>
-                <LinkButton link='/'>
-                    <MaterialSymbol
-                        icon='home'
-                        size={60}
-                        fill
-                        grade={200}
-                        color='green'
-                    />
-                </LinkButton>
-
-                <Dialog
-                    open
-                    trigger={open => (
-                        <button onClick={open} className='col-span-3'>
+            <main className='mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 pb-12 pt-8'>
+                <div className='flex flex-wrap items-center justify-between gap-4'>
+                    <div className='flex items-center gap-3'>
+                        <LinkButton link='/' className='snap-none'>
                             <MaterialSymbol
-                                icon='account_circle'
-                                size={60}
+                                icon='home'
+                                size={46}
                                 fill
                                 grade={200}
-                                className={`${
-                                    scouterName && superPosition
-                                        ? 'text-green-400'
-                                        : 'text-gray-400'
-                                }`}
+                                color='green'
+                                className='snap-none'
+                            />
+                        </LinkButton>
+
+                        <Dialog
+                            open
+                            trigger={open => (
+                                <button onClick={open}>
+                                    <MaterialSymbol
+                                        icon='account_circle'
+                                        size={46}
+                                        fill
+                                        grade={200}
+                                        className={`${
+                                            scouterName && superPosition
+                                                ? 'text-green-400'
+                                                : 'text-gray-400'
+                                        }`}
+                                    />
+                                </button>
+                            )}>
+                            {close => (
+                                <SignIn
+                                    scouterName={scouterName}
+                                    onChangeScouterName={setScouterName}
+                                    robotPosition={superPosition}
+                                    onChangeRobotPosition={setSuperPosition}
+                                    superScouting
+                                    onSubmit={close}
+                                />
+                            )}
+                        </Dialog>
+
+                        <button
+                            onClick={undoHistoryCount}
+                            className='rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]'>
+                            <MaterialSymbol
+                                icon='undo'
+                                size={32}
+                                fill
+                                grade={200}
+                                color='black'
                             />
                         </button>
-                    )}>
-                    {close => (
-                        <SignIn
-                            scouterName={scouterName}
-                            onChangeScouterName={setScouterName}
-                            robotPosition={superPosition}
-                            onChangeRobotPosition={setSuperPosition}
-                            superScouting
-                            onSubmit={close}
-                        />
-                    )}
-                </Dialog>
-
-                <button
-                    onClick={undoHistoryCount}
-                    className='z-10 aspect-square rounded bg-[#f07800] p-1 font-bold text-black'>
-                    <MaterialSymbol
-                        icon='undo'
-                        size={60}
-                        fill
-                        grade={200}
-                        color='black'
-                    />
-                </button>
-            </div>
-
-            <div>
-                <p className='text-xl text-white'>Match Number</p>
-                <NumberInput
-                    onChange={setMatchNumber}
-                    value={matchNumber}
-                    className='m-2 p-2 text-xl text-black'
-                />
-            </div>
-
-            <p className='mt-10 text-2xl text-white'>Human Player Fuel</p>
-            <div className='mx-auto mt-4 flex w-full max-w-md flex-col gap-3 rounded-lg bg-[#2f3646] p-4'>
-                <div className='flex justify-between gap-2'>
-                    <button
-                        className='flex-1 rounded bg-gray-600 px-4 py-3 text-2xl'
-                        onClick={() => handleHumanFuelChange(-1)}>
-                        -1
-                    </button>
-                    <button
-                        className='flex-1 rounded bg-[#48c55c] px-4 py-3 text-2xl text-black'
-                        onClick={() => handleHumanFuelChange(1)}>
-                        +1
-                    </button>
+                    </div>
+                    <div className='text-right'>
+                        <h1 className='text-2xl font-semibold text-[#48c55c]'>
+                            Super Scouting App
+                        </h1>
+                        <p className='text-sm text-gray-300'>
+                            {scouterName || 'Scouter'}{' '}
+                            {superPosition ? `(${superPosition})` : ''}
+                        </p>
+                    </div>
                 </div>
-                <p className='text-xl'>Total: {humanPlayerFuelScored}</p>
-            </div>
 
-            <p className='pt-5 text-2xl text-white'>Human Player Team</p>
-            <div className='mx-auto mt-2 flex flex-wrap justify-center gap-2'>
-                <MultiButton
-                    className='w-full max-w-40'
-                    onChange={setHumanPlayerIndex}
-                    values={teams.map((_team, index) => index)}
-                    labels={teams.map(
-                        (team, index) =>
-                            team.teamNumber ?? `Team ${index + 1}`
-                    ).map(label => label.toString())}
-                    value={humanPlayerIndex ?? undefined}
-                    selectedClassName='bg-[#48c55c] text-black'
-                    unSelectedClassName='bg-white text-black'
-                />
-            </div>
-
-            <div className='grid grid-cols-1 gap-10 px-6 py-6 md:grid-cols-3'>
-                {teams.map((team, index) => (
-                    <SuperTeam
-                        key={index}
-                        teamState={team}
-                        setTeamState={value => updateTeam(index, value)}
+                <section className={sectionClass}>
+                    <p className='text-sm uppercase tracking-wide text-gray-300'>
+                        Match Number
+                    </p>
+                    <NumberInput
+                        onChange={setMatchNumber}
+                        value={matchNumber}
+                        className='mt-2 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                     />
-                ))}
-            </div>
+                </section>
 
-            <button
-                onClick={handleSubmit}
-                className='m-5 w-full max-w-80 rounded-md bg-[#48c55c] px-4 py-2 text-lg text-black'>
-                Submit
-            </button>
+                <section className={sectionClass}>
+                    <div className='grid gap-4 md:grid-cols-2'>
+                        <div>
+                            <p className='text-sm uppercase tracking-wide text-gray-300'>
+                                Human Player Fuel
+                            </p>
+                            <div className='mt-2 flex gap-2'>
+                                <HoldButton
+                                    onHold={() => handleHumanFuelChange(-1)}
+                                    ariaLabel='Decrease human player fuel'
+                                    className='flex-1 rounded-lg bg-gray-700 px-4 py-3 text-lg font-semibold text-white transition hover:bg-gray-600 active:scale-[0.98]'
+                                >
+                                    -1
+                                </HoldButton>
+                                <HoldButton
+                                    onHold={() => handleHumanFuelChange(1)}
+                                    ariaLabel='Increase human player fuel'
+                                    className='flex-1 rounded-lg bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
+                                >
+                                    +1
+                                </HoldButton>
+                            </div>
+                            <p className='mt-2 text-sm text-gray-300'>
+                                Total:{' '}
+                                <span className='font-semibold text-white tabular-nums'>
+                                    {humanPlayerFuelScored}
+                                </span>
+                            </p>
+                        </div>
 
-            <div>
-                <div className='text-white'>Queue: {queue.length}</div>
-                <button
-                    onClick={sendAll}
-                    className='rounded-md bg-amber-500 px-2 py-1 text-center'>
-                    {sending ? 'Sending...' : 'Resend All'}
-                </button>
-            </div>
-        </main>
+                        <div>
+                            <p className='text-sm uppercase tracking-wide text-gray-300'>
+                                Human Player Team
+                            </p>
+                            <div className='mt-2 flex flex-wrap gap-2'>
+                                <MultiButton
+                                    className='w-full max-w-40'
+                                    onChange={setHumanPlayerIndex}
+                                    values={teams.map((_team, index) => index)}
+                                    labels={teams
+                                        .map(
+                                            (team, index) =>
+                                                team.teamNumber ?? `Team ${index + 1}`
+                                        )
+                                        .map(label => label.toString())}
+                                    value={humanPlayerIndex ?? undefined}
+                                    selectedClassName='bg-[#48c55c] text-black'
+                                    unSelectedClassName='bg-gray-700 text-white'
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section className='grid gap-6 md:grid-cols-3'>
+                    {teams.map((team, index) => (
+                        <SuperTeam
+                            key={index}
+                            teamState={team}
+                            setTeamState={value => updateTeam(index, value)}
+                        />
+                    ))}
+                </section>
+
+                <section className={sectionClass}>
+                    <button
+                        onClick={handleSubmit}
+                        className='w-full rounded-lg bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black shadow-lg shadow-black/30 transition hover:brightness-105 active:scale-[0.98]'>
+                        Submit
+                    </button>
+                    <div className='mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-300'>
+                        <span>Queue: {queue.length}</span>
+                        <button
+                            onClick={sendAll}
+                            className='rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
+                            {sending ? 'Sending...' : 'Resend All'}
+                        </button>
+                    </div>
+                </section>
+            </main>
+        </div>
     );
 }
 

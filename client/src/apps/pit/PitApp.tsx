@@ -48,6 +48,8 @@ function PitApp() {
         useState<TowerCapabilityClaimed>('unknown');
     const [robotImage, setRobotImage] = useState('');
     const [notes, setNotes] = useState('');
+    const sectionClass =
+        'rounded-xl border border-white/10 bg-[#2f3646] p-6 shadow-lg shadow-black/20';
 
     useEffect(() => {
         const timeout = setInterval(refreshScoutedTeams, 60 * 1000);
@@ -94,9 +96,9 @@ function PitApp() {
     };
 
     return (
-        <div className='min-h-screen bg-[#171c26] pb-10 text-white'>
-            <div className='mx-auto max-w-5xl px-6'>
-                <div className='mb-7 rounded-lg bg-[#2f3646] p-6'>
+        <div className='min-h-screen bg-gradient-to-b from-[#171c26] via-[#161b22] to-[#12151d] pb-10 text-white'>
+            <div className='mx-auto max-w-5xl px-6 pb-12'>
+                <div className={`${sectionClass} mb-7 text-center`}>
                     <h1 className='mb-4 text-center text-3xl font-bold text-[#48c55c]'>
                         Pit Scouting
                     </h1>
@@ -106,7 +108,7 @@ function PitApp() {
                     </p>
                 </div>
 
-                <div className='fixed left-4 top-4 z-20 flex flex-col gap-2 rounded-md bg-slate-200 p-2'>
+                <div className='fixed left-4 top-4 z-20 flex flex-col gap-2 rounded-xl border border-white/10 bg-[#1f2432]/90 p-2 shadow-lg shadow-black/40 backdrop-blur'>
                     <LinkButton link='/' className='snap-none'>
                         <MaterialSymbol
                             icon='home'
@@ -128,13 +130,13 @@ function PitApp() {
                                     fill
                                     grade={200}
                                     className={`${
-                                        scouterName
-                                            ? 'text-green-400'
-                                            : 'text-gray-400'
-                                    } snap-none`}
-                                />
-                            </button>
-                        )}>
+                                    scouterName
+                                        ? 'text-green-400'
+                                        : 'text-gray-400'
+                                } snap-none`}
+                            />
+                        </button>
+                    )}>
                         {close => (
                             <SignIn
                                 scouterName={scouterName}
@@ -147,18 +149,23 @@ function PitApp() {
                     <ConeStacker />
                 </div>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Team
                     </h2>
-                    <TeamDropdown
-                        onChange={setTeamNumber}
-                        value={teamNumber}
-                        disabledOptions={scoutedTeams}
-                    />
+                    <div className='mt-3'>
+                        <TeamDropdown
+                            onChange={setTeamNumber}
+                            value={teamNumber}
+                            disabledOptions={scoutedTeams}
+                        />
+                    </div>
+                    <p className='mt-2 text-xs text-gray-300'>
+                        Scouted teams: {scoutedTeams?.length ?? 0}
+                    </p>
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Drivebase
                     </h2>
@@ -174,7 +181,7 @@ function PitApp() {
                     </div>
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Fuel Storage Estimate
                     </h2>
@@ -187,13 +194,13 @@ function PitApp() {
                             );
                         }}
                         value={maxFuelStorageEstimate ?? ''}
-                        className='mt-3 w-40 rounded border border-gray-700 px-3 py-2 text-black'
+                        className='mt-3 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                         type='number'
                         placeholder='0'
                     />
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Intake Sources
                     </h2>
@@ -234,7 +241,7 @@ function PitApp() {
                     </div>
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Scoring Method
                     </h2>
@@ -250,7 +257,7 @@ function PitApp() {
                     </div>
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Preferred Scoring Spot
                     </h2>
@@ -266,7 +273,7 @@ function PitApp() {
                     </div>
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Tower Capability (Claimed)
                     </h2>
@@ -282,7 +289,7 @@ function PitApp() {
                     </div>
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Battery Count
                     </h2>
@@ -292,35 +299,35 @@ function PitApp() {
                             setBatteryCount(parseInt(event.target.value, 10) || 0)
                         }
                         value={batteryCount}
-                        className='mt-3 w-40 rounded border border-gray-700 px-3 py-2 text-black'
+                        className='mt-3 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                         type='number'
                         placeholder='0'
                     />
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Robot Photo
                     </h2>
                     <ImageUploader value={robotImage} onChange={setRobotImage} />
                 </section>
 
-                <section className='mb-6 rounded-lg bg-[#2f3646] p-6'>
+                <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Notes
                     </h2>
                     <TextInput
-                        className='w-full text-black'
+                        className='mt-3 w-full rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                         value={notes}
                         onChange={setNotes}
                         placeholder='Short notes...'
                     />
                 </section>
 
-                <section className='rounded-lg bg-[#2f3646] p-6 text-center'>
+                <section className={`${sectionClass} text-center`}>
                     <button
                         onClick={handleSubmit}
-                        className='rounded bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black'>
+                        className='rounded-lg bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                         {sendingPit ? 'Sending...' : 'Submit'}
                     </button>
 
@@ -329,7 +336,7 @@ function PitApp() {
                     </div>
                     <button
                         onClick={sendAllPit}
-                        className='mt-2 rounded bg-amber-500 px-4 py-2 text-sm font-semibold text-black'>
+                        className='mt-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
                         {sendingPit ? 'Sending...' : 'Resend All'}
                     </button>
                 </section>

@@ -7,22 +7,28 @@ function StatRow({
     rank: number;
     scouter: ScouterData;
 }) {
-   
+    const rankTone =
+        rank === 1
+            ? 'text-amber-300'
+            : rank === 2
+              ? 'text-slate-200'
+              : rank === 3
+                ? 'text-amber-500'
+                : 'text-white';
+    const accuracyText = Number.isFinite(scouter.accuracy)
+        ? scouter.accuracy.toFixed(2)
+        : 'N/A';
+
     return (
-        <tr>
-            <td className=' border-4 border-slate-700 px-16 py-2'>
+        <tr className='border-b border-white/5 last:border-b-0 hover:bg-white/5'>
+            <td className={`px-4 py-3 font-semibold tabular-nums ${rankTone}`}>
                 {rank}
             </td>
-           
-                <td
-                    className={`w-16 overflow-auto border-4 border-slate-700 text-center`}>
-                    {scouter && scouter.scouterName}
-                </td>
-            
-                <td
-                    className={`w-16 overflow-auto border-4 border-slate-700 text-center`}>
-                    {scouter && scouter.accuracy}
-                </td>
+            <td className='px-4 py-3'>{scouter?.scouterName}</td>
+            <td
+                className={`px-4 py-3 text-right font-semibold tabular-nums ${rankTone}`}>
+                {accuracyText}
+            </td>
         </tr>
     );
 }

@@ -107,7 +107,7 @@ function CannedCommentBox({
     onChange?: Dispatch<SelectOption<CommentValues>[]>;
 }) {
     return (
-        <div className='contents p-10 '>
+        <div className='w-full'>
             <Select
                 closeMenuOnSelect={false}
                 defaultValue={[]}
@@ -117,7 +117,7 @@ function CannedCommentBox({
                 onChange={value =>
                     onChange?.(value as SelectOption<CommentValues>[])
                 }
-                className='absolute m-2 min-w-[50%] max-w-[90%] text-xl '
+                className='w-full text-sm'
                 styles={colourStyles}
                 isSearchable={false}
             />

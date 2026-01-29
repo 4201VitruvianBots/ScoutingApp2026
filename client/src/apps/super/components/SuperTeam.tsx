@@ -9,6 +9,7 @@ import MultiButton from '../../../components/MultiButton';
 import Checkbox from '../../../components/Checkbox';
 import TeamDropdown from '../../../components/TeamDropdown';
 import CannedCommentBox, { SelectOption } from './CannedComments';
+import HoldButton from '../../../components/HoldButton';
 
 export interface SuperTeamState {
     fouls: SuperFouls;
@@ -43,6 +44,10 @@ function SuperTeam({
     setTeamState: Dispatch<SuperTeamState>;
     bgClass?: string;
 }) {
+    const cardClass =
+        bgClass ??
+        'rounded-xl border border-white/10 bg-[#2f3646] p-5 shadow-lg shadow-black/20';
+
     const handleDefense = (newDefense: DefenseProvided) => {
         setTeamState({ ...teamState, defenseProvided: newDefense });
     };
@@ -102,78 +107,117 @@ function SuperTeam({
     };
 
     return (
-        <div className={bgClass}>
-            <div className='mx-auto flex flex-col content-center items-center justify-center p-5'>
-                <p className='pt-3 text-lg text-zinc-100 underline'>
-                    Team Number
+        <section className={cardClass}>
+            <div className='flex flex-col gap-4'>
+                <div>
+                    <p className='text-xs uppercase tracking-wide text-gray-300'>
+                        Team Number
+                    </p>
+                    <div className='mt-2'>
+                        <TeamDropdown
+                            value={teamState.teamNumber}
+                            onChange={handleChangeTeam}
+                            allowAbsent
+                        />
+                    </div>
+                </div>
+                <div>
+                    <p className='text-xs uppercase tracking-wide text-gray-300'>
+                        Notes
+                    </p>
+                    <div className='mt-2'>
+                        <CannedCommentBox
+                            value={teamState.comments}
+                            onChange={handleAddComment}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div className='mt-5'>
+                <p className='text-xs uppercase tracking-wide text-gray-300'>
+                    Defense
                 </p>
-                <TeamDropdown
-                    value={teamState.teamNumber}
-                    onChange={handleChangeTeam}
-                    allowAbsent
-                />
-
-                <p className='pt-3 text-lg text-zinc-100 underline'>Notes</p>
-                <CannedCommentBox
-                    value={teamState.comments}
-                    onChange={handleAddComment}
-                />
+                <div className='mt-2 flex flex-wrap gap-2'>
+                    <MultiButton
+                        onChange={handleDefense}
+                        value={teamState.defenseProvided}
+                        labels={['None', 'Some', 'Heavy']}
+                        values={['none', 'some', 'heavy']}
+                        className='w-full sm:w-auto'
+                        selectedClassName='bg-[#48c55c] text-black'
+                        unSelectedClassName='bg-gray-700 text-white'
+                    />
+                </div>
+                <div className='mt-2'>
+                    <Checkbox
+                        className='text-sm text-white'
+                        boxClassName='size-5'
+                        checked={teamState.defenseReceived}
+                        onChange={handleWasDefended}>
+                        Was Defended?
+                    </Checkbox>
+                </div>
             </div>
 
-            <p className='mt-5 text-2xl text-zinc-100 underline'>Defense</p>
-            <MultiButton
-                onChange={handleDefense}
-                value={teamState.defenseProvided}
-                labels={['None', 'Some', 'Heavy']}
-                values={['none', 'some', 'heavy']}
-                className='my-2 w-full text-black'
-                selectedClassName='bg-[#48c55c] text-black'
-                unSelectedClassName='bg-gray-300 text-black'
-            />
-            <div>
-                <Checkbox
-                    className='text-lg text-white'
-                    boxClassName='size-5'
-                    checked={teamState.defenseReceived}
-                    onChange={handleWasDefended}>
-                    Was Defended?
-                </Checkbox>
+            <div className='mt-6'>
+                <p className='text-xs uppercase tracking-wide text-gray-300'>
+                    Fouls
+                </p>
+                <div className='mt-2 grid gap-2'>
+                    {foulLabels.map(foul => (
+                        <div className='flex items-center gap-2' key={foul.key}>
+                            <HoldButton
+                                onHold={() => handleDecreaseFoul(foul.key)}
+                                ariaLabel={`Decrease ${foul.label}`}
+                                className='rounded-lg border border-white/10 bg-red-500/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
+                            >
+                                -
+                            </HoldButton>
+                            <HoldButton
+                                onHold={() => handleIncreaseFoul(foul.key)}
+                                ariaLabel={`Increase ${foul.label}`}
+                                className='flex-1 rounded-lg border border-white/10 bg-slate-700 px-3 py-2 text-left text-sm text-white transition hover:bg-slate-600 active:scale-[0.98]'
+                            >
+                                + {foul.label}:{' '}
+                                <span className='ml-1 font-semibold tabular-nums'>
+                                    {teamState.fouls[foul.key]}
+                                </span>
+                            </HoldButton>
+                        </div>
+                    ))}
+                </div>
             </div>
 
-            <p className='mt-6 text-2xl text-zinc-100 underline'>Fouls</p>
-            {foulLabels.map(foul => (
-                <div className='flex justify-center gap-2 py-2' key={foul.key}>
-                    <button
-                        className='rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                        onClick={() => handleDecreaseFoul(foul.key)}>
-                        -
-                    </button>
-                    <button
-                        className='w-64 rounded-md border bg-slate-600 px-3 py-2 text-left text-lg text-zinc-100'
-                        onClick={() => handleIncreaseFoul(foul.key)}>
-                        + {foul.label}: {teamState.fouls[foul.key]}
-                    </button>
+            <div className='mt-6'>
+                <p className='text-xs uppercase tracking-wide text-gray-300'>
+                    Breaks
+                </p>
+                <div className='mt-2 grid gap-2'>
+                    {breakLabels.map(breakEntry => (
+                        <div className='flex items-center gap-2' key={breakEntry.key}>
+                            <HoldButton
+                                onHold={() => handleDecreaseBreak(breakEntry.key)}
+                                ariaLabel={`Decrease ${breakEntry.label}`}
+                                className='rounded-lg border border-white/10 bg-red-500/80 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
+                            >
+                                -
+                            </HoldButton>
+                            <HoldButton
+                                onHold={() => handleIncreaseBreak(breakEntry.key)}
+                                ariaLabel={`Increase ${breakEntry.label}`}
+                                className='flex-1 rounded-lg border border-white/10 bg-slate-700 px-3 py-2 text-left text-sm text-white transition hover:bg-slate-600 active:scale-[0.98]'
+                            >
+                                + {breakEntry.label}:{' '}
+                                <span className='ml-1 font-semibold tabular-nums'>
+                                    {teamState.breaks[breakEntry.key]}
+                                </span>
+                            </HoldButton>
+                        </div>
+                    ))}
                 </div>
-            ))}
-
-            <p className='mt-6 text-2xl text-zinc-100 underline'>Breaks</p>
-            {breakLabels.map(breakEntry => (
-                <div
-                    className='flex justify-center gap-2 py-2'
-                    key={breakEntry.key}>
-                    <button
-                        className='rounded-md border bg-red-400 px-3 py-2 text-lg text-zinc-100'
-                        onClick={() => handleDecreaseBreak(breakEntry.key)}>
-                        -
-                    </button>
-                    <button
-                        className='w-64 rounded-md border bg-slate-600 px-3 py-2 text-left text-lg text-zinc-100'
-                        onClick={() => handleIncreaseBreak(breakEntry.key)}>
-                        + {breakEntry.label}: {teamState.breaks[breakEntry.key]}
-                    </button>
-                </div>
-            ))}
-        </div>
+            </div>
+        </section>
     );
 }
 

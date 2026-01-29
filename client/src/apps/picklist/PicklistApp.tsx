@@ -178,7 +178,7 @@ function PicklistApp() {
 
     return (
         <main className='relative grid h-screen grid-rows-[auto_1fr] overflow-hidden'>
-            <div className='flex items-center border-b border-black bg-gray-100 py-3'>
+            <div className='flex items-center border-b border-white/10 bg-[#1f2432]/90 py-3 text-white shadow-lg shadow-black/30 backdrop-blur'>
                 <LinkButton
                     link='/'
                     className='flex snap-none items-center justify-center px-2'>
@@ -187,7 +187,7 @@ function PicklistApp() {
                         size={50}
                         fill
                         grade={200}
-                        color='black'
+                        color='white'
                         className='snap-none'
                     />
                 </LinkButton>
@@ -204,7 +204,7 @@ function PicklistApp() {
                         icon='refresh'
                         size={50}
                         grade={200}
-                        color='black'
+                        color='white'
                         className='snap-none'
                     />
                 </button>
@@ -215,12 +215,12 @@ function PicklistApp() {
                             className='flex snap-none items-center justify-center px-2'
                             onClick={open}
                             title='Add Stat Table'>
-                            <div className='flex items-center justify-center border border-black bg-gray-300 p-1'>
+                            <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
                                 <MaterialSymbol
                                     icon='table'
                                     size={50}
                                     grade={200}
-                                    color='black'
+                                    color='white'
                                     className='snap-none'
                                 />
                             </div>
@@ -236,12 +236,12 @@ function PicklistApp() {
                             className='flex snap-none items-center justify-center px-2'
                             onClick={open}
                             title='Add Stat Summary'>
-                            <div className='flex items-center justify-center border border-black bg-gray-300 p-1'>
+                            <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
                                 <MaterialSymbol
                                     icon='graphic_eq'
                                     size={50}
                                     grade={200}
-                                    color='black'
+                                    color='white'
                                     className='snap-none'
                                 />
                             </div>
@@ -261,12 +261,12 @@ function PicklistApp() {
                             className='flex snap-none items-center justify-center px-2'
                             onClick={open}
                             title='Add Bar Graph'>
-                            <div className='flex items-center justify-center border border-black bg-gray-300 p-1'>
+                            <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
                                 <MaterialSymbol
                                     icon='bar_chart_4_bars'
                                     size={50}
                                     grade={200}
-                                    color='black'
+                                    color='white'
                                     className='snap-none'
                                 />
                             </div>
@@ -283,8 +283,8 @@ function PicklistApp() {
                 <Dialog
                     trigger={open => (
                         <button className='flex snap-none items-center justify-center px-2' onClick={open} title="Add Scatter Plot">
-                            <div className='flex items-center justify-center bg-gray-300 border border-black p-1'>
-                                <MaterialSymbol icon="scatter_plot" size={50} grade={200} color='black' className='snap-none'/>
+                            <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
+                                <MaterialSymbol icon="scatter_plot" size={50} grade={200} color='white' className='snap-none'/>
                             </div>
                         </button>
                     )}>
@@ -302,12 +302,12 @@ function PicklistApp() {
                             className='flex snap-none items-center justify-center px-2'
                             onClick={open}
                             title='Add Team Summary'>
-                            <div className='flex items-center justify-center border border-black bg-gray-300 p-1'>
+                            <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
                                 <MaterialSymbol
                                     icon='robot'
                                     size={50}
                                     grade={200}
-                                    color='black'
+                                    color='white'
                                     className='snap-none'
                                 />
                             </div>
@@ -321,7 +321,7 @@ function PicklistApp() {
                         />
                     )}
                 </Dialog>
-                <h1 className='left-1/2 flex-grow text-center text-3xl font-bold xl:absolute xl:-translate-x-1/2 xl:p-6'>
+                <h1 className='left-1/2 flex-grow text-center text-3xl font-bold text-[#48c55c] xl:absolute xl:-translate-x-1/2 xl:p-6'>
                     Statistical Analysis
                 </h1>
             </div>
