@@ -466,18 +466,21 @@ function MatchApp() {
                         <HoldButton
                             onHold={() => handleFuelAdd(1)}
                             ariaLabel='Add 1 fuel'
+                            repeatInterval={100}
                             className='rounded-lg bg-[#48c55c] px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                             +1
                         </HoldButton>
                         <HoldButton
                             onHold={() => handleFuelAdd(5)}
                             ariaLabel='Add 5 fuel'
+                            repeatInterval={100}
                             className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
                             +5
                         </HoldButton>
                         <HoldButton
                             onHold={() => handleFuelAdd(10)}
                             ariaLabel='Add 10 fuel'
+                            repeatInterval={100}
                             className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
                             +10
                         </HoldButton>
