@@ -140,8 +140,6 @@ const towerCapabilities: TowerCapabilityClaimed[] = [
     'unknown',
 ];
 
-const autoFuelWinners: AutoFuelWinner[] = ['red', 'blue', 'tie', 'unknown'];
-
 type TeamProfile = {
     auto: number;
     tele: number;

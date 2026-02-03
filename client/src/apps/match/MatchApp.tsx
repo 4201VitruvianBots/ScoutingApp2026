@@ -1,5 +1,6 @@
 import LinkButton from '../../components/LinkButton';
 import {
+    AllianceColor,
     AutoFuelWinner,
     AutoStartingPosition,
     AutoTowerResult,
@@ -53,6 +54,8 @@ const teleTowerOptions: TeleTowerResult[] = [
     'level3',
     'failed',
 ];
+const autoFuelWinnerOptions: AutoFuelWinner[] = ['red', 'blue', 'tie', 'unknown'];
+const allianceOptions: AllianceColor[] = ['red', 'blue'];
 
 const breakdownOptions: BreakdownType[] = [
     'none',
@@ -189,13 +192,14 @@ function MatchApp() {
     const handleUndoFuel = () => {
         const last = fuelHistory.current.at(-1);
         if (!last) return;
+        const segment = last.segment;
         fuelHistory.current = fuelHistory.current.slice(0, -1);
-        if (last.segment === 'auto') {
+        if (segment === 'auto') {
             setAutoFuelScored(prev => Math.max(0, prev - last.amount));
         } else {
             setTeleFuelBySegment(prev => ({
                 ...prev,
-                [last.segment]: Math.max(0, prev[last.segment] - last.amount),
+                [segment]: Math.max(0, prev[segment] - last.amount),
             }));
         }
     };
@@ -614,7 +618,7 @@ function MatchApp() {
                                     }}
                                     value={autoFuelWinner}
                                     labels={['Red', 'Blue', 'Tie', 'Unknown']}
-                                    values={['red', 'blue', 'tie', 'unknown']}
+                                    values={autoFuelWinnerOptions}
                                     selectedClassName={[
                                         'bg-red-500 text-white',
                                         'bg-blue-500 text-white',
@@ -644,7 +648,7 @@ function MatchApp() {
                                 }}
                                 value={shift1ActiveHubIfTie ?? undefined}
                                 labels={['Red', 'Blue']}
-                                values={['red', 'blue']}
+                                values={allianceOptions}
                                 selectedClassName={[
                                     'bg-red-500 text-white',
                                     'bg-blue-500 text-white',

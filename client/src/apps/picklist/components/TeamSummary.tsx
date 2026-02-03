@@ -130,9 +130,13 @@ function TeamSummary({
                             e !== 'matchCount' &&
                             e !== 'superMatchCount'
                         ) {
+                            const value = teamData[e];
+                            if (typeof value === 'object') {
+                                return null;
+                            }
                             return (
                                 <p key={e}>
-                                    {camelToSpaced(e)}: {teamData[e]}
+                                    {camelToSpaced(e)}: {value}
                                 </p>
                             );
                         }

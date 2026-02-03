@@ -203,36 +203,45 @@ function StatTable({
                                 teamInfoJson={teamInfoJson}
                                 onSubmit={onSubmit}
                             />
-                            {table.columns.map(column =>
-                                column === 'robotImages' ? (
-                                    <td className='border-separate border border-black'>
-                                        <Dialog
-                                            trigger={open => (
-                                                <button onClick={open}>
-                                                    <img
-                                                        src={`/image/${entry.teamNumber}.jpeg`}
-                                                        width='100'
-                                                        height='100'
-                                                        alt=''
+                            {table.columns.map(column => {
+                                if (column === 'robotImages') {
+                                    return (
+                                        <td className='border-separate border border-black'>
+                                            <Dialog
+                                                trigger={open => (
+                                                    <button onClick={open}>
+                                                        <img
+                                                            src={`/image/${entry.teamNumber}.jpeg`}
+                                                            width='100'
+                                                            height='100'
+                                                            alt=''
+                                                        />
+                                                    </button>
+                                                )}>
+                                                {close => (
+                                                    <RobotPhotoDialog
+                                                        teamNumber={
+                                                            entry.teamNumber
+                                                        }
+                                                        onClose={close}
                                                     />
-                                                </button>
-                                            )}>
-                                            {close => (
-                                                <RobotPhotoDialog
-                                                    teamNumber={
-                                                        entry.teamNumber
-                                                    }
-                                                    onClose={close}
-                                                />
-                                            )}
-                                        </Dialog>
-                                    </td>
-                                ) : (
+                                                )}
+                                            </Dialog>
+                                        </td>
+                                    );
+                                }
+
+                                const cellValue = entry[column];
+                                const displayValue =
+                                    typeof cellValue === 'object'
+                                        ? ''
+                                        : cellValue;
+                                return (
                                     <td className='border border-black'>
-                                        {entry[column]}
+                                        {displayValue}
                                     </td>
-                                )
-                            )}
+                                );
+                            })}
                         </tr>
                     ))}
                 </tbody>

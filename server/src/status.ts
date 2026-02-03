@@ -11,18 +11,26 @@ import { matchApp, superApp } from './Schema.js';
 import fs from 'fs';
 import { gameConfig } from './gameConfig.js';
 
-const bluePositions: RobotPosition[] = [
+const bluePositionsAll: RobotPosition[] = [
     'blue_1',
     'blue_2',
     'blue_3',
     'blue_4',
-].slice(0, gameConfig.allianceSizeRobots.default);
-const redPositions: RobotPosition[] = [
+];
+const redPositionsAll: RobotPosition[] = [
     'red_1',
     'red_2',
     'red_3',
     'red_4',
-].slice(0, gameConfig.allianceSizeRobots.default);
+];
+const bluePositions = bluePositionsAll.slice(
+    0,
+    gameConfig.allianceSizeRobots.default
+);
+const redPositions = redPositionsAll.slice(
+    0,
+    gameConfig.allianceSizeRobots.default
+);
 
 const scheduleFile = '../client/src/assets/matchSchedule.json';
 

@@ -166,10 +166,13 @@ const pitDataSchema = new mongoose.Schema<PitDataSchemaType>({
     notes: String,
 });
 
-const pitApp = mongoose.model('pitApp', pitDataSchema);
-const matchApp = mongoose.model('matchApp', matchDataSchema);
-const superApp = mongoose.model('superApp', superScoutDataSchema);
-const leaderboardApp = mongoose.model('leaderboardApp', leaderboardDataSchema);
+const pitApp = mongoose.model<PitDataSchemaType>('pitApp', pitDataSchema);
+const matchApp = mongoose.model<MatchData>('matchApp', matchDataSchema);
+const superApp = mongoose.model<SuperData>('superApp', superScoutDataSchema);
+const leaderboardApp = mongoose.model<ScouterData>(
+    'leaderboardApp',
+    leaderboardDataSchema
+);
 
 export {
     matchApp,

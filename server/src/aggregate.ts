@@ -1,5 +1,6 @@
 import {
     AllianceColor,
+    CommentValues,
     MatchData,
     MatchDataAggregations,
     MatchIndividualDataAggregations,
@@ -218,6 +219,7 @@ async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
                 defenseSomeRate: 0,
                 defenseReceivedRate: 0,
                 matchCount: 0,
+                commentCounts: {},
             };
         }
 
@@ -230,7 +232,7 @@ async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
         let heavyDefense = 0;
         let someDefense = 0;
         let defenseReceived = 0;
-        const commentCounts: Partial<Record<string, number>> = {};
+        const commentCounts: Partial<Record<CommentValues, number>> = {};
 
         teamEntries.forEach(entry => {
             pinning += entry.fouls.pinning;
