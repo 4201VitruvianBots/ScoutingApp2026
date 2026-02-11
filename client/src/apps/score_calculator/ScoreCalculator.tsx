@@ -9,16 +9,19 @@ function Counter({
     label,
     min = 0,
     max,
+    deltas,
 }: {
     value: number;
     onChange: Dispatch<SetStateAction<number>>;
     label: string;
     min?: number;
     max?: number;
+    deltas?: number[];
 }) {
     const holdTimeoutRef = useRef<number | null>(null);
     const holdIntervalRef = useRef<number | null>(null);
     const ignoreClickRef = useRef(false);
+    const stepDeltas = deltas ?? [-10, -5, -1, 1, 5, 10];
 
     useEffect(() => {
         return () => {
@@ -77,87 +80,57 @@ function Counter({
         applyDelta(delta);
     };
 
+    const renderDeltaLabel = (delta: number) => {
+        if (delta === -1) {
+            return '-';
+        }
+        if (delta === 1) {
+            return '+';
+        }
+        return delta > 0 ? `+${delta}` : `${delta}`;
+    };
+
     return (
         <div className='flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>
             <p className='text-sm text-gray-200'>{label}</p>
             <div className='flex items-center gap-2'>
-                {/*Subtract 10 Button (-10)*/}
-                <button
-                    type='button'
-                    aria-label={`Decrease ${label}`}
-                    className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
-                    onPointerDown={() => startHold(-10)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onClick={() => handleClick(-10)}>
-                    -10
-                </button>
-                {/*Subtract 5 Button (-5)*/}
-                <button
-                    type='button'
-                    aria-label={`Decrease ${label}`}
-                    className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
-                    onPointerDown={() => startHold(-5)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onClick={() => handleClick(-5)}>
-                    -5
-                </button>
-                {/*Subtract 1 Button (-1)*/}
-                <button
-                    type='button'
-                    aria-label={`Decrease ${label}`}
-                    className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
-                    onPointerDown={() => startHold(-1)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onClick={() => handleClick(-1)}>
-                    -
-                </button>
+                {stepDeltas
+                    .filter(delta => delta < 0)
+                    .map(delta => (
+                        <button
+                            key={delta}
+                            type='button'
+                            aria-label={`Decrease ${label}`}
+                            className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
+                            onPointerDown={() => startHold(delta)}
+                            onPointerUp={stopHold}
+                            onPointerLeave={stopHold}
+                            onPointerCancel={stopHold}
+                            onClick={() => handleClick(delta)}>
+                            {renderDeltaLabel(delta)}
+                        </button>
+                    ))}
 
                 <div className='min-w-[50px] text-center text-2xl font-bold text-white tabular-nums'>
                     {value}
                 </div>
 
-                {/*Add 1 Button (+1)*/}
-                <button
-                    type='button'
-                    aria-label={`Increase ${label}`}
-                    className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
-                    onPointerDown={() => startHold(1)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onClick={() => handleClick(1)}>
-                    +
-                </button>
-                {/*Add 5 Button (+5)*/}
-                <button
-                    type='button'
-                    aria-label={`Increase ${label}`}
-                    className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
-                    onPointerDown={() => startHold(5)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onClick={() => handleClick(5)}>
-                    +5
-                </button>
-                {/*Add 10 Button (+10)*/}
-                <button
-                    type='button'
-                    aria-label={`Increase ${label}`}
-                    className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
-                    onPointerDown={() => startHold(10)}
-                    onPointerUp={stopHold}
-                    onPointerLeave={stopHold}
-                    onPointerCancel={stopHold}
-                    onClick={() => handleClick(10)}>
-                    +10
-                </button>
+                {stepDeltas
+                    .filter(delta => delta > 0)
+                    .map(delta => (
+                        <button
+                            key={delta}
+                            type='button'
+                            aria-label={`Increase ${label}`}
+                            className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
+                            onPointerDown={() => startHold(delta)}
+                            onPointerUp={stopHold}
+                            onPointerLeave={stopHold}
+                            onPointerCancel={stopHold}
+                            onClick={() => handleClick(delta)}>
+                            {renderDeltaLabel(delta)}
+                        </button>
+                    ))}
             </div>
         </div>
     );
@@ -245,6 +218,7 @@ function ScoreCalculator() {
                             onChange={setAutoTowerL1}
                             label='Auto Tower Level 1 (max 2) (15 pnts per climb)'
                             max={gameConfig.scoring.towerAuto.maxRobots}
+                            deltas={[-1, 1]}
                         />
                     </div>
                 </section>
@@ -263,16 +237,19 @@ function ScoreCalculator() {
                             value={teleTowerL1}
                             onChange={setTeleTowerL1}
                             label='Tele Tower Level 1 (max 3) (10 pnts per climb)'
+                            deltas={[-1, 1]}
                         />
                         <Counter
                             value={teleTowerL2}
                             onChange={setTeleTowerL2}
                             label='Tele Tower Level 2 (max 3) (20 pnts per climb)'
+                            deltas={[-1, 1]}
                         />
                         <Counter
                             value={teleTowerL3}
                             onChange={setTeleTowerL3}
                             label='Tele Tower Level 3 (max 3) (30 pnts per climb)'
+                            deltas={[-1, 1]}
                         />
                     </div>
                 </section>
