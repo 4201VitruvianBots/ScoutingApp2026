@@ -81,6 +81,31 @@ function Counter({
         <div className='flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>
             <p className='text-sm text-gray-200'>{label}</p>
             <div className='flex items-center gap-2'>
+                {/*Subtract 10 Button (-10)*/}
+                <button
+                    type='button'
+                    aria-label={`Decrease ${label}`}
+                    className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
+                    onPointerDown={() => startHold(-10)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onClick={() => handleClick(-10)}>
+                    -10
+                </button>
+                {/*Subtract 5 Button (-5)*/}
+                <button
+                    type='button'
+                    aria-label={`Decrease ${label}`}
+                    className='rounded-lg bg-red-500/80 px-4 py-2 text-lg font-semibold text-white transition hover:bg-red-500 active:scale-[0.98]'
+                    onPointerDown={() => startHold(-5)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onClick={() => handleClick(-5)}>
+                    -5
+                </button>
+                {/*Subtract 1 Button (-1)*/}
                 <button
                     type='button'
                     aria-label={`Decrease ${label}`}
@@ -92,9 +117,12 @@ function Counter({
                     onClick={() => handleClick(-1)}>
                     -
                 </button>
+
                 <div className='min-w-[50px] text-center text-2xl font-bold text-white tabular-nums'>
                     {value}
                 </div>
+
+                {/*Add 1 Button (+1)*/}
                 <button
                     type='button'
                     aria-label={`Increase ${label}`}
@@ -105,6 +133,30 @@ function Counter({
                     onPointerCancel={stopHold}
                     onClick={() => handleClick(1)}>
                     +
+                </button>
+                {/*Add 5 Button (+5)*/}
+                <button
+                    type='button'
+                    aria-label={`Increase ${label}`}
+                    className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
+                    onPointerDown={() => startHold(5)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onClick={() => handleClick(5)}>
+                    +5
+                </button>
+                {/*Add 10 Button (+10)*/}
+                <button
+                    type='button'
+                    aria-label={`Increase ${label}`}
+                    className='rounded-lg bg-[#48c55c] px-4 py-2 text-lg font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'
+                    onPointerDown={() => startHold(10)}
+                    onPointerUp={stopHold}
+                    onPointerLeave={stopHold}
+                    onPointerCancel={stopHold}
+                    onClick={() => handleClick(10)}>
+                    +10
                 </button>
             </div>
         </div>
@@ -191,7 +243,7 @@ function ScoreCalculator() {
                         <Counter
                             value={autoTowerL1}
                             onChange={setAutoTowerL1}
-                            label='Auto Tower Level 1 (max 2)'
+                            label='Auto Tower Level 1 (max 2) (15 pnts per climb)'
                             max={gameConfig.scoring.towerAuto.maxRobots}
                         />
                     </div>
@@ -210,17 +262,17 @@ function ScoreCalculator() {
                         <Counter
                             value={teleTowerL1}
                             onChange={setTeleTowerL1}
-                            label='Tele Tower Level 1'
+                            label='Tele Tower Level 1 (max 3) (10 pnts per climb)'
                         />
                         <Counter
                             value={teleTowerL2}
                             onChange={setTeleTowerL2}
-                            label='Tele Tower Level 2'
+                            label='Tele Tower Level 2 (max 3) (20 pnts per climb)'
                         />
                         <Counter
                             value={teleTowerL3}
                             onChange={setTeleTowerL3}
-                            label='Tele Tower Level 3'
+                            label='Tele Tower Level 3 (max 3) (30 pnts per climb)'
                         />
                     </div>
                 </section>
