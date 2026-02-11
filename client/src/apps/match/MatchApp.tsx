@@ -34,6 +34,23 @@ import {
     makeEmptyTeleFuelBySegment,
 } from '../../lib/gameConfig';
 
+//import { useEffect, useState } from 'react';
+function findScrollValue(threshold = 86) {
+    const [scrolled, setScrolled] = useState(false);
+
+    useEffect(() => {
+        const onScroll = () => {
+            setScrolled(window.scrollY >= threshold);
+        };
+
+        window.addEventListener("scroll", onScroll);
+        return () => window.removeEventListener("scroll", onScroll);
+    }, [threshold]);
+
+
+    return scrolled;
+}
+
 const schedule = scheduleFile as MatchSchedule;
 
 const autoStartingOptions: Array<{
@@ -336,17 +353,33 @@ function MatchApp() {
                                 />
                             )}
                         </Dialog>
-                        <button
-                            onClick={handleUndoFuel}
-                            className='rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]'>
-                            <MaterialSymbol
-                                icon='undo'
-                                size={32}
-                                fill
-                                grade={200}
-                                color='black'
-                            />
-                        </button>
+
+                        
+                        <div className={
+                            findScrollValue()
+                                ? 'fixed flex justify-end right-2 top-[1%] bg-gradient-to-bl from-black to-black/50 w-[54px] h-[54px] mr-2 mt-2 rounded-lg'
+                                : '' }
+                                id="undoShadow"> 
+                            <button
+                            //the button has a width & height of 56 px
+                                onClick={handleUndoFuel}
+                                className={
+                                    findScrollValue()
+                                    ? 'fixed right-2 top-[1%] max-w-[56px] max-h-[56px] rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' // if scrolled past 86 px
+                                    : 'rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' //if not scrolled past 86 px
+                                }
+                                id="undoButton">
+                                <MaterialSymbol
+                                    icon='undo'
+                                    size={32}
+                                    fill
+                                    grade={200}
+                                    color='black'
+                                />
+                            </button>
+                        </div>
+
+
                     </div>
                     <div className='text-right'>
                         <h1 className='text-2xl font-semibold text-[#48c55c]'>
@@ -437,6 +470,7 @@ function MatchApp() {
                         <NumberInput
                             onChange={setMatchNumber}
                             value={matchNumber}
+                            min={0}
                             className='mt-2 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                         />
                     </div>

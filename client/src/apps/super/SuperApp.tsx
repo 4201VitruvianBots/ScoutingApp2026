@@ -264,6 +264,7 @@ function SuperApp() {
                     <NumberInput
                         onChange={setMatchNumber}
                         value={matchNumber}
+                        min={0}
                         className='mt-2 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
                     />
                 </section>
