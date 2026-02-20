@@ -1,7 +1,10 @@
 import {
     MatchDataAggregations,
     MatchIndividualDataAggregations,
+    PitResult,
     SuperDataAggregations,
+    SuperIndividualDataAggregations,
+    TeamData,
 } from 'requests';
 import LinkButton from '../../components/LinkButton';
 import { useFetchJson } from '../../lib/useFetch';
@@ -9,7 +12,42 @@ import { useState } from 'react';
 import { MaterialSymbol } from 'react-material-symbols';
 import TeamDropdown from '../../components/TeamDropdown';
 import CheckBoxRecon from './components/CheckDisplayRecon';
-import BarChartWIP from './components/BarchartWIP';
+import FuelPerMatchChart from '../../components/charts/FuelPerMatchChart';
+import SuperFoulsPerMatchChart from '../../components/charts/SuperFoulsPerMatchChart';
+import SuperBreaksPerMatchChart from '../../components/charts/SuperBreaksPerMatchChart';
+import { snakeToSpaced } from '../../lib/snakeCaseConvert';
+
+function commentToColor(comment: string) {
+    switch (comment) {
+        case 'great_driving':
+        case 'fast_cycles':
+        case 'accurate_shots':
+        case 'smart_defense':
+        case 'fast_climb':
+            return 'bg-[#5ac750]';
+        case 'good_driving':
+            return 'bg-[#50a1c7]';
+        case 'ok_driving':
+        case 'slow_climb':
+            return 'bg-[#c78450]';
+        case 'drops_fuel':
+        case 'inaccurate_shots':
+        case 'defense_liability':
+        case 'no_climb':
+            return 'bg-[#c78450]';
+        case 'aggressive_defense':
+            return 'bg-[#c107f0]';
+        case 'rough_driving':
+            return 'bg-[#c75050]';
+        default:
+            return 'bg-gray-500';
+    }
+}
+
+function formatPercent(value: number, digits = 1) {
+    if (!Number.isFinite(value)) return 'N/A';
+    return `${(value * 100).toFixed(digits)}%`;
+}
 
 function ReconApp() {
     const [retrieveMatch, reloadRetrieveMatch] =
@@ -21,6 +59,13 @@ function ReconApp() {
         useFetchJson<MatchIndividualDataAggregations[]>(
             '/data/retrieve/individualMatch'
         );
+    const [retrieveIndividualSuper, reloadRetrieveIndividualSuper] =
+        useFetchJson<SuperIndividualDataAggregations[]>(
+            '/data/retrieve/individualSuper'
+        );
+    const [pitData, reloadPitData] = useFetchJson<PitResult>('/data/pit');
+    const [teamInfo, reloadTeamInfo] = useFetchJson<TeamData>('/team_info.json');
+
     const [teamNumber, setTeamNumber] = useState<number>();
     const sectionClass =
         'rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20';
@@ -32,11 +77,16 @@ function ReconApp() {
         entry => entry._id.teamNumber === teamNumber
     );
     const teamPhotoSrc = teamNumber ? `/image/${teamNumber}.jpeg` : null;
+    const pitEntry = teamNumber ? pitData?.[teamNumber] : undefined;
+    const teamMeta = teamNumber ? teamInfo?.[teamNumber.toString()] : undefined;
+    const teamInfoDetails = teamMeta?.info;
 
     const hasLevel3 = (matchAgg?.climbRateLevel3 ?? 0) > 0;
     const scoresActiveFuel = (matchAgg?.avgTeleFuelActiveComputed ?? 0) >= 10;
     const lowBreakdowns = (matchAgg?.breakdownRate ?? 1) <= 0.1;
     const lowFouls = (superAgg?.avgFoulsTotal ?? 99) <= 1;
+    const lowBreaks = (superAgg?.breakRateAny ?? 1) <= 0.1;
+    const goodDriver = (matchAgg?.driverQualityScoreAvg ?? 0) >= 0.6;
 
     return (
         <div className='min-h-screen bg-gradient-to-b from-[#171c26] via-[#161b22] to-[#12151d] px-6 pb-10 text-white'>
@@ -62,6 +112,9 @@ function ReconApp() {
                                 reloadRetrieveMatch();
                                 reloadRetrieveSuper();
                                 reloadRetrieveIndividualMatch();
+                                reloadRetrieveIndividualSuper();
+                                reloadPitData();
+                                reloadTeamInfo();
                             }}>
                             Reload Data
                         </button>
@@ -71,11 +124,91 @@ function ReconApp() {
                 <section className={sectionClass}>
                     <p className='text-sm uppercase text-gray-300'>Team</p>
                     <div className='mt-2'>
-                        <TeamDropdown onChange={setTeamNumber} value={teamNumber} />
+                        <TeamDropdown
+                            onChange={setTeamNumber}
+                            value={teamNumber}
+                        />
                     </div>
                 </section>
 
                 <div className='grid gap-6 md:grid-cols-2'>
+                    <section className={sectionClass}>
+                        <h2 className='text-lg font-semibold text-[#48c55c]'>
+                            Team
+                        </h2>
+                        <div className='mt-3 space-y-1 text-sm text-gray-200'>
+                            <p className='text-base font-semibold text-white'>
+                                {teamNumber
+                                    ? `Team ${teamNumber}`
+                                    : 'Select a team'}
+                            </p>
+                            {teamInfoDetails && (
+                                <>
+                                    <p className='text-gray-300'>
+                                        {teamInfoDetails.nickname}
+                                    </p>
+                                    <p>
+                                        {teamInfoDetails.city},{' '}
+                                        {teamInfoDetails.state_prov},{' '}
+                                        {teamInfoDetails.country}
+                                    </p>
+                                    <p>
+                                        Rookie Year:{' '}
+                                        {teamInfoDetails.rookie_year}
+                                    </p>
+                                </>
+                            )}
+                        </div>
+
+                        <div className='mt-4 grid grid-cols-2 gap-2 text-sm'>
+                            <div className='rounded-lg border border-white/10 bg-[#1f2432] p-2'>
+                                <p className='text-xs uppercase text-gray-400'>
+                                    Matches
+                                </p>
+                                <p className='text-lg font-semibold'>
+                                    {matchAgg?.matchCount ?? 0}
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#1f2432] p-2'>
+                                <p className='text-xs uppercase text-gray-400'>
+                                    Super Matches
+                                </p>
+                                <p className='text-lg font-semibold'>
+                                    {superAgg?.matchCount ?? 0}
+                                </p>
+                            </div>
+                        </div>
+
+                        <h3 className='mt-5 text-sm font-semibold text-gray-200'>
+                            Pit Snapshot
+                        </h3>
+                        <div className='mt-2 space-y-1 text-sm text-gray-200'>
+                            <p>Drivebase: {pitEntry?.drivebase ?? 'N/A'}</p>
+                            <p>
+                                Batteries: {pitEntry?.batteryCount ?? 'N/A'}
+                            </p>
+                            <p>
+                                Storage:{' '}
+                                {pitEntry?.maxFuelStorageEstimate ?? 'N/A'}
+                            </p>
+                            <p>
+                                Intake:{' '}
+                                {pitEntry?.intakeSources
+                                    ? Object.entries(pitEntry.intakeSources)
+                                          .filter(([, value]) => value)
+                                          .map(([key]) => snakeToSpaced(key))
+                                          .join(', ') || 'None'
+                                    : 'N/A'}
+                            </p>
+                            <p>
+                                Notes:{' '}
+                                <span className='text-gray-300'>
+                                    {pitEntry?.notes || 'N/A'}
+                                </span>
+                            </p>
+                        </div>
+                    </section>
+
                     <section className={sectionClass}>
                         <h2 className='text-lg font-semibold text-[#48c55c]'>
                             Team Photo
@@ -94,22 +227,40 @@ function ReconApp() {
                             )}
                         </div>
                     </section>
+                </div>
+
+                <div className='grid gap-6 md:grid-cols-2'>
+                    <section className={sectionClass}>
+                        <h2 className='text-lg font-semibold text-[#48c55c]'>
+                            Fuel Per Match (Segments)
+                        </h2>
+                        <FuelPerMatchChart
+                            data={retrieveIndividualMatch || []}
+                            teamNumber={teamNumber}
+                            mode='segments'
+                        />
+                    </section>
 
                     <section className={sectionClass}>
                         <h2 className='text-lg font-semibold text-[#48c55c]'>
-                            Fuel Per Match
+                            Fouls Per Match
                         </h2>
-                        <BarChartWIP
-                            data={retrieveIndividualMatch || []}
-                            teamNumber={teamNumber ?? -1}
+                        <SuperFoulsPerMatchChart
+                            data={retrieveIndividualSuper || []}
+                            teamNumber={teamNumber}
                         />
-                        {!teamNumber && (
-                            <p className='mt-2 text-xs text-gray-400'>
-                                Select a team to view match-level fuel trends.
-                            </p>
-                        )}
                     </section>
                 </div>
+
+                <section className={sectionClass}>
+                    <h2 className='text-lg font-semibold text-[#48c55c]'>
+                        Breaks Per Match
+                    </h2>
+                    <SuperBreaksPerMatchChart
+                        data={retrieveIndividualSuper || []}
+                        teamNumber={teamNumber}
+                    />
+                </section>
 
                 <div className='grid gap-6 md:grid-cols-2'>
                     <section className={sectionClass}>
@@ -124,6 +275,12 @@ function ReconApp() {
                                 </span>
                             </p>
                             <p>
+                                Avg Fuel Total:{' '}
+                                <span className='font-semibold text-white'>
+                                    {matchAgg?.avgFuelTotal?.toFixed(2) ?? 'N/A'}
+                                </span>
+                            </p>
+                            <p>
                                 Tele Active Fuel:{' '}
                                 <span className='font-semibold text-white'>
                                     {matchAgg?.avgTeleFuelActiveComputed?.toFixed(2) ??
@@ -135,6 +292,22 @@ function ReconApp() {
                                 <span className='font-semibold text-white'>
                                     {matchAgg?.avgTeleFuelWastedComputed?.toFixed(2) ??
                                         'N/A'}
+                                </span>
+                            </p>
+                            <p>
+                                Auto Move Rate:{' '}
+                                <span className='font-semibold text-white'>
+                                    {matchAgg
+                                        ? formatPercent(matchAgg.autoMovedRate, 1)
+                                        : 'N/A'}
+                                </span>
+                            </p>
+                            <p>
+                                Driver Quality Score:{' '}
+                                <span className='font-semibold text-white'>
+                                    {matchAgg
+                                        ? formatPercent(matchAgg.driverQualityScoreAvg, 1)
+                                        : 'N/A'}
                                 </span>
                             </p>
                             <p>
@@ -173,6 +346,25 @@ function ReconApp() {
                                         : 'N/A'}
                                 </span>
                             </p>
+                            <p>
+                                Breakdown (Comms):{' '}
+                                <span className='font-semibold text-white'>
+                                    {matchAgg
+                                        ? formatPercent(matchAgg.breakdownRateComms, 1)
+                                        : 'N/A'}
+                                </span>
+                            </p>
+                            <p>
+                                Breakdown (Mech):{' '}
+                                <span className='font-semibold text-white'>
+                                    {matchAgg
+                                        ? formatPercent(
+                                              matchAgg.breakdownRateMechanism,
+                                              1
+                                          )
+                                        : 'N/A'}
+                                </span>
+                            </p>
                         </div>
                     </section>
 
@@ -185,6 +377,20 @@ function ReconApp() {
                                 Avg Fouls:{' '}
                                 <span className='font-semibold text-white'>
                                     {superAgg?.avgFoulsTotal?.toFixed(2) ?? 'N/A'}
+                                </span>
+                            </p>
+                            <p>
+                                Avg Breaks:{' '}
+                                <span className='font-semibold text-white'>
+                                    {superAgg?.avgBreaksTotal?.toFixed(2) ?? 'N/A'}
+                                </span>
+                            </p>
+                            <p>
+                                Break Rate (Any):{' '}
+                                <span className='font-semibold text-white'>
+                                    {superAgg
+                                        ? formatPercent(superAgg.breakRateAny, 1)
+                                        : 'N/A'}
                                 </span>
                             </p>
                             <p>
@@ -230,9 +436,59 @@ function ReconApp() {
                                         : 'N/A'}
                                 </span>
                             </p>
+                            <p>
+                                Defense None Rate:{' '}
+                                <span className='font-semibold text-white'>
+                                    {superAgg
+                                        ? formatPercent(superAgg.defenseNoneRate, 1)
+                                        : 'N/A'}
+                                </span>
+                            </p>
+                            <p>
+                                Avg Comment Tags:{' '}
+                                <span className='font-semibold text-white'>
+                                    {superAgg?.avgCommentTags?.toFixed(2) ?? 'N/A'}
+                                </span>
+                            </p>
                         </div>
                     </section>
                 </div>
+
+                <section className={sectionClass}>
+                    <h2 className='text-lg font-semibold text-[#48c55c]'>
+                        Comments
+                    </h2>
+                    <div className='mt-3 flex flex-wrap gap-2 text-sm text-gray-200'>
+                        {superAgg?.commentCounts &&
+                            Object.entries(superAgg.commentCounts)
+                                .sort(([_, a], [__, b]) => (b ?? 0) - (a ?? 0))
+                                .map(
+                                    ([comment, count]) =>
+                                        (count ?? 0) > 0 && (
+                                            <span
+                                                key={comment}
+                                                className={`max-w-fit rounded-lg border px-2 py-1 text-zinc-100 saturate-[75%] ${commentToColor(comment)}`}>
+                                                {snakeToSpaced(comment)}{' '}
+                                                <span className='ml-1 rounded bg-black/15 px-2 py-1'>
+                                                    {count}
+                                                </span>
+                                            </span>
+                                        )
+                                )}
+                        {!teamNumber && (
+                            <p className='text-gray-400'>Select a team.</p>
+                        )}
+                        {teamNumber &&
+                            (!superAgg?.commentCounts ||
+                                Object.values(superAgg.commentCounts).every(
+                                    v => !v || v <= 0
+                                )) && (
+                                <p className='text-gray-400'>
+                                    No comments yet.
+                                </p>
+                            )}
+                    </div>
+                </section>
 
                 <section className={sectionClass}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
@@ -254,6 +510,14 @@ function ReconApp() {
                         <CheckBoxRecon
                             ischecked={lowFouls}
                             label='Low foul rate'
+                        />
+                        <CheckBoxRecon
+                            ischecked={lowBreaks}
+                            label='Low break rate'
+                        />
+                        <CheckBoxRecon
+                            ischecked={goodDriver}
+                            label='Good driver quality'
                         />
                     </div>
                 </section>

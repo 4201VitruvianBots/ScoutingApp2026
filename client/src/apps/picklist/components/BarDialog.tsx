@@ -16,9 +16,18 @@ function BarGraphDialog({
     data: AnalysisEntry[] | undefined;
 }) {
     const columns = data
-        ? Object.keys(data[0]).filter(
-              e => e !== 'teamNumber' && typeof data[0][e] === 'number'
-          )
+        ? Array.from(
+              new Set(
+                  data.flatMap(entry =>
+                      Object.keys(entry).filter(
+                          key =>
+                              key !== 'teamNumber' &&
+                              typeof entry[key] === 'number' &&
+                              Number.isFinite(entry[key] as number)
+                      )
+                  )
+              )
+          ).sort((a, b) => a.localeCompare(b))
         : [];
 
     const [title, setTitle] = useState('');

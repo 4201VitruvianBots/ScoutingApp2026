@@ -12,7 +12,11 @@ function BarGraph({
     teamInfoJson: TeamData;
 }) {
     const entries = data
-        .filter(entry => typeof entry[table.column] === 'number')
+        .filter(
+            entry =>
+                typeof entry[table.column] === 'number' &&
+                Number.isFinite(entry[table.column] as number)
+        )
         .map<ChartDataShape>(entry => ({
             key: entry.teamNumber.toString(),
             data: entry[table.column] as number,

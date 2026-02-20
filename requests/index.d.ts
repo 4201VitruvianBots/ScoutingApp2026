@@ -200,25 +200,54 @@ export interface ScouterData {
 export interface MatchDataAggregations {
     _id: { teamNumber: number };
     avgAutoFuel: number;
+    autoMovedRate: number;
+    autoStartingPositionLeftRate: number;
+    autoStartingPositionCenterRate: number;
+    autoStartingPositionRightRate: number;
+    autoStartingPositionUnknownRate: number;
+    autoTowerAttemptRate: number;
+    autoTowerLevel1Rate: number;
+    autoTowerFailRate: number;
     avgTeleFuelTransition: number;
     avgTeleFuelShift1: number;
     avgTeleFuelShift2: number;
     avgTeleFuelShift3: number;
     avgTeleFuelShift4: number;
     avgTeleFuelEndgame: number;
+    avgTeleFuelTotal: number;
     avgTeleFuelActiveComputed: number;
     avgTeleFuelWastedComputed: number;
+    avgFuelTotal: number;
     climbRateLevel1: number;
     climbRateLevel2: number;
     climbRateLevel3: number;
     climbFailRate: number;
+    climbNoAttemptRate: number;
+    climbAttemptRate: number;
+    climbTimeEarlyRate: number;
+    climbTimeMidRate: number;
+    climbTimeLateRate: number;
+    climbTimeKnownRate: number;
+    driverQualityGreatRate: number;
+    driverQualityGoodRate: number;
+    driverQualityOkRate: number;
+    driverQualityRoughRate: number;
+    driverQualityScoreAvg: number;
     breakdownRate: number;
+    breakdownRateStuck: number;
+    breakdownRateTipped: number;
+    breakdownRateComms: number;
+    breakdownRateMechanism: number;
+    breakdownRateOther: number;
     matchCount: number;
 }
 
 export interface MatchIndividualDataAggregations {
     _id: { teamNumber: number; matchNumber: number; robotPosition: RobotPosition };
+    scouterName: string;
     robotAbsent: boolean;
+    autoStartingPosition: AutoStartingPosition | null;
+    autoMoved: boolean;
     autoFuelScored: number;
     autoFuelWinner: AutoFuelWinner;
     shift1ActiveHubIfTie: AllianceColor | null;
@@ -227,8 +256,10 @@ export interface MatchIndividualDataAggregations {
     teleFuelWastedComputed: number;
     autoTower: AutoTowerResult;
     teleTower: TeleTowerResult;
+    climbTimeBucket: 'early' | 'mid' | 'late' | null;
     breakdown: BreakdownType;
     driverQuality: DriverQuality;
+    freeText: string;
 }
 
 export interface SuperDataAggregations {
@@ -240,20 +271,30 @@ export interface SuperDataAggregations {
     foulRateEjectedFuel: number;
     foulRateOther: number;
     avgHumanPlayerFuelScored: number;
+    avgBreaksTotal: number;
+    avgBreaksMechanism: number;
+    avgBreaksBattery: number;
+    avgBreaksComms: number;
+    avgBreaksBumper: number;
+    breakRateAny: number;
     defenseHeavyRate: number;
     defenseSomeRate: number;
+    defenseNoneRate: number;
     defenseReceivedRate: number;
+    avgCommentTags: number;
     matchCount: number;
     commentCounts: Partial<Record<CommentValues, number>>;
 }
 
-export interface SuperFoulAggregationsData {
-    _id: { teamNumber: number; matchNumber: number };
-    pinning: number;
-    towerContactInEndgame: number;
-    outOfZoneShooting: number;
-    ejectedFuel: number;
-    other: number;
+export interface SuperIndividualDataAggregations {
+    _id: { teamNumber: number; matchNumber: number; robotPosition: RobotPosition };
+    scouterName: string;
+    defenseProvided: DefenseProvided;
+    defenseReceived: boolean;
+    fouls: SuperFouls;
+    breaks: SuperBreaks;
+    comments: CommentValues[];
+    humanPlayerFuelScored: number;
 }
 
 export interface matchOutliersAggregation {

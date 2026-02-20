@@ -1,5 +1,12 @@
 import { AnalysisEntry, WindowData } from './data';
-import { MatchDataAggregations, PitResult, SuperDataAggregations, TeamData } from 'requests';
+import {
+    MatchDataAggregations,
+    MatchIndividualDataAggregations,
+    PitResult,
+    SuperDataAggregations,
+    SuperIndividualDataAggregations,
+    TeamData,
+} from 'requests';
 import Workspace from '../../components/workspace/Workspace';
 import { useWorkspaceState } from '../../components/workspace/useWorkspaceState';
 import StatTable from './components/StatTable';
@@ -18,6 +25,12 @@ import TeamSummaryDialog from './components/TeamSummaryDialog';
 import TeamSummary from './components/TeamSummary';
 import { Dispatch, useState } from 'react';
 import FinalPicklist from './components/FinalPicklist';
+import {
+    fakeMatchAgg,
+    fakePitData,
+    fakeSuperAgg,
+    fakeTeamInfo,
+} from './fakeData';
 
 function generateWindow(
     data: AnalysisEntry[],
@@ -25,6 +38,8 @@ function generateWindow(
     setTable: Dispatch<WindowData>,
     teamInfoJson: TeamData,
     pitData: PitResult,
+    matchIndividualData: MatchIndividualDataAggregations[],
+    superIndividualData: SuperIndividualDataAggregations[],
     addToFocused: Dispatch<WindowData>,
     setFinalPicklist: Dispatch<number[]>
 ) {
@@ -71,6 +86,8 @@ function generateWindow(
                     table={table}
                     pitData={pitData}
                     teamInfoJson={teamInfoJson}
+                    matchIndividualData={matchIndividualData}
+                    superIndividualData={superIndividualData}
                 />
             );
         default:
@@ -85,6 +102,12 @@ function PicklistApp() {
     const [superAgg, reloadSuperAgg] = useFetchJson<SuperDataAggregations[]>(
         '/data/retrieve/super'
     );
+    const [matchIndividual, reloadMatchIndividual] = useFetchJson<
+        MatchIndividualDataAggregations[]
+    >('/data/retrieve/individualMatch');
+    const [superIndividual, reloadSuperIndividual] = useFetchJson<
+        SuperIndividualDataAggregations[]
+    >('/data/retrieve/individualSuper');
     const [pitData, reloadPitData] = useFetchJson<PitResult>('/data/pit');
     const [teamInfo] = useFetchJson<TeamData>('/team_info.json');
 
@@ -94,15 +117,31 @@ function PicklistApp() {
     const [finalPicklist, setFinalPicklist] = useState<number[]>([]);
     const analyzedData: AnalysisEntry[] = [];
 
+    const forceFakeData =
+        typeof window !== 'undefined' &&
+        new URLSearchParams(window.location.search).has('fake');
+    const useFakeData =
+        forceFakeData ||
+        matchAgg === undefined ||
+        superAgg === undefined ||
+        pitData === undefined ||
+        teamInfo === undefined;
+    const matchAggData = useFakeData ? fakeMatchAgg : matchAgg ?? [];
+    const superAggData = useFakeData ? fakeSuperAgg : superAgg ?? [];
+    const pitDataValue = useFakeData ? fakePitData : pitData ?? {};
+    const teamInfoValue = useFakeData ? fakeTeamInfo : teamInfo ?? {};
+    const matchIndividualData = useFakeData ? [] : matchIndividual ?? [];
+    const superIndividualData = useFakeData ? [] : superIndividual ?? [];
+
     const superByTeam = new Map(
-        (superAgg || []).map(entry => [entry._id.teamNumber, entry])
+        (superAggData || []).map(entry => [entry._id.teamNumber, entry])
     );
     const allTeams = new Set<number>();
-    (matchAgg || []).forEach(entry => allTeams.add(entry._id.teamNumber));
-    (superAgg || []).forEach(entry => allTeams.add(entry._id.teamNumber));
+    (matchAggData || []).forEach(entry => allTeams.add(entry._id.teamNumber));
+    (superAggData || []).forEach(entry => allTeams.add(entry._id.teamNumber));
 
     allTeams.forEach(teamNumber => {
-        const matchEntry = matchAgg?.find(
+        const matchEntry = matchAggData?.find(
             entry => entry._id.teamNumber === teamNumber
         );
         const superEntry = superByTeam.get(teamNumber);
@@ -132,10 +171,33 @@ function PicklistApp() {
         const avgFoulsTotal = superEntry?.avgFoulsTotal ?? 0;
         const defenseHeavyRate = superEntry?.defenseHeavyRate ?? 0;
         const defenseSomeRate = superEntry?.defenseSomeRate ?? 0;
+        const breakRateAny = superEntry?.breakRateAny ?? 0;
+
+        const pitBatteryCount = pitDataValue[teamNumber]?.batteryCount ?? 0;
+        const pitMaxFuelStorageEstimate =
+            pitDataValue[teamNumber]?.maxFuelStorageEstimate ?? 0;
+        const pitIsSwerve = pitDataValue[teamNumber]?.drivebase === 'swerve';
+        const rookieYear =
+            teamInfoValue?.[teamNumber.toString()]?.info?.rookie_year ?? 0;
+        const yearsActive = rookieYear
+            ? Math.max(0, new Date().getFullYear() - rookieYear)
+            : 0;
 
         analyzedData.push({
             teamNumber,
             avgAutoFuel,
+            autoMovedRate: matchEntry?.autoMovedRate ?? 0,
+            autoStartingPositionLeftRate:
+                matchEntry?.autoStartingPositionLeftRate ?? 0,
+            autoStartingPositionCenterRate:
+                matchEntry?.autoStartingPositionCenterRate ?? 0,
+            autoStartingPositionRightRate:
+                matchEntry?.autoStartingPositionRightRate ?? 0,
+            autoStartingPositionUnknownRate:
+                matchEntry?.autoStartingPositionUnknownRate ?? 0,
+            autoTowerAttemptRate: matchEntry?.autoTowerAttemptRate ?? 0,
+            autoTowerLevel1Rate: matchEntry?.autoTowerLevel1Rate ?? 0,
+            autoTowerFailRate: matchEntry?.autoTowerFailRate ?? 0,
             avgTeleFuelTransition: matchEntry?.avgTeleFuelTransition ?? 0,
             avgTeleFuelShift1: matchEntry?.avgTeleFuelShift1 ?? 0,
             avgTeleFuelShift2: matchEntry?.avgTeleFuelShift2 ?? 0,
@@ -152,10 +214,26 @@ function PicklistApp() {
             climbRateLevel2,
             climbRateLevel3,
             climbFailRate,
+            climbNoAttemptRate: matchEntry?.climbNoAttemptRate ?? 0,
+            climbAttemptRate: matchEntry?.climbAttemptRate ?? 0,
+            climbTimeEarlyRate: matchEntry?.climbTimeEarlyRate ?? 0,
+            climbTimeMidRate: matchEntry?.climbTimeMidRate ?? 0,
+            climbTimeLateRate: matchEntry?.climbTimeLateRate ?? 0,
+            climbTimeKnownRate: matchEntry?.climbTimeKnownRate ?? 0,
             climbSuccessRate: Math.max(0, 1 - climbFailRate),
             climbLevel2PlusRate: climbRateLevel2 + climbRateLevel3,
             breakdownRate,
             reliabilityScore: Math.max(0, 1 - breakdownRate),
+            breakdownRateStuck: matchEntry?.breakdownRateStuck ?? 0,
+            breakdownRateTipped: matchEntry?.breakdownRateTipped ?? 0,
+            breakdownRateComms: matchEntry?.breakdownRateComms ?? 0,
+            breakdownRateMechanism: matchEntry?.breakdownRateMechanism ?? 0,
+            breakdownRateOther: matchEntry?.breakdownRateOther ?? 0,
+            driverQualityGreatRate: matchEntry?.driverQualityGreatRate ?? 0,
+            driverQualityGoodRate: matchEntry?.driverQualityGoodRate ?? 0,
+            driverQualityOkRate: matchEntry?.driverQualityOkRate ?? 0,
+            driverQualityRoughRate: matchEntry?.driverQualityRoughRate ?? 0,
+            driverQualityScoreAvg: matchEntry?.driverQualityScoreAvg ?? 0,
             matchCount: matchEntry?.matchCount ?? 0,
             avgFoulsTotal,
             foulRatePinning: superEntry?.foulRatePinning ?? 0,
@@ -166,12 +244,26 @@ function PicklistApp() {
             foulRateEjectedFuel: superEntry?.foulRateEjectedFuel ?? 0,
             foulRateOther: superEntry?.foulRateOther ?? 0,
             avgHumanPlayerFuelScored: superEntry?.avgHumanPlayerFuelScored ?? 0,
+            avgBreaksTotal: superEntry?.avgBreaksTotal ?? 0,
+            avgBreaksMechanism: superEntry?.avgBreaksMechanism ?? 0,
+            avgBreaksBattery: superEntry?.avgBreaksBattery ?? 0,
+            avgBreaksComms: superEntry?.avgBreaksComms ?? 0,
+            avgBreaksBumper: superEntry?.avgBreaksBumper ?? 0,
+            breakRateAny,
+            breakReliabilityScore: Math.max(0, 1 - breakRateAny),
             defenseHeavyRate,
             defenseSomeRate,
+            defenseNoneRate: superEntry?.defenseNoneRate ?? 0,
             defenseReceivedRate: superEntry?.defenseReceivedRate ?? 0,
             defenseAggressionScore: defenseHeavyRate * 2 + defenseSomeRate,
             disciplineScore: Math.max(0, 1 - avgFoulsTotal / 6),
+            avgCommentTags: superEntry?.avgCommentTags ?? 0,
             superMatchCount: superEntry?.matchCount ?? 0,
+            pitBatteryCount,
+            pitMaxFuelStorageEstimate,
+            pitIsSwerve: pitIsSwerve ? 1 : 0,
+            rookieYear,
+            yearsActive,
             Comments: superEntry?.commentCounts ?? {},
         });
     });
@@ -198,6 +290,8 @@ function PicklistApp() {
                         reloadMatchAgg();
                         reloadSuperAgg();
                         reloadPitData();
+                        reloadMatchIndividual();
+                        reloadSuperIndividual();
                     }}
                     title='Refresh Data'>
                     <MaterialSymbol
@@ -333,8 +427,10 @@ function PicklistApp() {
                             analyzedData,
                             value,
                             onChange,
-                            teamInfo || {},
-                            pitData || {},
+                            teamInfoValue,
+                            pitDataValue,
+                            matchIndividualData,
+                            superIndividualData,
                             addToFocused,
                             setFinalPicklist
                         )
@@ -343,7 +439,7 @@ function PicklistApp() {
             </Workspace>
             <FinalPicklist
                 onSubmit={addToFocused}
-                teamInfoJson={teamInfo || {}}
+                teamInfoJson={teamInfoValue}
                 data={analyzedData}
                 picklist={finalPicklist}
                 setPicklist={setFinalPicklist}

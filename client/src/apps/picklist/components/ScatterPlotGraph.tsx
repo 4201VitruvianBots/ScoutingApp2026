@@ -10,12 +10,19 @@ function ScatterPlotGraph({
     data: AnalysisEntry[];
     teamInfoJson: TeamData;
 }) {
-    const plotData: ChartShallowDataShape[] = data.map(e => {
-        return {
-            key: e.teamNumber.toString(),
-            data: [e[table.xColumn] as number, e[table.yColumn] as number],
-        };
-    });
+    const plotData: ChartShallowDataShape[] = data
+        .filter(
+            entry =>
+                Number.isFinite(entry[table.xColumn] as number) &&
+                Number.isFinite(entry[table.yColumn] as number)
+        )
+        .map(entry => ({
+            key: entry.teamNumber.toString(),
+            data: [
+                entry[table.xColumn] as number,
+                entry[table.yColumn] as number,
+            ],
+        }));
 
     return <ScatterPlot data={plotData} />;
 }
