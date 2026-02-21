@@ -60,12 +60,12 @@ function DropTarget<T extends TabBase>({
     return areaClassName === undefined ? (
         <div
             {...listeners}
-            className={`${dragTarget ? 'bg-neutral-500/50' : ''} ${className}`}
+            className={`${dragTarget ? 'bg-[#48c55c]/25' : ''} ${className}`}
         />
     ) : (
         <>
             <div
-                className={`${areaClassName} ${dragTarget ? 'bg-neutral-500/50' : ''}`}
+                className={`${areaClassName} ${dragTarget ? 'bg-[#48c55c]/25' : ''}`}
             />
             <div {...listeners} className={`${className} z-10`} />
         </>

@@ -14,6 +14,30 @@
     body {
         @apply overscroll-none;
     }
+
+    .select-search {
+        @apply text-sm;
+    }
+
+    .select-search__input {
+        @apply w-full rounded border border-white/20 bg-[#0f1420] px-2 py-2 text-white;
+    }
+
+    .select-search__input::placeholder {
+        @apply text-gray-400;
+    }
+
+    .select-search__select {
+        @apply mt-1 overflow-hidden rounded border border-white/15 bg-[#151d2a] text-white shadow-lg shadow-black/30;
+    }
+
+    .select-search__option {
+        @apply block cursor-pointer px-2 py-1 text-sm text-gray-200 hover:bg-white/10;
+    }
+
+    .select-search__option.is-selected {
+        @apply bg-[#48c55c]/20 text-white;
+    }
 }
 
 @layer utilities {

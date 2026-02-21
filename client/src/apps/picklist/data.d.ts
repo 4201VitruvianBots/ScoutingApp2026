@@ -21,20 +21,28 @@ export interface StatTableData extends TabBase {
 
 export interface BarGraphData extends TabBase {
     column: string;
-    ascending: boolean;
-    top?: number;
+    highlightedTeams: number[];
+    bins: number;
     type: 'BarGraph';
 }
 
 export interface ScatterPlotGraphData extends TabBase {
     xColumn: string;
     yColumn: string;
+    showLabels: boolean;
     type: 'ScatterPlotGraph';
 }
 
 export interface StatSummaryData extends TabBase {
     column: string;
     type: 'StatSummary';
+}
+
+export interface RadarGraphData extends TabBase {
+    columns: string[];
+    teamNumbers: number[];
+    normalize: boolean;
+    type: 'RadarGraph';
 }
 
 export interface TeamSummaryData extends TabBase {
@@ -46,5 +54,6 @@ export type WindowData =
     | StatTableData
     | BarGraphData
     | ScatterPlotGraphData
+    | RadarGraphData
     | StatSummaryData
     | TeamSummaryData; // | WeightedTableData | BlankTableData | ...

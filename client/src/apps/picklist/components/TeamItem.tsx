@@ -13,32 +13,41 @@ function TeamItem({
     teamInfoJson: TeamData;
     onSubmit: Dispatch<WindowData>;
 }) {
-    // Handle when a team on the stat table is clicked
-    function handleTeamSummaryClick(teamNumber: number) {
+    function handleTeamSummaryClick(nextTeamNumber: number) {
         onSubmit({
-            title: 'Team ' + teamNumber + ' Summary',
+            title: `Team ${nextTeamNumber} Summary`,
             type: 'TeamSummary',
-            teamNumber: teamNumber,
+            teamNumber: nextTeamNumber,
         });
     }
 
     const avatar = teamInfoJson[teamNumber]?.avatar;
+    const teamNickname = teamInfoJson[teamNumber]?.info?.nickname;
 
     return (
         <>
-            <td>
+            <td className='px-2 py-2'>
                 <img
                     src={avatar ? `data:image/png;base64,${avatar}` : blankImage}
                     alt=''
+                    className='h-8 w-8 rounded border border-white/20 bg-black/30 object-cover'
                 />
             </td>
-            <td>
-                {teamNumber}
-                {
-                    <button onClick={() => handleTeamSummaryClick(teamNumber)}>
-                        <MaterialSymbol icon='info' />
+            <td className='px-2 py-2'>
+                <div className='flex items-center gap-2'>
+                    <div>
+                        <p className='font-semibold text-white'>#{teamNumber}</p>
+                        {teamNickname && (
+                            <p className='text-xs text-gray-400'>{teamNickname}</p>
+                        )}
+                    </div>
+                    <button
+                        onClick={() => handleTeamSummaryClick(teamNumber)}
+                        className='rounded bg-white/10 p-1 text-gray-200 transition hover:bg-white/20 hover:text-white'
+                        title={`Open Team ${teamNumber} Summary`}>
+                        <MaterialSymbol icon='info' size={20} />
                     </button>
-                }
+                </div>
             </td>
         </>
     );

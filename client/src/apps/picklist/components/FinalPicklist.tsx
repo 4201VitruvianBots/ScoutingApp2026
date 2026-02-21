@@ -1,11 +1,11 @@
-import { Dispatch, useState } from 'react';
+import { Dispatch, useMemo, useState } from 'react';
 import { MaterialSymbol } from 'react-material-symbols';
 import { AnalysisEntry, WindowData } from '../data';
 import { TeamData } from 'requests';
 import TeamItem from './TeamItem';
 import SelectSearch from 'react-select-search';
 
-function picklist({
+function FinalPicklist({
     teamInfoJson,
     onSubmit,
     data,
@@ -18,21 +18,16 @@ function picklist({
     picklist: number[];
     setPicklist: Dispatch<number[]>;
 }) {
-    // Get all team numbers from the json data
-    const teamNumbers = data?.map(e => e.teamNumber.toString()) ?? [];
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [expanded, setExpanded] = useState(false);
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     const [newTeamNumber, setNewTeamNumber] = useState<string>();
 
-    function handleExpand() {
-        setExpanded(!expanded);
-    }
+    const teamNumbers = useMemo(
+        () => (data ?? []).map(entry => entry.teamNumber.toString()),
+        [data]
+    );
 
     function handleRemoveTeam(index: number) {
-        setPicklist(picklist.filter((_, i) => i !== index));
+        setPicklist(picklist.filter((_, pickIndex) => pickIndex !== index));
     }
 
     function moveTeamNumber(index: number, up: boolean) {
@@ -41,18 +36,18 @@ function picklist({
                 picklist
                     .slice(0, index - 1)
                     .concat(
-                        picklist[index],
-                        picklist[index - 1],
+                        picklist[index]!,
+                        picklist[index - 1]!,
                         picklist.slice(index + 1)
                     )
             );
-        } else if (index < picklist.length - 1) {
+        } else if (!up && index < picklist.length - 1) {
             setPicklist(
                 picklist
                     .slice(0, index)
                     .concat(
-                        picklist[index + 1],
-                        picklist[index],
+                        picklist[index + 1]!,
+                        picklist[index]!,
                         picklist.slice(index + 2)
                     )
             );
@@ -60,74 +55,97 @@ function picklist({
     }
 
     function addNewTeamNumber(teamNumber: string) {
-        if (teamNumber && !picklist.includes(Number(teamNumber))) {
-            setPicklist([...picklist, Number(teamNumber)]);
-            setNewTeamNumber('Select Team');
-        }
+        if (!teamNumber) return;
+        const parsed = Number(teamNumber);
+        if (Number.isNaN(parsed) || picklist.includes(parsed)) return;
+        setPicklist([...picklist, parsed]);
+        setNewTeamNumber(undefined);
     }
 
     return (
         <div
-            className={`absolute right-0 rounded-2xl border-2 border-gray-800 bg-gray-300 p-2 ${expanded ? 'bottom-0 top-40' : '-bottom-5'} flex flex-col items-start`}>
-            <button onClick={handleExpand} className='flex space-x-80'>
-                <p className='text-2xl'>Final Picklist</p>
+            className={`absolute bottom-2 right-2 z-30 w-[min(100vw-1rem,420px)] rounded-xl border border-white/20 bg-[#111723]/95 p-2 text-white shadow-xl shadow-black/40 backdrop-blur transition-all ${
+                expanded ? 'max-h-[80vh]' : 'max-h-14'
+            }`}>
+            <button
+                onClick={() => setExpanded(value => !value)}
+                className='flex w-full items-center justify-between rounded-lg px-2 py-1 transition hover:bg-white/10'>
+                <div className='text-left'>
+                    <p className='text-sm uppercase tracking-wide text-gray-400'>
+                        Final Picklist
+                    </p>
+                    <p className='text-lg font-semibold'>{picklist.length} teams</p>
+                </div>
                 <MaterialSymbol
-                    icon={expanded ? 'arrow_drop_down' : 'arrow_drop_up'}
-                    size={40}
+                    icon={expanded ? 'expand_more' : 'expand_less'}
+                    size={28}
                 />
             </button>
-            {expanded ? (
-                <>
-                    <div className='space-y-3 self-stretch overflow-y-auto text-center text-2xl'>
-                        {picklist.map((team, i) => {
-                            return (
-                                <div className='flex justify-center'>
-                                    <div className='flex flex-col -space-y-3'>
-                                        <button
-                                            onClick={() =>
-                                                moveTeamNumber(i, true)
-                                            }>
-                                            <MaterialSymbol icon='arrow_drop_up' />
-                                        </button>
-                                        <button
-                                            onClick={() =>
-                                                moveTeamNumber(i, false)
-                                            }>
-                                            <MaterialSymbol icon='arrow_drop_down' />
-                                        </button>
-                                    </div>
-                                    <TeamItem
-                                        teamNumber={team}
-                                        teamInfoJson={teamInfoJson}
-                                        onSubmit={onSubmit}
-                                    />
-                                    <button onClick={() => handleRemoveTeam(i)}>
-                                        <MaterialSymbol icon='close' />
+
+            {expanded && (
+                <div className='mt-2 space-y-2'>
+                    <div className='max-h-[54vh] space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-[#171d2a] p-2'>
+                        {picklist.map((team, index) => (
+                            <div
+                                key={`${team}-${index}`}
+                                className='flex items-center justify-between rounded bg-[#101520] px-1 py-1'>
+                                <div className='flex items-center gap-1'>
+                                    <button
+                                        onClick={() => moveTeamNumber(index, true)}
+                                        className='rounded p-1 text-gray-300 hover:bg-white/10 hover:text-white'>
+                                        <MaterialSymbol icon='arrow_drop_up' />
+                                    </button>
+                                    <button
+                                        onClick={() => moveTeamNumber(index, false)}
+                                        className='rounded p-1 text-gray-300 hover:bg-white/10 hover:text-white'>
+                                        <MaterialSymbol icon='arrow_drop_down' />
                                     </button>
                                 </div>
-                            );
-                        })}
+
+                                <table>
+                                    <tbody>
+                                        <tr>
+                                            <TeamItem
+                                                teamNumber={team}
+                                                teamInfoJson={teamInfoJson}
+                                                onSubmit={onSubmit}
+                                            />
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <button
+                                    onClick={() => handleRemoveTeam(index)}
+                                    className='rounded p-1 text-gray-300 hover:bg-white/10 hover:text-white'
+                                    title='Remove team'>
+                                    <MaterialSymbol icon='close' />
+                                </button>
+                            </div>
+                        ))}
+                        {picklist.length === 0 && (
+                            <p className='p-2 text-sm text-gray-400'>
+                                No teams in final picklist yet.
+                            </p>
+                        )}
                     </div>
-                    <div className='self-center'>
+
+                    <div className='rounded-lg border border-white/10 bg-[#171d2a] p-2'>
+                        <p className='mb-1 text-sm font-medium text-gray-200'>Add team</p>
                         <SelectSearch
-                            options={teamNumbers.map(e => ({
-                                value: e,
-                                name: e,
+                            options={teamNumbers.map(team => ({
+                                value: team,
+                                name: team,
                             }))}
                             value={newTeamNumber}
-                            onChange={value =>
-                                addNewTeamNumber(value as string)
-                            }
+                            onChange={value => addNewTeamNumber(value as string)}
                             placeholder='Select Team'
                             search
                         />
                     </div>
-                </>
-            ) : (
-                <></>
+                </div>
             )}
         </div>
     );
 }
 
-export default picklist;
+export default FinalPicklist;

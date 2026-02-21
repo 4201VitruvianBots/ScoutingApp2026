@@ -12,7 +12,6 @@ function StatDialog({
     onClose?: () => void;
 }) {
     const [title, setTitle] = useState('');
-
     const [weighted, setWeighted] = useState(false);
 
     const handleSubmit = () => {
@@ -21,37 +20,43 @@ function StatDialog({
             type: 'StatTable',
             columns: [],
             ascending: false,
-            weighted: weighted,
+            weighted,
             weights: [],
         });
         onClose?.();
     };
 
     return (
-        <>
-            <div className='flex justify-end'>
+        <div className='space-y-3 rounded-xl border border-white/15 bg-[#202736] p-3 text-white'>
+            <div className='flex items-center justify-between'>
+                <h2 className='text-lg font-semibold'>New Stat Table</h2>
                 <button
                     onClick={onClose}
-                    className='grid aspect-square h-3/4 rounded-full hover:bg-gray-500/50'>
+                    className='rounded-full p-1 text-gray-300 transition hover:bg-white/10 hover:text-white'>
                     <MaterialSymbol icon='close' />
                 </button>
             </div>
-            <p>
-                <label>
-                    Title
-                    <TextInput
-                        value={title}
-                        onChange={setTitle}
-                        placeholder={'Stat Table'}
-                        className='p-1'
-                    />
-                </label>
-            </p>
-            <p>
-                <Checkbox onChange={setWeighted}>Weighted</Checkbox>
-            </p>
-            <button onClick={handleSubmit}>Create</button>
-        </>
+
+            <label className='block text-sm font-medium text-gray-200'>
+                Title
+                <TextInput
+                    value={title}
+                    onChange={setTitle}
+                    placeholder='Stat Table'
+                    className='mt-1 w-full rounded border border-white/20 bg-[#0f1420] p-2 text-white'
+                />
+            </label>
+
+            <Checkbox checked={weighted} onChange={setWeighted}>
+                Weighted ranking table
+            </Checkbox>
+
+            <button
+                onClick={handleSubmit}
+                className='rounded bg-[#48c55c] px-3 py-2 font-semibold text-black transition hover:brightness-105'>
+                Create
+            </button>
+        </div>
     );
 }
 

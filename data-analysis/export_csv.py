@@ -1,20 +1,35 @@
+import argparse
 import csv
 import json
+import math
 import os
 import statistics
+from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 from pymongo import MongoClient
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "client" / "src" / "assets" / "game_config_2026.json"
+DEFAULT_OUTPUT_DIR = ROOT / "data-analysis" / "output"
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as config_file:
     GAME_CONFIG = json.load(config_file)
 
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017/")
-DB_NAME = os.getenv("SCOUT_DB", "test")
+FUEL_POINTS_ACTIVE = float(GAME_CONFIG["scoring"]["fuelPointsActive"])
+AUTO_TOWER_POINTS: Dict[str, float] = {
+    "none": 0.0,
+    "failed": 0.0,
+    "level1": float(GAME_CONFIG["scoring"]["towerAuto"]["level1"]),
+}
+TELE_TOWER_POINTS: Dict[str, float] = {
+    "none": 0.0,
+    "failed": 0.0,
+    "level1": float(GAME_CONFIG["scoring"]["towerTele"]["level1"]),
+    "level2": float(GAME_CONFIG["scoring"]["towerTele"]["level2"]),
+    "level3": float(GAME_CONFIG["scoring"]["towerTele"]["level3"]),
+}
 
 COMMENT_VALUES = [
     "great_driving",
@@ -33,7 +48,45 @@ COMMENT_VALUES = [
     "no_climb",
 ]
 
-ID_FIELDS = {"teamNumber", "matchNumber", "robotTeam"}
+DRIVER_QUALITY_SCORE = {
+    "great": 3.0,
+    "good": 2.0,
+    "ok": 1.0,
+    "rough": 0.0,
+}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Extract scouting data from MongoDB, export raw JSON/CSV, and build "
+            "quantitative + categorical analysis outputs."
+        )
+    )
+    parser.add_argument(
+        "--mongo-url",
+        default=os.getenv("MONGO_URL", "mongodb://localhost:27017/"),
+        help="MongoDB connection URL",
+    )
+    parser.add_argument(
+        "--db",
+        default=os.getenv("SCOUT_DB", "test"),
+        help="MongoDB database name",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=str(DEFAULT_OUTPUT_DIR),
+        help="Directory for generated analysis artifacts",
+    )
+    return parser.parse_args()
+
+
+def clamp(value: float, min_value: float, max_value: float) -> float:
+    return max(min_value, min(value, max_value))
+
+
+def safe_div(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator else 0.0
 
 
 def to_number(value: Any) -> float | None:
@@ -44,96 +97,113 @@ def to_number(value: Any) -> float | None:
     return None
 
 
-def summarize_rows(
+def json_default(value: Any) -> str:
+    return str(value)
+
+
+def write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as json_file:
+        json.dump(payload, json_file, indent=2, default=json_default)
+
+
+def write_csv(
+    path: Path,
     rows: List[Dict[str, Any]],
-    dataset: str,
-    exclude: set[str] | None = None,
-) -> List[Dict[str, Any]]:
-    exclude = exclude or set()
-    keys = sorted(
-        {
-            key
-            for row in rows
-            for key, value in row.items()
-            if to_number(value) is not None and key not in exclude
+    fieldnames: Sequence[str] | None = None,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if fieldnames is None:
+        fieldnames = sorted({key for row in rows for key in row.keys()})
+    with open(path, "w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=list(fieldnames))
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def quantile(values: List[float], q: float) -> float:
+    if not values:
+        return 0.0
+    sorted_values = sorted(values)
+    position = (len(sorted_values) - 1) * q
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+    if lower_index == upper_index:
+        return sorted_values[lower_index]
+    lower = sorted_values[lower_index]
+    upper = sorted_values[upper_index]
+    return lower + (upper - lower) * (position - lower_index)
+
+
+def stats_for_values(values: List[float]) -> Dict[str, float | int]:
+    if not values:
+        return {
+            "count": 0,
+            "mean": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "stdev": 0.0,
+            "q1": 0.0,
+            "q3": 0.0,
+            "iqr": 0.0,
         }
-    )
 
-    summary: List[Dict[str, Any]] = []
-    for key in keys:
-        values = [
-            to_number(row.get(key))
-            for row in rows
-            if to_number(row.get(key)) is not None
-        ]
-        if not values:
-            continue
-        mean_value = sum(values) / len(values)
-        summary.append(
-            {
-                "dataset": dataset,
-                "metric": key,
-                "count": len(values),
-                "mean": mean_value,
-                "min": min(values),
-                "max": max(values),
-                "stdev": statistics.pstdev(values) if len(values) > 1 else 0.0,
-            }
-        )
-
-    return summary
+    mean_value = statistics.fmean(values)
+    median_value = statistics.median(values)
+    min_value = min(values)
+    max_value = max(values)
+    stdev = statistics.pstdev(values) if len(values) > 1 else 0.0
+    q1 = quantile(values, 0.25)
+    q3 = quantile(values, 0.75)
+    return {
+        "count": len(values),
+        "mean": mean_value,
+        "median": median_value,
+        "min": min_value,
+        "max": max_value,
+        "stdev": stdev,
+        "q1": q1,
+        "q3": q3,
+        "iqr": q3 - q1,
+    }
 
 
-def clamp(value: float, min_value: float, max_value: float) -> float:
-    return max(min_value, min(max_value, value))
-
-
-def safe_div(value: float, count: float) -> float:
-    return value / count if count else 0.0
-
-
-def add_custom_metrics(row: Dict[str, Any]) -> None:
-    tele_total = sum(
-        [
-            row.get("avgTeleFuelTransition", 0) or 0,
-            row.get("avgTeleFuelShift1", 0) or 0,
-            row.get("avgTeleFuelShift2", 0) or 0,
-            row.get("avgTeleFuelShift3", 0) or 0,
-            row.get("avgTeleFuelShift4", 0) or 0,
-            row.get("avgTeleFuelEndgame", 0) or 0,
-        ]
-    )
-    auto_fuel = row.get("avgAutoFuel", 0) or 0
-    active = row.get("avgTeleFuelActiveComputed", 0) or 0
-    wasted = row.get("avgTeleFuelWastedComputed", 0) or 0
-    fouls = row.get("avgFoulsTotal", 0) or 0
-
-    row["avgTeleFuelTotal"] = tele_total
-    row["avgFuelTotal"] = auto_fuel + tele_total
-    row["teleFuelActiveRate"] = safe_div(active, tele_total)
-    row["teleFuelEfficiency"] = safe_div(active, active + wasted)
-    row["climbSuccessRate"] = clamp(1 - (row.get("climbFailRate", 0) or 0), 0, 1)
-    row["climbLevel2PlusRate"] = (
-        (row.get("climbRateLevel2", 0) or 0)
-        + (row.get("climbRateLevel3", 0) or 0)
-    )
-    row["defenseAggressionScore"] = (
-        (row.get("defenseHeavyRate", 0) or 0) * 2
-        + (row.get("defenseSomeRate", 0) or 0)
-    )
-    row["reliabilityScore"] = clamp(1 - (row.get("breakdownRate", 0) or 0), 0, 1)
-    row["disciplineScore"] = clamp(1 - safe_div(fouls, 6), 0, 1)
+def mode_and_counts(values: Iterable[Any]) -> Dict[str, Any]:
+    normalized = [("null" if value is None else str(value)) for value in values]
+    counts = Counter(normalized)
+    if not counts:
+        return {
+            "count": 0,
+            "uniqueCount": 0,
+            "mode": None,
+            "modeCount": 0,
+            "counts": {},
+        }
+    ordered_counts = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    mode_value, mode_count = ordered_counts[0]
+    return {
+        "count": sum(counts.values()),
+        "uniqueCount": len(counts),
+        "mode": mode_value,
+        "modeCount": mode_count,
+        "counts": dict(sorted(counts.items(), key=lambda item: item[0])),
+    }
 
 
 def get_alliance(robot_position: str) -> str:
-    return "red" if robot_position and robot_position.startswith("red") else "blue"
+    return "red" if robot_position.startswith("red") else "blue"
 
 
-def flip_alliance(color: str) -> str:
-    return "blue" if color == "red" else "red"
+def flip_alliance(alliance: str) -> str:
+    return "blue" if alliance == "red" else "red"
 
 
-def get_shift1_active(auto_winner: str, shift1_active_if_tie: str | None) -> str | None:
+def get_shift1_active_hub(
+    auto_winner: str,
+    shift1_active_if_tie: str | None,
+) -> str | None:
     if auto_winner in ("red", "blue"):
         return auto_winner
     if auto_winner == "tie":
@@ -141,421 +211,843 @@ def get_shift1_active(auto_winner: str, shift1_active_if_tie: str | None) -> str
     return None
 
 
-def compute_active_wasted(entry: Dict[str, Any]) -> Tuple[int, int]:
-    tele = entry.get("teleFuelBySegment") or {}
-    alliance = get_alliance(entry.get("metadata", {}).get("robotPosition", ""))
+def compute_active_wasted(match_entry: Mapping[str, Any]) -> Tuple[float, float]:
+    tele = match_entry.get("teleFuelBySegment") or {}
+    metadata = match_entry.get("metadata") or {}
 
-    both_active = set(GAME_CONFIG["hubRule"]["bothActiveSegments"])
-    shift_order = GAME_CONFIG["hubRule"]["shiftOrder"]
-
-    active = 0
-    wasted = 0
-
-    for segment in both_active:
-        if segment in tele:
-            active += tele.get(segment, 0) or 0
-
-    shift1_active = get_shift1_active(
-        entry.get("autoFuelWinner"), entry.get("shift1ActiveHubIfTie")
+    alliance = get_alliance(metadata.get("robotPosition") or "")
+    shift1_active = get_shift1_active_hub(
+        match_entry.get("autoFuelWinner") or "unknown",
+        match_entry.get("shift1ActiveHubIfTie"),
     )
-    if shift1_active:
-        for index, segment in enumerate(shift_order):
-            if segment not in tele:
-                continue
-            active_hub = shift1_active if index % 2 == 0 else flip_alliance(shift1_active)
-            if active_hub == alliance:
-                active += tele.get(segment, 0) or 0
-            else:
-                wasted += tele.get(segment, 0) or 0
+    shift_order: List[str] = GAME_CONFIG["hubRule"]["shiftOrder"]
+    both_active_segments: List[str] = GAME_CONFIG["hubRule"]["bothActiveSegments"]
+
+    active = 0.0
+    wasted = 0.0
+
+    for segment in both_active_segments:
+        active += float(tele.get(segment, 0) or 0)
+
+    for index, shift in enumerate(shift_order):
+        value = float(tele.get(shift, 0) or 0)
+        if value == 0:
+            continue
+        if shift1_active is None:
+            continue
+        active_hub = shift1_active if index % 2 == 0 else flip_alliance(shift1_active)
+        if active_hub == alliance:
+            active += value
+        else:
+            wasted += value
 
     return active, wasted
 
 
-def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str]) -> None:
-    with open(path, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+def total_tele(tele: Mapping[str, Any]) -> float:
+    return (
+        float(tele.get("transition", 0) or 0)
+        + float(tele.get("shift1", 0) or 0)
+        + float(tele.get("shift2", 0) or 0)
+        + float(tele.get("shift3", 0) or 0)
+        + float(tele.get("shift4", 0) or 0)
+        + float(tele.get("endgame", 0) or 0)
+    )
+
+
+def climb_points_from_tele_tower(tele_tower: str | None) -> float:
+    if tele_tower is None:
+        return 0.0
+    return TELE_TOWER_POINTS.get(tele_tower, 0.0)
+
+
+def flatten_match_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    metadata = entry.get("metadata") or {}
+    tele = entry.get("teleFuelBySegment") or {}
+    active, wasted = compute_active_wasted(entry)
+    auto_fuel = float(entry.get("autoFuelScored", 0) or 0)
+    tele_total = total_tele(tele)
+    auto_tower = str(entry.get("autoTower") or "none")
+    tele_tower = str(entry.get("teleTower") or "none")
+
+    expected_points = (
+        auto_fuel * FUEL_POINTS_ACTIVE
+        + active * FUEL_POINTS_ACTIVE
+        + AUTO_TOWER_POINTS.get(auto_tower, 0.0)
+        + TELE_TOWER_POINTS.get(tele_tower, 0.0)
+    )
+
+    return {
+        "scouterName": metadata.get("scouterName", ""),
+        "matchNumber": metadata.get("matchNumber"),
+        "teamNumber": metadata.get("robotTeam"),
+        "robotPosition": metadata.get("robotPosition", ""),
+        "alliance": get_alliance(metadata.get("robotPosition") or ""),
+        "robotAbsent": bool(entry.get("robotAbsent", False)),
+        "autoStartingPosition": entry.get("autoStartingPosition"),
+        "autoMoved": bool(entry.get("autoMoved", False)),
+        "autoFuelScored": auto_fuel,
+        "autoTower": auto_tower,
+        "autoFuelWinner": entry.get("autoFuelWinner"),
+        "shift1ActiveHubIfTie": entry.get("shift1ActiveHubIfTie"),
+        "teleFuelTransition": float(tele.get("transition", 0) or 0),
+        "teleFuelShift1": float(tele.get("shift1", 0) or 0),
+        "teleFuelShift2": float(tele.get("shift2", 0) or 0),
+        "teleFuelShift3": float(tele.get("shift3", 0) or 0),
+        "teleFuelShift4": float(tele.get("shift4", 0) or 0),
+        "teleFuelEndgame": float(tele.get("endgame", 0) or 0),
+        "teleFuelTotal": tele_total,
+        "teleFuelActiveComputed": active,
+        "teleFuelWastedComputed": wasted,
+        "teleFuelEfficiencyComputed": safe_div(active, active + wasted),
+        "autoTowerPoints": AUTO_TOWER_POINTS.get(auto_tower, 0.0),
+        "teleTower": tele_tower,
+        "teleTowerPoints": TELE_TOWER_POINTS.get(tele_tower, 0.0),
+        "climbPoints": climb_points_from_tele_tower(tele_tower),
+        "climbTimeBucket": entry.get("climbTimeBucket"),
+        "breakdown": entry.get("breakdown"),
+        "driverQuality": entry.get("driverQuality"),
+        "driverQualityScore": DRIVER_QUALITY_SCORE.get(
+            str(entry.get("driverQuality")),
+            0.0,
+        ),
+        "expectedPoints": expected_points,
+        "notes": entry.get("freeText", ""),
+    }
+
+
+def flatten_super_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    metadata = entry.get("metadata") or {}
+    fouls = entry.get("fouls") or {}
+    breaks = entry.get("breaks") or {}
+    comments = [
+        comment for comment in (entry.get("comments") or []) if isinstance(comment, str)
+    ]
+
+    foul_pinning = float(fouls.get("pinning", 0) or 0)
+    foul_tower = float(fouls.get("towerContactInEndgame", 0) or 0)
+    foul_out_of_zone = float(fouls.get("outOfZoneShooting", 0) or 0)
+    foul_ejected = float(fouls.get("ejectedFuel", 0) or 0)
+    foul_other = float(fouls.get("other", 0) or 0)
+
+    break_mechanism = float(breaks.get("mechanism", 0) or 0)
+    break_battery = float(breaks.get("battery", 0) or 0)
+    break_comms = float(breaks.get("comms", 0) or 0)
+    break_bumper = float(breaks.get("bumper", 0) or 0)
+
+    return {
+        "scouterName": metadata.get("scouterName", ""),
+        "matchNumber": metadata.get("matchNumber"),
+        "teamNumber": metadata.get("robotTeam"),
+        "robotPosition": metadata.get("robotPosition", ""),
+        "defenseProvided": entry.get("defenseProvided", "none"),
+        "defenseReceived": bool(entry.get("defenseReceived", False)),
+        "foulPinning": foul_pinning,
+        "foulTowerContactInEndgame": foul_tower,
+        "foulOutOfZoneShooting": foul_out_of_zone,
+        "foulEjectedFuel": foul_ejected,
+        "foulOther": foul_other,
+        "foulsTotal": (
+            foul_pinning
+            + foul_tower
+            + foul_out_of_zone
+            + foul_ejected
+            + foul_other
+        ),
+        "breakMechanism": break_mechanism,
+        "breakBattery": break_battery,
+        "breakComms": break_comms,
+        "breakBumper": break_bumper,
+        "breaksTotal": break_mechanism + break_battery + break_comms + break_bumper,
+        "humanPlayerFuelScored": float(entry.get("humanPlayerFuelScored", 0) or 0),
+        "commentCount": len(comments),
+        "comments": comments,
+    }
+
+
+def flatten_pit_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    intake = entry.get("intakeSources") or {}
+    return {
+        "scouterName": entry.get("scouterName", ""),
+        "teamNumber": entry.get("teamNumber"),
+        "drivebase": entry.get("drivebase"),
+        "maxFuelStorageEstimate": entry.get("maxFuelStorageEstimate"),
+        "intakeDepot": bool(intake.get("depot", False)),
+        "intakeOutpostCorral": bool(intake.get("outpostCorral", False)),
+        "intakeFloorNeutral": bool(intake.get("floorNeutral", False)),
+        "scoringMethod": entry.get("scoringMethod"),
+        "preferredScoringSpot": entry.get("preferredScoringSpot"),
+        "towerCapabilityClaimed": entry.get("towerCapabilityClaimed"),
+        "batteryCount": entry.get("batteryCount"),
+        "notes": entry.get("notes", ""),
+    }
+
+
+def coefficient_of_variation(values: List[float]) -> float:
+    if len(values) <= 1:
+        return 0.0
+    mean_value = abs(statistics.fmean(values))
+    if mean_value < 1e-9:
+        return 2.5
+    return min(2.5, statistics.pstdev(values) / mean_value)
+
+
+def linear_regression(points: List[Tuple[float, float]]) -> Dict[str, float]:
+    if len(points) < 2:
+        return {
+            "slope": 0.0,
+            "intercept": points[0][1] if points else 0.0,
+            "r": 0.0,
+        }
+
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    mean_x = statistics.fmean(xs)
+    mean_y = statistics.fmean(ys)
+
+    x_var = sum((x - mean_x) ** 2 for x in xs)
+    if x_var == 0:
+        return {"slope": 0.0, "intercept": mean_y, "r": 0.0}
+
+    covariance = sum((x - mean_x) * (y - mean_y) for x, y in points)
+    slope = covariance / x_var
+    intercept = mean_y - slope * mean_x
+
+    y_var = sum((y - mean_y) ** 2 for y in ys)
+    if x_var == 0 or y_var == 0:
+        correlation = 0.0
+    else:
+        correlation = covariance / math.sqrt(x_var * y_var)
+
+    return {"slope": slope, "intercept": intercept, "r": correlation}
+
+
+def summarize_quantitative_rows(
+    rows: List[Dict[str, Any]],
+    dataset: str,
+    exclude_fields: set[str] | None = None,
+) -> List[Dict[str, Any]]:
+    exclude_fields = exclude_fields or set()
+    metrics = sorted(
+        {
+            key
+            for row in rows
+            for key, value in row.items()
+            if to_number(value) is not None and key not in exclude_fields
+        }
+    )
+
+    summary: List[Dict[str, Any]] = []
+    for metric in metrics:
+        values = [
+            to_number(row.get(metric))
+            for row in rows
+            if to_number(row.get(metric)) is not None
+        ]
+        numeric_values = [value for value in values if value is not None]
+        if not numeric_values:
+            continue
+        stats = stats_for_values(numeric_values)
+        summary.append({"dataset": dataset, "metric": metric, **stats})
+    return summary
+
+
+def summarize_categorical_rows(
+    rows: List[Dict[str, Any]],
+    dataset: str,
+    exclude_fields: set[str] | None = None,
+) -> List[Dict[str, Any]]:
+    exclude_fields = exclude_fields or set()
+    metrics = sorted(
+        {
+            key
+            for row in rows
+            for key, value in row.items()
+            if (key not in exclude_fields)
+            and (isinstance(value, (str, bool)) or value is None)
+        }
+    )
+
+    summary: List[Dict[str, Any]] = []
+    for metric in metrics:
+        values = [row.get(metric) for row in rows]
+        mode_stats = mode_and_counts(values)
+        summary.append(
+            {
+                "dataset": dataset,
+                "metric": metric,
+                "count": mode_stats["count"],
+                "uniqueCount": mode_stats["uniqueCount"],
+                "mode": mode_stats["mode"],
+                "modeCount": mode_stats["modeCount"],
+                "countsJson": json.dumps(mode_stats["counts"], sort_keys=True),
+            }
+        )
+    return summary
+
+
+def build_team_profiles(
+    match_rows: List[Dict[str, Any]],
+    super_rows: List[Dict[str, Any]],
+    pit_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    match_rows_by_team: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+    match_rows_by_match: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+    super_rows_by_team: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+    pit_by_team: Dict[int, Dict[str, Any]] = {}
+
+    for row in pit_rows:
+        team_number = row.get("teamNumber")
+        if isinstance(team_number, int):
+            pit_by_team[team_number] = row
+
+    for row in match_rows:
+        team_number = row.get("teamNumber")
+        match_number = row.get("matchNumber")
+        if not isinstance(team_number, int) or not isinstance(match_number, int):
+            continue
+        match_rows_by_team[team_number].append(row)
+        match_rows_by_match[match_number].append(row)
+
+    for row in super_rows:
+        team_number = row.get("teamNumber")
+        match_number = row.get("matchNumber")
+        if not isinstance(team_number, int) or not isinstance(match_number, int):
+            continue
+        super_rows_by_team[team_number].append(row)
+
+    team_numbers = sorted(
+        set(match_rows_by_team.keys())
+        | set(super_rows_by_team.keys())
+        | set(pit_by_team.keys())
+    )
+
+    team_expected_points_baseline: Dict[int, float] = {}
+    for team_number in team_numbers:
+        team_matches = [
+            row
+            for row in match_rows_by_team.get(team_number, [])
+            if not row.get("robotAbsent", False)
+        ]
+        values = [
+            float(row.get("expectedPoints", 0.0) or 0.0) for row in team_matches
+        ]
+        team_expected_points_baseline[team_number] = (
+            statistics.fmean(values) if values else 0.0
+        )
+
+    field_expected_points_mean = statistics.fmean(
+        [team_expected_points_baseline.get(team, 0.0) for team in team_numbers]
+    ) if team_numbers else 0.0
+
+    profiles: List[Dict[str, Any]] = []
+    for team_number in team_numbers:
+        team_matches_all = match_rows_by_team.get(team_number, [])
+        team_matches = [
+            row for row in team_matches_all if not row.get("robotAbsent", False)
+        ]
+        team_super = super_rows_by_team.get(team_number, [])
+        team_pit = pit_by_team.get(team_number)
+
+        quantitative_inputs: Dict[str, List[float]] = {
+            "autoFuelScored": [
+                float(row.get("autoFuelScored", 0) or 0) for row in team_matches
+            ],
+            "teleFuelTotal": [
+                float(row.get("teleFuelTotal", 0) or 0) for row in team_matches
+            ],
+            "teleFuelActiveComputed": [
+                float(row.get("teleFuelActiveComputed", 0) or 0)
+                for row in team_matches
+            ],
+            "teleFuelWastedComputed": [
+                float(row.get("teleFuelWastedComputed", 0) or 0)
+                for row in team_matches
+            ],
+            "teleFuelEfficiencyComputed": [
+                float(row.get("teleFuelEfficiencyComputed", 0) or 0)
+                for row in team_matches
+            ],
+            "expectedPoints": [
+                float(row.get("expectedPoints", 0) or 0) for row in team_matches
+            ],
+            "climbPoints": [
+                float(row.get("climbPoints", 0) or 0) for row in team_matches
+            ],
+            "driverQualityScore": [
+                float(row.get("driverQualityScore", 0) or 0) for row in team_matches
+            ],
+            "foulsTotal": [
+                float(row.get("foulsTotal", 0) or 0) for row in team_super
+            ],
+            "breaksTotal": [
+                float(row.get("breaksTotal", 0) or 0) for row in team_super
+            ],
+            "humanPlayerFuelScored": [
+                float(row.get("humanPlayerFuelScored", 0) or 0)
+                for row in team_super
+            ],
+        }
+
+        if team_pit:
+            battery_count = to_number(team_pit.get("batteryCount"))
+            max_storage = to_number(team_pit.get("maxFuelStorageEstimate"))
+            if battery_count is not None:
+                quantitative_inputs["pitBatteryCount"] = [battery_count]
+            if max_storage is not None:
+                quantitative_inputs["pitMaxFuelStorageEstimate"] = [max_storage]
+
+        quantitative_stats = {
+            metric: stats_for_values(values)
+            for metric, values in quantitative_inputs.items()
+        }
+
+        categorical_inputs: Dict[str, List[Any]] = {
+            "autoStartingPosition": [
+                row.get("autoStartingPosition") for row in team_matches
+            ],
+            "autoTower": [row.get("autoTower") for row in team_matches],
+            "autoFuelWinner": [row.get("autoFuelWinner") for row in team_matches],
+            "teleTower": [row.get("teleTower") for row in team_matches],
+            "climbTimeBucket": [row.get("climbTimeBucket") for row in team_matches],
+            "breakdown": [row.get("breakdown") for row in team_matches],
+            "driverQuality": [row.get("driverQuality") for row in team_matches],
+            "defenseProvided": [row.get("defenseProvided") for row in team_super],
+            "defenseReceived": [row.get("defenseReceived") for row in team_super],
+        }
+
+        if team_pit:
+            categorical_inputs["drivebase"] = [team_pit.get("drivebase")]
+            categorical_inputs["scoringMethod"] = [team_pit.get("scoringMethod")]
+            categorical_inputs["preferredScoringSpot"] = [
+                team_pit.get("preferredScoringSpot")
+            ]
+            categorical_inputs["towerCapabilityClaimed"] = [
+                team_pit.get("towerCapabilityClaimed")
+            ]
+
+        categorical_stats = {
+            metric: mode_and_counts(values)
+            for metric, values in categorical_inputs.items()
+        }
+
+        comment_counts = Counter()
+        for row in team_super:
+            for tag in row.get("comments", []):
+                comment_counts[tag] += 1
+
+        expected_points_values = quantitative_inputs["expectedPoints"]
+        tele_values = quantitative_inputs["teleFuelTotal"]
+        climb_values = quantitative_inputs["climbPoints"]
+        foul_values = quantitative_inputs["foulsTotal"]
+
+        consistency_components = []
+        for values in (expected_points_values, tele_values, climb_values):
+            consistency_components.append(math.exp(-coefficient_of_variation(values)))
+        if foul_values:
+            consistency_components.append(math.exp(-coefficient_of_variation(foul_values)))
+        consistency_score = (
+            100.0 * statistics.fmean(consistency_components)
+            if consistency_components
+            else 0.0
+        )
+
+        defense_events: List[float] = []
+        defended_matches = 0
+        for super_row in team_super:
+            defense_mode = super_row.get("defenseProvided")
+            if defense_mode not in ("some", "heavy"):
+                continue
+            match_number = super_row.get("matchNumber")
+            if not isinstance(match_number, int):
+                continue
+            team_match_row = next(
+                (
+                    row
+                    for row in match_rows_by_match.get(match_number, [])
+                    if row.get("teamNumber") == team_number
+                ),
+                None,
+            )
+            if not team_match_row:
+                continue
+            opponents = [
+                row
+                for row in match_rows_by_match.get(match_number, [])
+                if row.get("alliance") != team_match_row.get("alliance")
+                and not row.get("robotAbsent", False)
+            ]
+            if not opponents:
+                continue
+            suppressions = []
+            for opponent in opponents:
+                opponent_team = opponent.get("teamNumber")
+                if not isinstance(opponent_team, int):
+                    continue
+                baseline = team_expected_points_baseline.get(opponent_team, 0.0)
+                observed = float(opponent.get("expectedPoints", 0) or 0)
+                suppressions.append(baseline - observed)
+            if not suppressions:
+                continue
+            weight = 1.0 if defense_mode == "heavy" else 0.6
+            defense_events.append(weight * statistics.fmean(suppressions))
+            defended_matches += 1
+
+        defense_impact = statistics.fmean(defense_events) if defense_events else 0.0
+        defense_impact_stdev = (
+            statistics.pstdev(defense_events) if len(defense_events) > 1 else 0.0
+        )
+        defense_confidence = 1 - math.exp(-safe_div(defended_matches, 3.0))
+        defense_score = clamp(
+            50 + 50 * math.tanh(safe_div(defense_impact * defense_confidence, 12)),
+            0,
+            100,
+        )
+
+        breakdown_rate = safe_div(
+            sum(
+                1
+                for row in team_matches
+                if row.get("breakdown") not in (None, "none")
+            ),
+            len(team_matches),
+        )
+        break_rate_any = safe_div(
+            sum(
+                1
+                for row in team_super
+                if float(row.get("breaksTotal", 0) or 0) > 0
+            ),
+            len(team_super),
+        )
+        reliability_index = clamp(
+            1 - (0.6 * breakdown_rate + 0.4 * break_rate_any),
+            0,
+            1,
+        )
+        foul_discipline = clamp(
+            1 - safe_div(quantitative_stats["foulsTotal"]["mean"], 6),
+            0,
+            1,
+        )
+
+        trend_points = [
+            (
+                float(row.get("matchNumber", 0) or 0),
+                float(row.get("expectedPoints", 0) or 0),
+            )
+            for row in sorted(
+                team_matches,
+                key=lambda row: float(row.get("matchNumber", 0) or 0),
+            )
+            if row.get("matchNumber") is not None
+        ]
+        trend = linear_regression(trend_points)
+
+        profile = {
+            "teamNumber": team_number,
+            "matchCount": len(team_matches),
+            "superMatchCount": len(team_super),
+            "quantitative": quantitative_stats,
+            "categorical": categorical_stats,
+            "customMetrics": {
+                "consistencyScore": consistency_score,
+                "defenseImpactExpectedPoints": defense_impact,
+                "defenseImpactStdev": defense_impact_stdev,
+                "defenseImpactScore": defense_score,
+                "defenseImpactConfidence": defense_confidence,
+                "reliabilityIndex": reliability_index,
+                "disciplineIndex": foul_discipline,
+                "offensiveExpectedPointsAboveField": (
+                    quantitative_stats["expectedPoints"]["mean"]
+                    - field_expected_points_mean
+                ),
+                "expectedPointsTrendPerMatch": trend["slope"],
+                "expectedPointsTrendCorrelation": trend["r"],
+                "floorExpectedPointsQ1": quantitative_stats["expectedPoints"]["q1"],
+                "ceilingExpectedPointsQ3": quantitative_stats["expectedPoints"]["q3"],
+                "upsideSpreadIQR": quantitative_stats["expectedPoints"]["iqr"],
+            },
+            "commentCounts": dict(comment_counts),
+            "pit": team_pit or {},
+        }
+        profiles.append(profile)
+
+    selection_components: Dict[str, List[float]] = {
+        "offense": [
+            profile["quantitative"]["expectedPoints"]["mean"] for profile in profiles
+        ],
+        "consistency": [
+            profile["customMetrics"]["consistencyScore"] for profile in profiles
+        ],
+        "defense": [
+            profile["customMetrics"]["defenseImpactExpectedPoints"]
+            for profile in profiles
+        ],
+        "reliability": [
+            profile["customMetrics"]["reliabilityIndex"] for profile in profiles
+        ],
+        "discipline": [
+            profile["customMetrics"]["disciplineIndex"] for profile in profiles
+        ],
+    }
+
+    component_stats = {
+        key: stats_for_values([float(value) for value in values])
+        for key, values in selection_components.items()
+    }
+
+    for profile in profiles:
+        offense_z = safe_div(
+            profile["quantitative"]["expectedPoints"]["mean"]
+            - component_stats["offense"]["mean"],
+            component_stats["offense"]["stdev"] or 1.0,
+        )
+        consistency_z = safe_div(
+            profile["customMetrics"]["consistencyScore"]
+            - component_stats["consistency"]["mean"],
+            component_stats["consistency"]["stdev"] or 1.0,
+        )
+        defense_z = safe_div(
+            profile["customMetrics"]["defenseImpactExpectedPoints"]
+            - component_stats["defense"]["mean"],
+            component_stats["defense"]["stdev"] or 1.0,
+        )
+        reliability_z = safe_div(
+            profile["customMetrics"]["reliabilityIndex"]
+            - component_stats["reliability"]["mean"],
+            component_stats["reliability"]["stdev"] or 1.0,
+        )
+        discipline_z = safe_div(
+            profile["customMetrics"]["disciplineIndex"]
+            - component_stats["discipline"]["mean"],
+            component_stats["discipline"]["stdev"] or 1.0,
+        )
+
+        profile["customMetrics"]["selectionScore"] = clamp(
+            50
+            + 18 * offense_z
+            + 12 * consistency_z
+            + 12 * defense_z
+            + 8 * reliability_z
+            + 6 * discipline_z,
+            0,
+            100,
+        )
+        profile["customMetrics"]["offenseZScore"] = offense_z
+        profile["customMetrics"]["consistencyZScore"] = consistency_z
+        profile["customMetrics"]["defenseZScore"] = defense_z
+
+    return sorted(profiles, key=lambda profile: profile["teamNumber"])
+
+
+def profile_to_flat_row(profile: Dict[str, Any]) -> Dict[str, Any]:
+    row: Dict[str, Any] = {
+        "teamNumber": profile["teamNumber"],
+        "matchCount": profile["matchCount"],
+        "superMatchCount": profile["superMatchCount"],
+    }
+
+    for metric, metric_stats in sorted(profile["quantitative"].items()):
+        for stat_name, stat_value in metric_stats.items():
+            row[f"{metric}_{stat_name}"] = stat_value
+
+    for metric, metric_stats in sorted(profile["categorical"].items()):
+        row[f"{metric}_mode"] = metric_stats.get("mode")
+        row[f"{metric}_modeCount"] = metric_stats.get("modeCount")
+        row[f"{metric}_uniqueCount"] = metric_stats.get("uniqueCount")
+        row[f"{metric}_countsJson"] = json.dumps(
+            metric_stats.get("counts", {}),
+            sort_keys=True,
+        )
+
+    for metric, value in sorted(profile["customMetrics"].items()):
+        row[metric] = value
+
+    row["commentCountsJson"] = json.dumps(profile["commentCounts"], sort_keys=True)
+    return row
+
+
+def build_picklist_feature_rows(
+    team_profiles: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for profile in team_profiles:
+        quantitative = profile["quantitative"]
+        categorical = profile["categorical"]
+        custom = profile["customMetrics"]
+        row = {
+            "teamNumber": profile["teamNumber"],
+            "matchCount": profile["matchCount"],
+            "superMatchCount": profile["superMatchCount"],
+            "expectedPoints_mean": quantitative["expectedPoints"]["mean"],
+            "expectedPoints_median": quantitative["expectedPoints"]["median"],
+            "expectedPoints_stdev": quantitative["expectedPoints"]["stdev"],
+            "teleFuelTotal_mean": quantitative["teleFuelTotal"]["mean"],
+            "teleFuelEfficiency_mean": quantitative["teleFuelEfficiencyComputed"][
+                "mean"
+            ],
+            "autoFuelScored_mean": quantitative["autoFuelScored"]["mean"],
+            "climbPoints_mean": quantitative["climbPoints"]["mean"],
+            "driverQualityScore_mean": quantitative["driverQualityScore"]["mean"],
+            "foulsTotal_mean": quantitative["foulsTotal"]["mean"],
+            "breaksTotal_mean": quantitative["breaksTotal"]["mean"],
+            "consistencyScore": custom["consistencyScore"],
+            "defenseImpactExpectedPoints": custom["defenseImpactExpectedPoints"],
+            "defenseImpactScore": custom["defenseImpactScore"],
+            "defenseImpactConfidence": custom["defenseImpactConfidence"],
+            "reliabilityIndex": custom["reliabilityIndex"],
+            "disciplineIndex": custom["disciplineIndex"],
+            "expectedPointsTrendPerMatch": custom["expectedPointsTrendPerMatch"],
+            "selectionScore": custom["selectionScore"],
+            "teleTower_mode": categorical["teleTower"]["mode"],
+            "defenseProvided_mode": categorical["defenseProvided"]["mode"],
+            "driverQuality_mode": categorical["driverQuality"]["mode"],
+            "breakdown_mode": categorical["breakdown"]["mode"],
+        }
+        rows.append(row)
+    return rows
+
+
+def build_comment_summary(super_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    counts = Counter()
+    for row in super_rows:
+        for comment in row.get("comments", []):
+            if comment in COMMENT_VALUES:
+                counts[comment] += 1
+    total = sum(counts.values())
+    return [
+        {
+            "comment": comment,
+            "count": counts.get(comment, 0),
+            "rate": safe_div(counts.get(comment, 0), total),
+        }
+        for comment in COMMENT_VALUES
+    ]
+
+
+def export_legacy_outputs(
+    output_dir: Path,
+    match_rows: List[Dict[str, Any]],
+    super_rows: List[Dict[str, Any]],
+    pit_rows: List[Dict[str, Any]],
+    picklist_rows: List[Dict[str, Any]],
+    quantitative_summary: List[Dict[str, Any]],
+) -> None:
+    legacy_dir = ROOT / "data-analysis"
+    write_csv(legacy_dir / "match_raw_2026.csv", match_rows)
+    write_csv(legacy_dir / "super_raw_2026.csv", super_rows)
+    write_csv(legacy_dir / "pit_2026.csv", pit_rows)
+    write_csv(legacy_dir / "team_agg_2026.csv", picklist_rows)
+    write_csv(legacy_dir / "metric_summary_2026.csv", quantitative_summary)
+
+    write_json(output_dir / "legacy_files_written.json", {"path": str(legacy_dir)})
 
 
 def main() -> None:
-    client = MongoClient(MONGO_URL)
-    db = client[DB_NAME]
+    args = parse_args()
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    client = MongoClient(args.mongo_url)
+    db = client[args.db]
 
     match_entries = list(db.matchapps.find({}))
     super_entries = list(db.superapps.find({}))
     pit_entries = list(db.pitapps.find({}))
 
-    match_rows: List[Dict[str, Any]] = []
-    for entry in match_entries:
-        metadata = entry.get("metadata", {})
-        tele = entry.get("teleFuelBySegment") or {}
-        tele_active, tele_wasted = compute_active_wasted(entry)
-        match_rows.append(
-            {
-                "scouterName": metadata.get("scouterName", ""),
-                "matchNumber": metadata.get("matchNumber"),
-                "robotTeam": metadata.get("robotTeam"),
-                "robotPosition": metadata.get("robotPosition", ""),
-                "robotAbsent": entry.get("robotAbsent", False),
-                "autoStartingPosition": entry.get("autoStartingPosition"),
-                "autoMoved": entry.get("autoMoved", False),
-                "autoFuelScored": entry.get("autoFuelScored", 0),
-                "autoTower": entry.get("autoTower"),
-                "autoFuelWinner": entry.get("autoFuelWinner"),
-                "shift1ActiveHubIfTie": entry.get("shift1ActiveHubIfTie"),
-                "teleFuelTransition": tele.get("transition", 0),
-                "teleFuelShift1": tele.get("shift1", 0),
-                "teleFuelShift2": tele.get("shift2", 0),
-                "teleFuelShift3": tele.get("shift3", 0),
-                "teleFuelShift4": tele.get("shift4", 0),
-                "teleFuelEndgame": tele.get("endgame", 0),
-                "teleTower": entry.get("teleTower"),
-                "climbTimeBucket": entry.get("climbTimeBucket"),
-                "breakdown": entry.get("breakdown"),
-                "driverQuality": entry.get("driverQuality"),
-                "freeText": entry.get("freeText", ""),
-                "teleFuelActiveComputed": tele_active,
-                "teleFuelWastedComputed": tele_wasted,
-            }
-        )
+    raw_export = {
+        "mongo": {
+            "url": args.mongo_url,
+            "db": args.db,
+            "matchCount": len(match_entries),
+            "superCount": len(super_entries),
+            "pitCount": len(pit_entries),
+        },
+        "collections": {
+            "matchapps": match_entries,
+            "superapps": super_entries,
+            "pitapps": pit_entries,
+        },
+    }
+    write_json(output_dir / "mongo_raw_2026.json", raw_export)
 
-    super_rows: List[Dict[str, Any]] = []
-    for entry in super_entries:
-        metadata = entry.get("metadata", {})
-        fouls = entry.get("fouls") or {}
-        breaks = entry.get("breaks") or {}
-        comments = entry.get("comments") or []
-        super_rows.append(
-            {
-                "scouterName": metadata.get("scouterName", ""),
-                "matchNumber": metadata.get("matchNumber"),
-                "robotTeam": metadata.get("robotTeam"),
-                "robotPosition": metadata.get("robotPosition", ""),
-                "defenseProvided": entry.get("defenseProvided"),
-                "defenseReceived": entry.get("defenseReceived", False),
-                "foulPinning": fouls.get("pinning", 0),
-                "foulTowerContactInEndgame": fouls.get("towerContactInEndgame", 0),
-                "foulOutOfZoneShooting": fouls.get("outOfZoneShooting", 0),
-                "foulEjectedFuel": fouls.get("ejectedFuel", 0),
-                "foulOther": fouls.get("other", 0),
-                "breakMechanism": breaks.get("mechanism", 0),
-                "breakBattery": breaks.get("battery", 0),
-                "breakComms": breaks.get("comms", 0),
-                "breakBumper": breaks.get("bumper", 0),
-                "comments": ";".join(comments),
-                "humanPlayerFuelScored": entry.get("humanPlayerFuelScored", 0),
-            }
-        )
+    match_rows = [flatten_match_entry(entry) for entry in match_entries]
+    super_rows = [flatten_super_entry(entry) for entry in super_entries]
+    pit_rows = [flatten_pit_entry(entry) for entry in pit_entries]
 
-    pit_rows: List[Dict[str, Any]] = []
-    for entry in pit_entries:
-        intake = entry.get("intakeSources") or {}
-        pit_rows.append(
-            {
-                "scouterName": entry.get("scouterName", ""),
-                "teamNumber": entry.get("teamNumber"),
-                "drivebase": entry.get("drivebase"),
-                "maxFuelStorageEstimate": entry.get("maxFuelStorageEstimate"),
-                "intakeDepot": intake.get("depot", False),
-                "intakeOutpostCorral": intake.get("outpostCorral", False),
-                "intakeFloorNeutral": intake.get("floorNeutral", False),
-                "scoringMethod": entry.get("scoringMethod"),
-                "preferredScoringSpot": entry.get("preferredScoringSpot"),
-                "towerCapabilityClaimed": entry.get("towerCapabilityClaimed"),
-                "batteryCount": entry.get("batteryCount", 0),
-                "notes": entry.get("notes", ""),
-            }
-        )
+    team_profiles = build_team_profiles(match_rows, super_rows, pit_rows)
+    team_profile_rows = [profile_to_flat_row(profile) for profile in team_profiles]
+    picklist_feature_rows = build_picklist_feature_rows(team_profiles)
 
-    match_agg: Dict[int, Dict[str, Any]] = {}
-    for entry in match_entries:
-        metadata = entry.get("metadata", {})
-        team = metadata.get("robotTeam")
-        if not team or entry.get("robotAbsent"):
-            continue
-        agg = match_agg.setdefault(
-            team,
-            {
-                "matchCount": 0,
-                "autoFuel": 0,
-                "teleTransition": 0,
-                "teleShift1": 0,
-                "teleShift2": 0,
-                "teleShift3": 0,
-                "teleShift4": 0,
-                "teleEndgame": 0,
-                "teleActive": 0,
-                "teleWasted": 0,
-                "climbL1": 0,
-                "climbL2": 0,
-                "climbL3": 0,
-                "climbFail": 0,
-                "breakdown": 0,
-            },
-        )
-        tele = entry.get("teleFuelBySegment") or {}
-        agg["matchCount"] += 1
-        agg["autoFuel"] += entry.get("autoFuelScored", 0)
-        agg["teleTransition"] += tele.get("transition", 0)
-        agg["teleShift1"] += tele.get("shift1", 0)
-        agg["teleShift2"] += tele.get("shift2", 0)
-        agg["teleShift3"] += tele.get("shift3", 0)
-        agg["teleShift4"] += tele.get("shift4", 0)
-        agg["teleEndgame"] += tele.get("endgame", 0)
-        tele_active, tele_wasted = compute_active_wasted(entry)
-        agg["teleActive"] += tele_active
-        agg["teleWasted"] += tele_wasted
-        tele_tower = entry.get("teleTower")
-        if tele_tower == "level1":
-            agg["climbL1"] += 1
-        if tele_tower == "level2":
-            agg["climbL2"] += 1
-        if tele_tower == "level3":
-            agg["climbL3"] += 1
-        if tele_tower == "failed":
-            agg["climbFail"] += 1
-        if entry.get("breakdown") and entry.get("breakdown") != "none":
-            agg["breakdown"] += 1
+    quantitative_summary: List[Dict[str, Any]] = []
+    quantitative_summary += summarize_quantitative_rows(
+        match_rows, "match", {"matchNumber", "teamNumber"}
+    )
+    quantitative_summary += summarize_quantitative_rows(
+        super_rows, "super", {"matchNumber", "teamNumber"}
+    )
+    quantitative_summary += summarize_quantitative_rows(
+        pit_rows, "pit", {"teamNumber"}
+    )
+    quantitative_summary += summarize_quantitative_rows(
+        team_profile_rows, "team_profile", {"teamNumber"}
+    )
+    quantitative_summary += summarize_quantitative_rows(
+        picklist_feature_rows, "picklist", {"teamNumber"}
+    )
 
-    super_agg: Dict[int, Dict[str, Any]] = {}
-    for entry in super_entries:
-        metadata = entry.get("metadata", {})
-        team = metadata.get("robotTeam")
-        if not team:
-            continue
-        agg = super_agg.setdefault(
-            team,
-            {
-                "matchCount": 0,
-                "pinning": 0,
-                "towerContact": 0,
-                "outOfZone": 0,
-                "ejectedFuel": 0,
-                "other": 0,
-                "humanFuel": 0,
-                "heavyDefense": 0,
-                "someDefense": 0,
-                "defenseReceived": 0,
-                "commentCounts": {comment: 0 for comment in COMMENT_VALUES},
-            },
-        )
-        fouls = entry.get("fouls") or {}
-        agg["matchCount"] += 1
-        agg["pinning"] += fouls.get("pinning", 0)
-        agg["towerContact"] += fouls.get("towerContactInEndgame", 0)
-        agg["outOfZone"] += fouls.get("outOfZoneShooting", 0)
-        agg["ejectedFuel"] += fouls.get("ejectedFuel", 0)
-        agg["other"] += fouls.get("other", 0)
-        agg["humanFuel"] += entry.get("humanPlayerFuelScored", 0)
-        if entry.get("defenseProvided") == "heavy":
-            agg["heavyDefense"] += 1
-        if entry.get("defenseProvided") == "some":
-            agg["someDefense"] += 1
-        if entry.get("defenseReceived"):
-            agg["defenseReceived"] += 1
-        for comment in entry.get("comments") or []:
-            if comment in agg["commentCounts"]:
-                agg["commentCounts"][comment] += 1
+    categorical_summary: List[Dict[str, Any]] = []
+    categorical_summary += summarize_categorical_rows(match_rows, "match", {"notes"})
+    categorical_summary += summarize_categorical_rows(super_rows, "super", {"comments"})
+    categorical_summary += summarize_categorical_rows(pit_rows, "pit", {"notes"})
+    categorical_summary += summarize_categorical_rows(picklist_feature_rows, "picklist")
 
-    team_numbers = set(match_agg.keys()) | set(super_agg.keys())
-    team_rows: List[Dict[str, Any]] = []
-    for team in sorted(team_numbers):
-        match_team = match_agg.get(team, {})
-        super_team = super_agg.get(team, {})
-        match_count = match_team.get("matchCount", 0) or 0
-        super_count = super_team.get("matchCount", 0) or 0
+    comment_summary = build_comment_summary(super_rows)
 
-        def safe_avg(value: int | float, count: int) -> float:
-            return value / count if count else 0
+    write_json(output_dir / "match_raw_2026.json", match_rows)
+    write_json(output_dir / "super_raw_2026.json", super_rows)
+    write_json(output_dir / "pit_raw_2026.json", pit_rows)
+    write_json(output_dir / "team_profiles_2026.json", team_profiles)
+    write_json(output_dir / "team_picklist_features_2026.json", picklist_feature_rows)
+    write_json(
+        output_dir / "quantitative_metric_summary_2026.json",
+        quantitative_summary,
+    )
+    write_json(
+        output_dir / "categorical_metric_summary_2026.json",
+        categorical_summary,
+    )
+    write_json(output_dir / "comment_tag_summary_2026.json", comment_summary)
 
-        row = {
-            "teamNumber": team,
-            "avgAutoFuel": safe_avg(match_team.get("autoFuel", 0), match_count),
-            "avgTeleFuelTransition": safe_avg(
-                match_team.get("teleTransition", 0), match_count
-            ),
-            "avgTeleFuelShift1": safe_avg(match_team.get("teleShift1", 0), match_count),
-            "avgTeleFuelShift2": safe_avg(match_team.get("teleShift2", 0), match_count),
-            "avgTeleFuelShift3": safe_avg(match_team.get("teleShift3", 0), match_count),
-            "avgTeleFuelShift4": safe_avg(match_team.get("teleShift4", 0), match_count),
-            "avgTeleFuelEndgame": safe_avg(
-                match_team.get("teleEndgame", 0), match_count
-            ),
-            "avgTeleFuelActiveComputed": safe_avg(
-                match_team.get("teleActive", 0), match_count
-            ),
-            "avgTeleFuelWastedComputed": safe_avg(
-                match_team.get("teleWasted", 0), match_count
-            ),
-            "climbRateLevel1": safe_avg(match_team.get("climbL1", 0), match_count),
-            "climbRateLevel2": safe_avg(match_team.get("climbL2", 0), match_count),
-            "climbRateLevel3": safe_avg(match_team.get("climbL3", 0), match_count),
-            "climbFailRate": safe_avg(match_team.get("climbFail", 0), match_count),
-            "breakdownRate": safe_avg(match_team.get("breakdown", 0), match_count),
-            "matchCount": match_count,
-            "avgFoulsTotal": safe_avg(
-                super_team.get("pinning", 0)
-                + super_team.get("towerContact", 0)
-                + super_team.get("outOfZone", 0)
-                + super_team.get("ejectedFuel", 0)
-                + super_team.get("other", 0),
-                super_count,
-            ),
-            "foulRatePinning": safe_avg(super_team.get("pinning", 0), super_count),
-            "foulRateTowerContactInEndgame": safe_avg(
-                super_team.get("towerContact", 0), super_count
-            ),
-            "foulRateOutOfZoneShooting": safe_avg(
-                super_team.get("outOfZone", 0), super_count
-            ),
-            "foulRateEjectedFuel": safe_avg(
-                super_team.get("ejectedFuel", 0), super_count
-            ),
-            "foulRateOther": safe_avg(super_team.get("other", 0), super_count),
-            "avgHumanPlayerFuelScored": safe_avg(
-                super_team.get("humanFuel", 0), super_count
-            ),
-            "defenseHeavyRate": safe_avg(
-                super_team.get("heavyDefense", 0), super_count
-            ),
-            "defenseSomeRate": safe_avg(
-                super_team.get("someDefense", 0), super_count
-            ),
-            "defenseReceivedRate": safe_avg(
-                super_team.get("defenseReceived", 0), super_count
-            ),
-            "superMatchCount": super_count,
-        }
-        add_custom_metrics(row)
-        comment_counts = super_team.get("commentCounts", {})
-        for comment in COMMENT_VALUES:
-            row[f"comment_{comment}"] = comment_counts.get(comment, 0)
-
-        team_rows.append(row)
-
-    match_fields = [
-        "scouterName",
-        "matchNumber",
-        "robotTeam",
-        "robotPosition",
-        "robotAbsent",
-        "autoStartingPosition",
-        "autoMoved",
-        "autoFuelScored",
-        "autoTower",
-        "autoFuelWinner",
-        "shift1ActiveHubIfTie",
-        "teleFuelTransition",
-        "teleFuelShift1",
-        "teleFuelShift2",
-        "teleFuelShift3",
-        "teleFuelShift4",
-        "teleFuelEndgame",
-        "teleTower",
-        "climbTimeBucket",
-        "breakdown",
-        "driverQuality",
-        "freeText",
-        "teleFuelActiveComputed",
-        "teleFuelWastedComputed",
-    ]
-
-    super_fields = [
-        "scouterName",
-        "matchNumber",
-        "robotTeam",
-        "robotPosition",
-        "defenseProvided",
-        "defenseReceived",
-        "foulPinning",
-        "foulTowerContactInEndgame",
-        "foulOutOfZoneShooting",
-        "foulEjectedFuel",
-        "foulOther",
-        "breakMechanism",
-        "breakBattery",
-        "breakComms",
-        "breakBumper",
-        "comments",
-        "humanPlayerFuelScored",
-    ]
-
-    pit_fields = [
-        "scouterName",
-        "teamNumber",
-        "drivebase",
-        "maxFuelStorageEstimate",
-        "intakeDepot",
-        "intakeOutpostCorral",
-        "intakeFloorNeutral",
-        "scoringMethod",
-        "preferredScoringSpot",
-        "towerCapabilityClaimed",
-        "batteryCount",
-        "notes",
-    ]
-
-    team_fields = [
-        "teamNumber",
-        "avgAutoFuel",
-        "avgTeleFuelTransition",
-        "avgTeleFuelShift1",
-        "avgTeleFuelShift2",
-        "avgTeleFuelShift3",
-        "avgTeleFuelShift4",
-        "avgTeleFuelEndgame",
-        "avgTeleFuelActiveComputed",
-        "avgTeleFuelWastedComputed",
-        "avgTeleFuelTotal",
-        "avgFuelTotal",
-        "teleFuelActiveRate",
-        "teleFuelEfficiency",
-        "climbRateLevel1",
-        "climbRateLevel2",
-        "climbRateLevel3",
-        "climbFailRate",
-        "climbSuccessRate",
-        "climbLevel2PlusRate",
-        "breakdownRate",
-        "reliabilityScore",
-        "matchCount",
-        "avgFoulsTotal",
-        "foulRatePinning",
-        "foulRateTowerContactInEndgame",
-        "foulRateOutOfZoneShooting",
-        "foulRateEjectedFuel",
-        "foulRateOther",
-        "avgHumanPlayerFuelScored",
-        "defenseHeavyRate",
-        "defenseSomeRate",
-        "defenseReceivedRate",
-        "defenseAggressionScore",
-        "disciplineScore",
-        "superMatchCount",
-    ] + [f"comment_{comment}" for comment in COMMENT_VALUES]
-
-    write_csv(ROOT / "data-analysis" / "match_raw_2026.csv", match_rows, match_fields)
-    write_csv(ROOT / "data-analysis" / "super_raw_2026.csv", super_rows, super_fields)
-    write_csv(ROOT / "data-analysis" / "pit_2026.csv", pit_rows, pit_fields)
-    write_csv(ROOT / "data-analysis" / "team_agg_2026.csv", team_rows, team_fields)
-
-    summary_rows: List[Dict[str, Any]] = []
-    summary_rows += summarize_rows(match_rows, "match", ID_FIELDS)
-    summary_rows += summarize_rows(super_rows, "super", ID_FIELDS)
-    summary_rows += summarize_rows(pit_rows, "pit", ID_FIELDS)
-    summary_rows += summarize_rows(team_rows, "team", {"teamNumber"})
-
-    summary_fields = ["dataset", "metric", "count", "mean", "min", "max", "stdev"]
+    write_csv(output_dir / "match_raw_2026.csv", match_rows)
+    write_csv(output_dir / "super_raw_2026.csv", super_rows)
+    write_csv(output_dir / "pit_raw_2026.csv", pit_rows)
+    write_csv(output_dir / "team_profiles_2026.csv", team_profile_rows)
+    write_csv(output_dir / "team_picklist_features_2026.csv", picklist_feature_rows)
     write_csv(
-        ROOT / "data-analysis" / "metric_summary_2026.csv",
-        summary_rows,
-        summary_fields,
+        output_dir / "quantitative_metric_summary_2026.csv",
+        quantitative_summary,
+    )
+    write_csv(
+        output_dir / "categorical_metric_summary_2026.csv",
+        categorical_summary,
+    )
+    write_csv(output_dir / "comment_tag_summary_2026.csv", comment_summary)
+
+    export_legacy_outputs(
+        output_dir=output_dir,
+        match_rows=match_rows,
+        super_rows=super_rows,
+        pit_rows=pit_rows,
+        picklist_rows=picklist_feature_rows,
+        quantitative_summary=quantitative_summary,
     )
 
     print(
-        "Wrote match_raw_2026.csv, super_raw_2026.csv, pit_2026.csv, team_agg_2026.csv, metric_summary_2026.csv"
+        "Analysis complete. Wrote raw extracts, quantitative/categorical summaries, "
+        "team profiles, and picklist features to "
+        f"{output_dir}."
     )
 
 

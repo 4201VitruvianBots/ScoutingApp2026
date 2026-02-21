@@ -93,9 +93,9 @@ function FuelPerMatchChart({
                 <YAxis tick={{ fill: 'white' }} />
                 <Tooltip
                     contentStyle={{
-                        backgroundColor: 'white',
+                        backgroundColor: '#10141d',
                         borderRadius: '0.5rem',
-                        border: '1px solid #e5e7eb',
+                        border: '1px solid rgba(255,255,255,0.15)',
                     }}
                 />
                 <Legend />

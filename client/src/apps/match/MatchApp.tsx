@@ -35,7 +35,7 @@ import {
 } from '../../lib/gameConfig';
 
 //import { useEffect, useState } from 'react';
-function findScrollValue(threshold = 86) {
+function useScrollValue(threshold = 86) {
     const [scrolled, setScrolled] = useState(false);
 
     useEffect(() => {
@@ -135,6 +135,7 @@ function MatchApp() {
         useState<'auto' | TeleSegmentId>('auto');
     const [showAutoWinnerPrompt, setShowAutoWinnerPrompt] = useState(false);
     const [showShift1Prompt, setShowShift1Prompt] = useState(false);
+    const isUndoSticky = useScrollValue();
     const fuelHistory = useRef<{ segment: 'auto' | TeleSegmentId; amount: number }[]>(
         []
     );
@@ -144,6 +145,29 @@ function MatchApp() {
     const currentSegment = getSegmentForRemaining(remainingSec);
     const activeSegment = isRunning ? currentSegment : manualSegment;
     const previousSegment = useRef(currentSegment);
+    const elapsedSec = gameConfig.matchDurationSec - remainingSec;
+    const elapsedPercent = Math.max(
+        0,
+        Math.min(100, (elapsedSec / gameConfig.matchDurationSec) * 100)
+    );
+
+    const setMatchTimeFromElapsed = (elapsed: number) => {
+        const clampedElapsed = Math.max(
+            0,
+            Math.min(elapsed, gameConfig.matchDurationSec)
+        );
+        const nextRemaining = gameConfig.matchDurationSec - clampedElapsed;
+        const nextSegment = getSegmentForRemaining(nextRemaining);
+        setRemainingSec(nextRemaining);
+        if (!isRunning) {
+            setManualSegment(
+                nextSegment === 'auto'
+                    ? 'auto'
+                    : (nextSegment as TeleSegmentId)
+            );
+            previousSegment.current = nextSegment;
+        }
+    };
 
     useEffect(() => {
         if (!isRunning) return;
@@ -179,6 +203,12 @@ function MatchApp() {
             previousSegment.current = currentSegment;
         }
     }, [autoFuelWinner, currentSegment, isRunning, shift1ActiveHubIfTie]);
+
+    useEffect(() => {
+        if (!isRunning) {
+            previousSegment.current = currentSegment;
+        }
+    }, [currentSegment, isRunning]);
 
     useEffect(() => {
         setTeamNumber(
@@ -356,7 +386,7 @@ function MatchApp() {
 
                         
                         <div className={
-                            findScrollValue()
+                            isUndoSticky
                                 ? 'fixed flex justify-end right-2 top-[1%] bg-gradient-to-bl from-black to-black/50 w-[54px] h-[54px] mr-2 mt-2 rounded-lg'
                                 : '' }
                                 id="undoShadow"> 
@@ -364,7 +394,7 @@ function MatchApp() {
                             //the button has a width & height of 56 px
                                 onClick={handleUndoFuel}
                                 className={
-                                    findScrollValue()
+                                    isUndoSticky
                                     ? 'fixed right-2 top-[1%] max-w-[56px] max-h-[56px] rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' // if scrolled past 86 px
                                     : 'rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' //if not scrolled past 86 px
                                 }
@@ -435,6 +465,68 @@ function MatchApp() {
                                 className='rounded-lg border border-white/20 px-4 py-2 font-semibold text-white transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
                                 Reset Timer
                             </button>
+                        </div>
+                    </div>
+                    <div className='mt-4 space-y-3'>
+                        <div className='relative h-12 overflow-hidden rounded-xl border border-white/10 bg-[#1b2030]'>
+                            {gameConfig.segments.map(segment => {
+                                const segmentWidth =
+                                    ((segment.endSec - segment.startSec) /
+                                        gameConfig.matchDurationSec) *
+                                    100;
+                                const segmentLeft =
+                                    (segment.startSec /
+                                        gameConfig.matchDurationSec) *
+                                    100;
+                                const segmentIsActive =
+                                    elapsedSec >= segment.startSec &&
+                                    (elapsedSec < segment.endSec ||
+                                        segment.id === 'endgame');
+                                return (
+                                    <button
+                                        key={`timeline-${segment.id}`}
+                                        onClick={() =>
+                                            setMatchTimeFromElapsed(
+                                                segment.startSec
+                                            )
+                                        }
+                                        style={{
+                                            left: `${segmentLeft}%`,
+                                            width: `${segmentWidth}%`,
+                                        }}
+                                        className={`absolute inset-y-0 z-10 border-r border-black/20 px-1 text-[10px] font-semibold uppercase tracking-wide transition ${
+                                            segmentIsActive
+                                                ? 'bg-[#48c55c] text-black'
+                                                : 'bg-[#2a3144] text-gray-200 hover:bg-[#3a435a]'
+                                        }`}>
+                                        <span>{segment.label}</span>
+                                    </button>
+                                );
+                            })}
+                            <div
+                                className='pointer-events-none absolute inset-y-0 z-20 w-[2px] bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]'
+                                style={{
+                                    left: `calc(${elapsedPercent}% - 1px)`,
+                                }}
+                            />
+                        </div>
+                        <input
+                            type='range'
+                            min={0}
+                            max={gameConfig.matchDurationSec}
+                            step={1}
+                            value={elapsedSec}
+                            onChange={event =>
+                                setMatchTimeFromElapsed(
+                                    Number.parseInt(event.target.value, 10)
+                                )
+                            }
+                            className='w-full accent-[#48c55c]'
+                            aria-label='Match elapsed seconds'
+                        />
+                        <div className='flex items-center justify-between text-xs text-gray-300'>
+                            <p>Elapsed: {elapsedSec}s</p>
+                            <p>Remaining: {remainingSec}s</p>
                         </div>
                     </div>
                     <div className='mt-4 flex flex-wrap gap-2'>

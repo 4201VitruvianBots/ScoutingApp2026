@@ -25,12 +25,15 @@ import TeamSummaryDialog from './components/TeamSummaryDialog';
 import TeamSummary from './components/TeamSummary';
 import { Dispatch, useState } from 'react';
 import FinalPicklist from './components/FinalPicklist';
+import RadarGraphDialog from './components/RadarDialog';
+import RadarGraph from './components/RadarGraph';
 import {
     fakeMatchAgg,
     fakePitData,
     fakeSuperAgg,
     fakeTeamInfo,
 } from './fakeData';
+import { buildAnalyzedData } from './analysis';
 
 function generateWindow(
     data: AnalysisEntry[],
@@ -90,6 +93,10 @@ function generateWindow(
                     superIndividualData={superIndividualData}
                 />
             );
+        case 'RadarGraph':
+            return (
+                <RadarGraph data={data} table={table} teamInfoJson={teamInfoJson} />
+            );
         default:
             return undefined;
     }
@@ -115,17 +122,19 @@ function PicklistApp() {
         useWorkspaceState<WindowData>();
 
     const [finalPicklist, setFinalPicklist] = useState<number[]>([]);
-    const analyzedData: AnalysisEntry[] = [];
 
     const forceFakeData =
         typeof window !== 'undefined' &&
         new URLSearchParams(window.location.search).has('fake');
-    const useFakeData =
-        forceFakeData ||
-        matchAgg === undefined ||
-        superAgg === undefined ||
-        pitData === undefined ||
-        teamInfo === undefined;
+    const loadingLiveData =
+        !forceFakeData &&
+        (matchAgg === undefined ||
+            superAgg === undefined ||
+            pitData === undefined ||
+            teamInfo === undefined ||
+            matchIndividual === undefined ||
+            superIndividual === undefined);
+    const useFakeData = forceFakeData;
     const matchAggData = useFakeData ? fakeMatchAgg : matchAgg ?? [];
     const superAggData = useFakeData ? fakeSuperAgg : superAgg ?? [];
     const pitDataValue = useFakeData ? fakePitData : pitData ?? {};
@@ -133,144 +142,18 @@ function PicklistApp() {
     const matchIndividualData = useFakeData ? [] : matchIndividual ?? [];
     const superIndividualData = useFakeData ? [] : superIndividual ?? [];
 
-    const superByTeam = new Map(
-        (superAggData || []).map(entry => [entry._id.teamNumber, entry])
-    );
-    const allTeams = new Set<number>();
-    (matchAggData || []).forEach(entry => allTeams.add(entry._id.teamNumber));
-    (superAggData || []).forEach(entry => allTeams.add(entry._id.teamNumber));
-
-    allTeams.forEach(teamNumber => {
-        const matchEntry = matchAggData?.find(
-            entry => entry._id.teamNumber === teamNumber
-        );
-        const superEntry = superByTeam.get(teamNumber);
-        const avgTeleFuelTotal =
-            (matchEntry?.avgTeleFuelTransition ?? 0) +
-            (matchEntry?.avgTeleFuelShift1 ?? 0) +
-            (matchEntry?.avgTeleFuelShift2 ?? 0) +
-            (matchEntry?.avgTeleFuelShift3 ?? 0) +
-            (matchEntry?.avgTeleFuelShift4 ?? 0) +
-            (matchEntry?.avgTeleFuelEndgame ?? 0);
-        const avgAutoFuel = matchEntry?.avgAutoFuel ?? 0;
-        const avgFuelTotal = avgAutoFuel + avgTeleFuelTotal;
-        const avgTeleFuelActiveComputed = matchEntry?.avgTeleFuelActiveComputed ?? 0;
-        const avgTeleFuelWastedComputed = matchEntry?.avgTeleFuelWastedComputed ?? 0;
-        const teleFuelActiveRate = avgTeleFuelTotal
-            ? avgTeleFuelActiveComputed / avgTeleFuelTotal
-            : 0;
-        const teleFuelEfficiency =
-            avgTeleFuelActiveComputed + avgTeleFuelWastedComputed
-                ? avgTeleFuelActiveComputed /
-                  (avgTeleFuelActiveComputed + avgTeleFuelWastedComputed)
-                : 0;
-        const climbFailRate = matchEntry?.climbFailRate ?? 0;
-        const climbRateLevel2 = matchEntry?.climbRateLevel2 ?? 0;
-        const climbRateLevel3 = matchEntry?.climbRateLevel3 ?? 0;
-        const breakdownRate = matchEntry?.breakdownRate ?? 0;
-        const avgFoulsTotal = superEntry?.avgFoulsTotal ?? 0;
-        const defenseHeavyRate = superEntry?.defenseHeavyRate ?? 0;
-        const defenseSomeRate = superEntry?.defenseSomeRate ?? 0;
-        const breakRateAny = superEntry?.breakRateAny ?? 0;
-
-        const pitBatteryCount = pitDataValue[teamNumber]?.batteryCount ?? 0;
-        const pitMaxFuelStorageEstimate =
-            pitDataValue[teamNumber]?.maxFuelStorageEstimate ?? 0;
-        const pitIsSwerve = pitDataValue[teamNumber]?.drivebase === 'swerve';
-        const rookieYear =
-            teamInfoValue?.[teamNumber.toString()]?.info?.rookie_year ?? 0;
-        const yearsActive = rookieYear
-            ? Math.max(0, new Date().getFullYear() - rookieYear)
-            : 0;
-
-        analyzedData.push({
-            teamNumber,
-            avgAutoFuel,
-            autoMovedRate: matchEntry?.autoMovedRate ?? 0,
-            autoStartingPositionLeftRate:
-                matchEntry?.autoStartingPositionLeftRate ?? 0,
-            autoStartingPositionCenterRate:
-                matchEntry?.autoStartingPositionCenterRate ?? 0,
-            autoStartingPositionRightRate:
-                matchEntry?.autoStartingPositionRightRate ?? 0,
-            autoStartingPositionUnknownRate:
-                matchEntry?.autoStartingPositionUnknownRate ?? 0,
-            autoTowerAttemptRate: matchEntry?.autoTowerAttemptRate ?? 0,
-            autoTowerLevel1Rate: matchEntry?.autoTowerLevel1Rate ?? 0,
-            autoTowerFailRate: matchEntry?.autoTowerFailRate ?? 0,
-            avgTeleFuelTransition: matchEntry?.avgTeleFuelTransition ?? 0,
-            avgTeleFuelShift1: matchEntry?.avgTeleFuelShift1 ?? 0,
-            avgTeleFuelShift2: matchEntry?.avgTeleFuelShift2 ?? 0,
-            avgTeleFuelShift3: matchEntry?.avgTeleFuelShift3 ?? 0,
-            avgTeleFuelShift4: matchEntry?.avgTeleFuelShift4 ?? 0,
-            avgTeleFuelEndgame: matchEntry?.avgTeleFuelEndgame ?? 0,
-            avgTeleFuelActiveComputed,
-            avgTeleFuelWastedComputed,
-            avgTeleFuelTotal,
-            avgFuelTotal,
-            teleFuelActiveRate,
-            teleFuelEfficiency,
-            climbRateLevel1: matchEntry?.climbRateLevel1 ?? 0,
-            climbRateLevel2,
-            climbRateLevel3,
-            climbFailRate,
-            climbNoAttemptRate: matchEntry?.climbNoAttemptRate ?? 0,
-            climbAttemptRate: matchEntry?.climbAttemptRate ?? 0,
-            climbTimeEarlyRate: matchEntry?.climbTimeEarlyRate ?? 0,
-            climbTimeMidRate: matchEntry?.climbTimeMidRate ?? 0,
-            climbTimeLateRate: matchEntry?.climbTimeLateRate ?? 0,
-            climbTimeKnownRate: matchEntry?.climbTimeKnownRate ?? 0,
-            climbSuccessRate: Math.max(0, 1 - climbFailRate),
-            climbLevel2PlusRate: climbRateLevel2 + climbRateLevel3,
-            breakdownRate,
-            reliabilityScore: Math.max(0, 1 - breakdownRate),
-            breakdownRateStuck: matchEntry?.breakdownRateStuck ?? 0,
-            breakdownRateTipped: matchEntry?.breakdownRateTipped ?? 0,
-            breakdownRateComms: matchEntry?.breakdownRateComms ?? 0,
-            breakdownRateMechanism: matchEntry?.breakdownRateMechanism ?? 0,
-            breakdownRateOther: matchEntry?.breakdownRateOther ?? 0,
-            driverQualityGreatRate: matchEntry?.driverQualityGreatRate ?? 0,
-            driverQualityGoodRate: matchEntry?.driverQualityGoodRate ?? 0,
-            driverQualityOkRate: matchEntry?.driverQualityOkRate ?? 0,
-            driverQualityRoughRate: matchEntry?.driverQualityRoughRate ?? 0,
-            driverQualityScoreAvg: matchEntry?.driverQualityScoreAvg ?? 0,
-            matchCount: matchEntry?.matchCount ?? 0,
-            avgFoulsTotal,
-            foulRatePinning: superEntry?.foulRatePinning ?? 0,
-            foulRateTowerContactInEndgame:
-                superEntry?.foulRateTowerContactInEndgame ?? 0,
-            foulRateOutOfZoneShooting:
-                superEntry?.foulRateOutOfZoneShooting ?? 0,
-            foulRateEjectedFuel: superEntry?.foulRateEjectedFuel ?? 0,
-            foulRateOther: superEntry?.foulRateOther ?? 0,
-            avgHumanPlayerFuelScored: superEntry?.avgHumanPlayerFuelScored ?? 0,
-            avgBreaksTotal: superEntry?.avgBreaksTotal ?? 0,
-            avgBreaksMechanism: superEntry?.avgBreaksMechanism ?? 0,
-            avgBreaksBattery: superEntry?.avgBreaksBattery ?? 0,
-            avgBreaksComms: superEntry?.avgBreaksComms ?? 0,
-            avgBreaksBumper: superEntry?.avgBreaksBumper ?? 0,
-            breakRateAny,
-            breakReliabilityScore: Math.max(0, 1 - breakRateAny),
-            defenseHeavyRate,
-            defenseSomeRate,
-            defenseNoneRate: superEntry?.defenseNoneRate ?? 0,
-            defenseReceivedRate: superEntry?.defenseReceivedRate ?? 0,
-            defenseAggressionScore: defenseHeavyRate * 2 + defenseSomeRate,
-            disciplineScore: Math.max(0, 1 - avgFoulsTotal / 6),
-            avgCommentTags: superEntry?.avgCommentTags ?? 0,
-            superMatchCount: superEntry?.matchCount ?? 0,
-            pitBatteryCount,
-            pitMaxFuelStorageEstimate,
-            pitIsSwerve: pitIsSwerve ? 1 : 0,
-            rookieYear,
-            yearsActive,
-            Comments: superEntry?.commentCounts ?? {},
-        });
+    const analyzedData: AnalysisEntry[] = buildAnalyzedData({
+        matchAgg: matchAggData,
+        superAgg: superAggData,
+        matchIndividual: matchIndividualData,
+        superIndividual: superIndividualData,
+        pitData: pitDataValue,
+        teamInfo: teamInfoValue,
     });
 
     return (
-        <main className='relative grid h-screen grid-rows-[auto_1fr] overflow-hidden'>
-            <div className='flex items-center border-b border-white/10 bg-[#1f2432]/90 py-3 text-white shadow-lg shadow-black/30 backdrop-blur'>
+        <main className='relative grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-gradient-to-b from-[#141922] via-[#11161f] to-[#0d1118] text-white'>
+            <div className='flex items-center border-b border-white/10 bg-[#1f2432]/85 py-3 text-white shadow-lg shadow-black/30 backdrop-blur'>
                 <LinkButton
                     link='/'
                     className='flex snap-none items-center justify-center px-2'>
@@ -376,6 +259,31 @@ function PicklistApp() {
                 </Dialog>
                 <Dialog
                     trigger={open => (
+                        <button
+                            className='flex snap-none items-center justify-center px-2'
+                            onClick={open}
+                            title='Add Radar Graph'>
+                            <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
+                                <MaterialSymbol
+                                    icon='radar'
+                                    size={50}
+                                    grade={200}
+                                    color='white'
+                                    className='snap-none'
+                                />
+                            </div>
+                        </button>
+                    )}>
+                    {close => (
+                        <RadarGraphDialog
+                            data={analyzedData || []}
+                            onSubmit={addToFocused}
+                            onClose={close}
+                        />
+                    )}
+                </Dialog>
+                <Dialog
+                    trigger={open => (
                         <button className='flex snap-none items-center justify-center px-2' onClick={open} title="Add Scatter Plot">
                             <div className='flex items-center justify-center rounded border border-white/10 bg-[#2f3646] p-1'>
                                 <MaterialSymbol icon="scatter_plot" size={50} grade={200} color='white' className='snap-none'/>
@@ -419,6 +327,11 @@ function PicklistApp() {
                     Statistical Analysis
                 </h1>
             </div>
+            {loadingLiveData && (
+                <div className='absolute left-1/2 top-20 z-20 -translate-x-1/2 rounded-lg border border-white/20 bg-[#1d2330]/95 px-4 py-2 text-sm text-gray-200 shadow-lg shadow-black/40'>
+                    Loading live scouting data...
+                </div>
+            )}
             <Workspace value={views} onChange={setViews} controls={controls}>
                 {(value, onChange) => {
                     return (

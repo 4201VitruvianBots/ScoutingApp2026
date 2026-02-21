@@ -92,7 +92,7 @@ function Tabs<T extends TabBase>({
 
     return (
         <div className='flex h-full w-full flex-col' onClick={handleFocus}>
-            <div className='flex flex-row overflow-x-auto overflow-y-hidden border-b border-black *:flex-shrink-0'>
+            <div className='flex flex-row overflow-x-auto overflow-y-hidden border-b border-white/10 bg-[#101621] *:flex-shrink-0'>
                 {tabs.map((tab, i) => (
                     <Tab
                         key={i}
@@ -124,7 +124,7 @@ function Tabs<T extends TabBase>({
                 />
             </div>
             <div className='relative flex-grow basis-0'>
-                <div className='absolute inset-0 overflow-auto p-2'>
+                <div className='absolute inset-0 overflow-auto bg-[#111823] p-2'>
                     <Fragment key={selected}>
                         {tabs[selected] &&
                             tabContext(tabs[selected], tab =>

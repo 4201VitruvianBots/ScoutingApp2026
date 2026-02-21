@@ -48,7 +48,11 @@ function Tab<T extends TabBase>({
             onDragEnd={handleDragEnd}
             // drop is triggered before dragEnd
             onClick={onClick}
-            className={`relative -my-px -ml-px min-w-32 cursor-pointer select-none border border-black px-3 py-1 ${selected ? 'bg-neutral-200' : 'text-neutral-500'} flex flex-row items-center justify-between gap-2 whitespace-nowrap`}>
+            className={`relative -my-px -ml-px flex min-w-32 cursor-pointer select-none items-center justify-between gap-2 whitespace-nowrap border border-white/10 px-3 py-1 text-sm ${
+                selected
+                    ? 'bg-[#2b3346] text-white'
+                    : 'bg-[#161d2a] text-gray-400 hover:bg-[#202837] hover:text-gray-200'
+            }`}>
             {dragging && (
                 <DropTarget
                     disabled={draggingSelf}
@@ -59,7 +63,7 @@ function Tab<T extends TabBase>({
             {title}
             <button
                 onClick={onRemove}
-                className='grid aspect-square h-3/4 place-items-center rounded-full hover:bg-gray-500/50'>
+                className='grid aspect-square h-3/4 place-items-center rounded-full text-gray-300 hover:bg-white/10 hover:text-white'>
                 <MaterialSymbol icon='close' />
             </button>
         </div>

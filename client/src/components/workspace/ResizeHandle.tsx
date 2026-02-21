@@ -38,7 +38,7 @@ function ResizeHandle({
             className={`${vertical ? '-my-2 cursor-ns-resize py-2' : '-mx-2 cursor-ew-resize px-2'} z-10`}
             onMouseDown={handleMouseDown}>
             <div
-                className={`${vertical ? 'h-px w-full' : 'h-full w-px'} bg-black`}
+                className={`${vertical ? 'h-px w-full' : 'h-full w-px'} bg-white/20`}
             />
         </div>
     );
