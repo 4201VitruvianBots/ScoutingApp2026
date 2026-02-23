@@ -35,7 +35,7 @@ import {
 } from '../../lib/gameConfig';
 
 //import { useEffect, useState } from 'react';
-function findScrollValue(threshold = 86) {
+function useScrollValue(threshold = 86) {
     const [scrolled, setScrolled] = useState(false);
 
     useEffect(() => {
@@ -356,7 +356,7 @@ function MatchApp() {
 
                         
                         <div className={
-                            findScrollValue()
+                            useScrollValue()
                                 ? 'fixed flex justify-end right-2 top-[1%] bg-gradient-to-bl from-black to-black/50 w-[54px] h-[54px] mr-2 mt-2 rounded-lg'
                                 : '' }
                                 id="undoShadow"> 
@@ -364,7 +364,7 @@ function MatchApp() {
                             //the button has a width & height of 56 px
                                 onClick={handleUndoFuel}
                                 className={
-                                    findScrollValue()
+                                    useScrollValue()
                                     ? 'fixed right-2 top-[1%] max-w-[56px] max-h-[56px] rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' // if scrolled past 86 px
                                     : 'rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' //if not scrolled past 86 px
                                 }
