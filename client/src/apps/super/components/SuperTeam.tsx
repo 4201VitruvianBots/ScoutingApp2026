@@ -143,7 +143,7 @@ function SuperTeam({
                         onChange={handleDefense}
                         value={teamState.defenseProvided}
                         labels={['None', 'Some', 'Heavy']}
-                        values={['none', 'some', 'heavy']}
+                        values={['None', 'some', 'heavy']}
                         className='w-full sm:w-auto'
                         selectedClassName='bg-[#48c55c] text-black'
                         unSelectedClassName='bg-gray-700 text-white'
@@ -155,7 +155,7 @@ function SuperTeam({
                         boxClassName='size-5'
                         checked={teamState.defenseReceived}
                         onChange={handleWasDefended}>
-                        Was Defended?
+                        <span className='absolute ml-1 botton-1'>Was Defended?</span>
                     </Checkbox>
                 </div>
             </div>

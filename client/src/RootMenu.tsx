@@ -10,7 +10,6 @@ const images = [
     'bg-field-blue-super',
     'bg-field-red-super',
 ];
-
 function RootMenu() {
     return (
         <main
@@ -49,13 +48,8 @@ function RootMenu() {
                 Picklist
             </LinkButton>
             <LinkButton
-                link='/score_calculator'
-                className='rounded-3xl bg-[#2f3646] text-5xl'>
-                Scoring Calculator
-            </LinkButton>
-            <LinkButton
                 link='/scouting_leaderboard'
-                className='col-span-2 rounded-3xl bg-[#2f3646] text-5xl'>
+                className='rounded-3xl bg-[#2f3646] text-4xl'>
                 Scouting Leaderboard
             </LinkButton>
             <div className='absolute opacity-0'>
@@ -64,8 +58,13 @@ function RootMenu() {
                 ))}
                 <MaterialSymbol icon='search' />
             </div>
-        </main>
+
+<p className='absolute bottom-0 right-[20%] text-[3px]'> smaller text for the scouting leaderboard buton, what are you talking about? </p>
+
+        </main>  
     );
 }
+
+
 
 export default RootMenu;

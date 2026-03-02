@@ -80,8 +80,8 @@ export interface MetaData {
 }
 
 export type AutoStartingPosition = 'left' | 'center' | 'right';
-export type AutoTowerResult = 'none' | 'level1' | 'failed';
-export type TeleTowerResult = 'none' | 'level1' | 'level2' | 'level3' | 'failed';
+export type AutoTowerResult = 'None' | 'level1' | 'Failed';
+export type TeleTowerResult = 'None' | 'level1' | 'level2' | 'level3' | 'Failed';
 export type AutoFuelWinner = AllianceColor | 'tie' | 'unknown';
 
 export interface TeleFuelBySegment {
@@ -94,7 +94,7 @@ export interface TeleFuelBySegment {
 }
 
 export type BreakdownType =
-    | 'none'
+    | 'None'
     | 'stuck'
     | 'tipped'
     | 'comms'
@@ -120,7 +120,7 @@ export interface MatchData {
     freeText: string;
 }
 
-export type DefenseProvided = 'none' | 'some' | 'heavy';
+export type DefenseProvided = 'None' | 'some' | 'heavy';
 
 export interface SuperFouls {
     pinning: number;

@@ -13,7 +13,6 @@ import ReconApp from './apps/recon/ReconApp';
 import SuperApp from './apps/super/SuperApp';
 import PublicApp from './apps/public/PublicApp';
 import 'react-material-symbols/rounded';
-import ScoringCalculator from './apps/score_calculator/ScoreCalculator';
 import LeaderboardApp from './apps/scouting_leaderboard/LeaderboardApp';
 
 import { registerSW } from 'virtual:pwa-register';
@@ -63,10 +62,6 @@ const router = createBrowserRouter([
                         <PicklistApp />
                     </Suspense>
                 ),
-            },
-            {
-                path: 'score_calculator',
-                element: <ScoringCalculator />,
             },
             {
                 path: 'scouting_leaderboard',

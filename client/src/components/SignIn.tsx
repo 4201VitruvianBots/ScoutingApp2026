@@ -52,7 +52,7 @@ function SignIn({
     return (
         <>
             <div
-                className={`grid w-[400px] grid-cols-2 grid-flow-col selection:box-border ${superScouting ? 'grid-rows-[auto_auto_1fr_1fr_auto]' : pitScouting ? 'grid-rows-[auto_auto_auto]' : 'grid-rows-[auto_auto_1fr_1fr_1fr_1fr_1fr]'}  justify-center gap-3`}>
+                className={`grid w-[400px] grid-cols-2 selection:box-border ${superScouting ? 'grid-rows-[auto_auto_1fr_1fr_auto]' : pitScouting ? 'grid-rows-[auto_auto_auto]' : 'grid-rows-[auto_auto_1fr_1fr_1fr_1fr_1fr]'}  justify-center gap-3`}>
                 <p className='col-span-2 justify-self-center p-1 text-2xl font-medium text-green-600'>
                     Sign-In
                 </p>
@@ -69,9 +69,9 @@ function SignIn({
                         value={robotPosition}
                         labels={['Red', 'Blue']}
                         values={['red_ss','blue_ss']}
-                        className={'text-xl col-2 row-2'}
+                        className={'text-xl'}
                         unSelectedClassName={[
-                            'text-red-500 bg-gray-300 ',
+                            'text-red-500 bg-gray-300',
                             'text-blue-500 bg-gray-300',
                         ]}
                         selectedClassName={[
