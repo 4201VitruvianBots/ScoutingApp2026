@@ -102,6 +102,8 @@ function MatchApp() {
     const [sendQueue, sendAll, queue, sending] = useQueue();
     const [teamNumber, setTeamNumber] = useState<number>();
     const [matchNumber, setMatchNumber] = useState<number>();
+    //const [fakeMatchNumber, setFakeMatchNumber] = useState<number>();
+    //const [fakeTeamNumber, setFakeTeamNumber] = useState<number>();
     const [showCheck, setShowCheck] = useState(false);
     const [scouterName, setScouterName] = useState('');
     const [robotPosition, setRobotPosition] = useState<RobotPosition>();
@@ -168,6 +170,11 @@ function MatchApp() {
             previousSegment.current = nextSegment;
         }
     };
+
+    const RNGenerator = (min: number, max: number) => {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    };
+    const segmentArr = ['auto', 'transition', 'shift1', 'shift2', 'shift3', 'shift4', 'endgame'];
 
     useEffect(() => {
         if (!isRunning) return;
@@ -318,6 +325,24 @@ function MatchApp() {
         }, 3000);
     };
 
+    const genFakeFuel = () => {
+        //setFakeMatchNumber(-1);
+        //setFakeTeamNumber(0);
+        for (let segArrIndex = 0; segArrIndex < segmentArr.length; segArrIndex++) {
+            const segment = segmentArr[segArrIndex];
+            if (segment === 'auto') {
+                setAutoFuelScored(0);
+                handleFuelAdd(RNGenerator(1, 150));
+            }
+            else if (segment === 'transition' || segment === 'shift1' || segment === 'shift2' || segment === 'shift3' || segment === 'shift4' || segment === 'endgame') {
+                setTeleFuelBySegment(prev => ({
+                    ...prev,
+                    [segment]: RNGenerator(1, 200),
+                }));
+            }
+        }
+    };
+
     const handleAbsentRobot = async () => {
         if (robotPosition == undefined || matchNumber == undefined) {
             alert('Check sign-in and match number');
@@ -386,7 +411,7 @@ function MatchApp() {
 
                         
                         <div className={
-                            isUndoSticky
+                            useScrollValue()
                                 ? 'fixed flex justify-end right-2 top-[1%] bg-gradient-to-bl from-black to-black/50 w-[54px] h-[54px] mr-2 mt-2 rounded-lg'
                                 : '' }
                                 id="undoShadow"> 
@@ -394,7 +419,7 @@ function MatchApp() {
                             //the button has a width & height of 56 px
                                 onClick={handleUndoFuel}
                                 className={
-                                    isUndoSticky
+                                    useScrollValue()
                                     ? 'fixed right-2 top-[1%] max-w-[56px] max-h-[56px] rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' // if scrolled past 86 px
                                     : 'rounded-lg bg-[#f07800] px-3 py-2 text-black transition hover:brightness-105 active:scale-[0.98]' //if not scrolled past 86 px
                                 }
@@ -441,6 +466,13 @@ function MatchApp() {
                             </p>
                         </div>
                         <div className='flex flex-wrap gap-2'>
+                            <button
+                                onClick={() => {
+                                    genFakeFuel();
+                                }}
+                                className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]">
+                                Fake Data
+                            </button>
                             <button
                                 onClick={() => {
                                     setRemainingSec(gameConfig.matchDurationSec);
