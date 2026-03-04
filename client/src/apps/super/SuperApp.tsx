@@ -30,7 +30,7 @@ const defaultSuperTeamState: SuperTeamState = {
         comms: 0,
         bumper: 0,
     },
-    defenseProvided: 'none',
+    defenseProvided: 'None',
     defenseReceived: false,
     teamNumber: undefined,
     comments: [],

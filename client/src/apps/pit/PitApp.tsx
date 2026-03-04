@@ -214,7 +214,7 @@ function PitApp() {
                                 }))
                             }
                             className='text-base'>
-                            Depot
+                            <span className='ml-0.5'>Depot</span>
                         </Checkbox>
                         <Checkbox
                             checked={intakeSources.outpostCorral}
@@ -225,7 +225,7 @@ function PitApp() {
                                 }))
                             }
                             className='text-base'>
-                            Outpost Corral
+                            <span className='ml-0.5'>Outpost Corral</span>
                         </Checkbox>
                         <Checkbox
                             checked={intakeSources.floorNeutral}
@@ -236,7 +236,7 @@ function PitApp() {
                                 }))
                             }
                             className='text-base'>
-                            Floor (Neutral)
+                            <span className='ml-0.5'>Floor (Neutral)</span>
                         </Checkbox>
                     </div>
                 </section>

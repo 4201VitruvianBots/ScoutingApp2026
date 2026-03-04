@@ -63,19 +63,19 @@ const autoStartingOptions: Array<{
     { label: 'N/A', value: null },
 ];
 
-const autoTowerOptions: AutoTowerResult[] = ['none', 'level1', 'failed'];
+const autoTowerOptions: AutoTowerResult[] = ['None', 'level1', 'Failed'];
 const teleTowerOptions: TeleTowerResult[] = [
-    'none',
+    'None',
     'level1',
     'level2',
     'level3',
-    'failed',
+    'Failed',
 ];
 const autoFuelWinnerOptions: AutoFuelWinner[] = ['red', 'blue', 'tie', 'unknown'];
 const allianceOptions: AllianceColor[] = ['red', 'blue'];
 
 const breakdownOptions: BreakdownType[] = [
-    'none',
+    'None',
     'stuck',
     'tipped',
     'comms',
@@ -113,7 +113,7 @@ function MatchApp() {
         useState<AutoStartingPosition | null>(null);
     const [autoMoved, setAutoMoved] = useState(false);
     const [autoFuelScored, setAutoFuelScored] = useState(0);
-    const [autoTower, setAutoTower] = useState<AutoTowerResult>('none');
+    const [autoTower, setAutoTower] = useState<AutoTowerResult>('None');
     const [autoFuelWinner, setAutoFuelWinner] =
         useState<AutoFuelWinner>('unknown');
     const [shift1ActiveHubIfTie, setShift1ActiveHubIfTie] =
@@ -121,10 +121,10 @@ function MatchApp() {
     const [teleFuelBySegment, setTeleFuelBySegment] = useState(
         makeEmptyTeleFuelBySegment()
     );
-    const [teleTower, setTeleTower] = useState<TeleTowerResult>('none');
+    const [teleTower, setTeleTower] = useState<TeleTowerResult>('None');
     const [climbTimeBucket, setClimbTimeBucket] =
         useState<MatchData['climbTimeBucket']>(null);
-    const [breakdown, setBreakdown] = useState<BreakdownType>('none');
+    const [breakdown, setBreakdown] = useState<BreakdownType>('None');
     const [driverQuality, setDriverQuality] =
         useState<DriverQuality>('ok');
     const [freeText, setFreeText] = useState('');
@@ -230,11 +230,11 @@ function MatchApp() {
     const handleFuelAdd = (amount: number) => {
         const segment = activeSegment;
         if (segment === 'auto') {
-            setAutoFuelScored(prev => prev + amount);
+            setAutoFuelScored(prev => (prev + amount) >= 0 ? prev + amount: prev = 0); //If the prevous value plus the amount being added is MORE THAN OR EQUAL to 0 than add it, otherwise set the value to 0
         } else {
             setTeleFuelBySegment(prev => ({
                 ...prev,
-                [segment]: prev[segment] + amount,
+                [segment]: (prev[segment] + amount) >= 0 ? prev[segment] + amount: prev[segment] = 0, // exact same function as above
             }));
         }
         fuelHistory.current = [
@@ -270,13 +270,13 @@ function MatchApp() {
         setAutoStartingPosition(null);
         setAutoMoved(false);
         setAutoFuelScored(0);
-        setAutoTower('none');
+        setAutoTower('None');
         setAutoFuelWinner('unknown');
         setShift1ActiveHubIfTie(null);
         setTeleFuelBySegment(makeEmptyTeleFuelBySegment());
-        setTeleTower('none');
+        setTeleTower('None');
         setClimbTimeBucket(null);
-        setBreakdown('none');
+        setBreakdown('None');
         setDriverQuality('ok');
         setFreeText('');
         fuelHistory.current = [];
@@ -626,6 +626,27 @@ function MatchApp() {
                     </p>
                     <div className='mt-3 flex flex-wrap gap-3'>
                         <HoldButton
+                            onHold={() => handleFuelAdd(-10)}
+                            ariaLabel='Add 5 fuel'
+                            repeatInterval={100}
+                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
+                            -10
+                        </HoldButton>
+                        <HoldButton
+                            onHold={() => handleFuelAdd(-5)}
+                            ariaLabel='Add 5 fuel'
+                            repeatInterval={100}
+                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
+                            -5
+                        </HoldButton>
+                        <HoldButton
+                            onHold={() => handleFuelAdd(-1)}
+                            ariaLabel='Add 1 fuel'
+                            repeatInterval={100}
+                            className='rounded-lg bg-red-600 px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
+                            -1
+                        </HoldButton>
+                        <HoldButton
                             onHold={() => handleFuelAdd(1)}
                             ariaLabel='Add 1 fuel'
                             repeatInterval={100}
@@ -721,16 +742,6 @@ function MatchApp() {
                             </div>
                         </div>
                         <div>
-                            <p className='text-sm text-gray-300'>Auto Move</p>
-                            <Checkbox
-                                className='text-base'
-                                boxClassName='size-5'
-                                checked={autoMoved}
-                                onChange={setAutoMoved}>
-                                Moved off the line
-                            </Checkbox>
-                        </div>
-                        <div>
                             <p className='text-sm text-gray-300'>Auto Tower</p>
                             <div className='flex flex-wrap gap-2'>
                                 <MultiButton
@@ -821,55 +832,8 @@ function MatchApp() {
                     <h2 className='text-xl font-semibold text-[#48c55c]'>
                         TELEOP / ENDGAME
                     </h2>
-                    <div className='mt-4 grid gap-4 sm:grid-cols-2'>
                         <div>
-                            <p className='text-sm text-gray-300'>Tele Tower</p>
-                            <div className='flex flex-wrap gap-2'>
-                                <MultiButton
-                                    onChange={setTeleTower}
-                                    value={teleTower}
-                                    labels={teleTowerOptions.map(option =>
-                                        option.replace('level', 'Level ')
-                                    )}
-                                    values={teleTowerOptions}
-                                    selectedClassName='bg-[#48c55c] text-black'
-                                    unSelectedClassName='bg-gray-700 text-white'
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <p className='text-sm text-gray-300'>Climb Time</p>
-                            <div className='flex flex-wrap gap-2'>
-                                <MultiButton
-                                    onChange={setClimbTimeBucket}
-                                    value={climbTimeBucket}
-                                    labels={climbTimeOptions.map(option => option.label)}
-                                    values={climbTimeOptions.map(option => option.value)}
-                                    selectedClassName='bg-[#48c55c] text-black'
-                                    unSelectedClassName='bg-gray-700 text-white'
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <p className='text-sm text-gray-300'>Breakdown</p>
-                            <div className='flex flex-wrap gap-2'>
-                                <MultiButton
-                                    onChange={setBreakdown}
-                                    value={breakdown}
-                                    labels={breakdownOptions.map(option =>
-                                        option === 'none'
-                                            ? 'None'
-                                            : option.charAt(0).toUpperCase() +
-                                              option.slice(1)
-                                    )}
-                                    values={breakdownOptions}
-                                    selectedClassName='bg-[#48c55c] text-black'
-                                    unSelectedClassName='bg-gray-700 text-white'
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <p className='text-sm text-gray-300'>
+                            <p className=' mt-1 text-sm text-gray-300'>
                                 Driver Quality
                             </p>
                             <div className='flex flex-wrap gap-2'>
@@ -885,9 +849,7 @@ function MatchApp() {
                                 />
                             </div>
                         </div>
-                    </div>
                 </section>
-
                 <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>
                         Notes
