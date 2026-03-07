@@ -180,9 +180,9 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             if (entry.autoStartingPosition === 'right') autoStartRight += 1;
             if (entry.autoStartingPosition === null) autoStartUnknown += 1;
 
-            if (entry.autoTower !== 'none') autoTowerAttempt += 1;
+            if (entry.autoTower !== 'None') autoTowerAttempt += 1;
             if (entry.autoTower === 'level1') autoTowerL1 += 1;
-            if (entry.autoTower === 'failed') autoTowerFail += 1;
+            if (entry.autoTower === 'Failed') autoTowerFail += 1;
 
             teleTransition += entry.teleFuelBySegment.transition;
             teleShift1 += entry.teleFuelBySegment.shift1;
@@ -198,8 +198,8 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             if (entry.teleTower === 'level1') climbL1 += 1;
             if (entry.teleTower === 'level2') climbL2 += 1;
             if (entry.teleTower === 'level3') climbL3 += 1;
-            if (entry.teleTower === 'failed') climbFail += 1;
-            if (entry.teleTower === 'none') climbNone += 1;
+            if (entry.teleTower === 'Failed') climbFail += 1;
+            if (entry.teleTower === 'None') climbNone += 1;
 
             if (entry.climbTimeBucket === 'early') climbTimeEarly += 1;
             if (entry.climbTimeBucket === 'mid') climbTimeMid += 1;
@@ -222,7 +222,7 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
                 driverQualityScoreSum += 0;
             }
 
-            if (entry.breakdown !== 'none') breakdown += 1;
+            if (entry.breakdown !== 'None') breakdown += 1;
             if (entry.breakdown === 'stuck') breakdownStuck += 1;
             if (entry.breakdown === 'tipped') breakdownTipped += 1;
             if (entry.breakdown === 'comms') breakdownComms += 1;
@@ -397,7 +397,7 @@ async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
 
             if (entry.defenseProvided === 'heavy') heavyDefense += 1;
             if (entry.defenseProvided === 'some') someDefense += 1;
-            if (entry.defenseProvided === 'none') noneDefense += 1;
+            if (entry.defenseProvided === 'None') noneDefense += 1;
             if (entry.defenseReceived) defenseReceived += 1;
             totalCommentTags += entry.comments.length;
             entry.comments.forEach(comment => {
