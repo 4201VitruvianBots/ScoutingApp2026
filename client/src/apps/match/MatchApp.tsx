@@ -97,6 +97,17 @@ const climbTimeOptions: Array<{ label: string; value: MatchData['climbTimeBucket
     { label: 'N/A', value: null },
 ];
 
+const DEFAULT_BALLS_PER_SECOND = 5;
+const FUEL_HOLD_INTERVAL_MS = 100;
+
+const clampFuelValue = (value: number) =>
+    Math.max(0, Math.round(value * 100) / 100);
+
+const formatFuelValue = (value: number) =>
+    Number.isInteger(value)
+        ? value.toString()
+        : value.toFixed(2).replace(/\.?0+$/, '');
+
 function MatchApp() {
     usePreventUnload();
     const [sendQueue, sendAll, queue, sending] = useQueue();
@@ -137,6 +148,9 @@ function MatchApp() {
         useState<'auto' | TeleSegmentId>('auto');
     const [showAutoWinnerPrompt, setShowAutoWinnerPrompt] = useState(false);
     const [showShift1Prompt, setShowShift1Prompt] = useState(false);
+    const [ballsPerSecond, setBallsPerSecond] = useState(
+        DEFAULT_BALLS_PER_SECOND
+    );
     const isUndoSticky = useScrollValue();
     const fuelHistory = useRef<{ segment: 'auto' | TeleSegmentId; amount: number }[]>(
         []
@@ -148,6 +162,7 @@ function MatchApp() {
     const activeSegment = isRunning ? currentSegment : manualSegment;
     const previousSegment = useRef(currentSegment);
     const elapsedSec = gameConfig.matchDurationSec - remainingSec;
+    const fuelPerTick = ballsPerSecond * (FUEL_HOLD_INTERVAL_MS / 1000);
     const elapsedPercent = Math.max(
         0,
         Math.min(100, (elapsedSec / gameConfig.matchDurationSec) * 100)
@@ -228,18 +243,19 @@ function MatchApp() {
     useStatus(robotPosition, matchNumber, scouterName);
 
     const handleFuelAdd = (amount: number) => {
+        if (amount === 0 || !Number.isFinite(amount)) return;
         const segment = activeSegment;
         if (segment === 'auto') {
-            setAutoFuelScored(prev => (prev + amount) >= 0 ? prev + amount: prev = 0); //If the prevous value plus the amount being added is MORE THAN OR EQUAL to 0 than add it, otherwise set the value to 0
+            setAutoFuelScored(prev => clampFuelValue(prev + amount));
         } else {
             setTeleFuelBySegment(prev => ({
                 ...prev,
-                [segment]: (prev[segment] + amount) >= 0 ? prev[segment] + amount: prev[segment] = 0, // exact same function as above
+                [segment]: clampFuelValue(prev[segment] + amount),
             }));
         }
         fuelHistory.current = [
             ...fuelHistory.current,
-            { segment, amount },
+            { segment, amount: clampFuelValue(amount) },
         ];
     };
 
@@ -249,13 +265,21 @@ function MatchApp() {
         const segment = last.segment;
         fuelHistory.current = fuelHistory.current.slice(0, -1);
         if (segment === 'auto') {
-            setAutoFuelScored(prev => Math.max(0, prev - last.amount));
+            setAutoFuelScored(prev => clampFuelValue(prev - last.amount));
         } else {
             setTeleFuelBySegment(prev => ({
                 ...prev,
-                [segment]: Math.max(0, prev[segment] - last.amount),
+                [segment]: clampFuelValue(prev[segment] - last.amount),
             }));
         }
+    };
+
+    const handleBallsPerSecondChange = (value: number | undefined) => {
+        if (value == undefined || Number.isNaN(value)) {
+            setBallsPerSecond(DEFAULT_BALLS_PER_SECOND);
+            return;
+        }
+        setBallsPerSecond(Math.max(0, value));
     };
 
     const handleAutoEnd = () => {
@@ -464,6 +488,16 @@ function MatchApp() {
                                     )?.label || 'AUTO'}
                                 </span>
                             </p>
+                            <div className='mt-3 flex items-center gap-2 text-sm'>
+                                <span className='text-gray-300'>Balls/sec</span>
+                                <NumberInput
+                                    value={ballsPerSecond}
+                                    onChange={handleBallsPerSecondChange}
+                                    min={0}
+                                    step={0.1}
+                                    className='w-24 rounded-lg border border-gray-700 bg-white px-2 py-1 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
+                                />
+                            </div>
                         </div>
                         <div className='flex flex-wrap gap-2'>
                             <button
@@ -621,94 +655,73 @@ function MatchApp() {
                 <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>Fuel</h2>
                     <p className='text-sm text-gray-300'>
-                        Tap to add fuel to the active segment. (Auto adds to
-                        Auto fuel; Tele adds by segment.)
+                        Hold to track scored fuel in the active segment at{' '}
+                        <span className='font-semibold text-white'>
+                            {formatFuelValue(ballsPerSecond)}
+                        </span>{' '}
+                        balls/sec.
                     </p>
                     <div className='mt-3 flex flex-wrap gap-3'>
                         <HoldButton
-                            onHold={() => handleFuelAdd(-10)}
-                            ariaLabel='Add 5 fuel'
-                            repeatInterval={100}
-                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
-                            -10
-                        </HoldButton>
-                        <HoldButton
-                            onHold={() => handleFuelAdd(-5)}
-                            ariaLabel='Add 5 fuel'
-                            repeatInterval={100}
-                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
-                            -5
-                        </HoldButton>
-                        <HoldButton
-                            onHold={() => handleFuelAdd(-1)}
-                            ariaLabel='Add 1 fuel'
-                            repeatInterval={100}
-                            className='rounded-lg bg-red-600 px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
-                            -1
-                        </HoldButton>
-                        <HoldButton
-                            onHold={() => handleFuelAdd(1)}
-                            ariaLabel='Add 1 fuel'
-                            repeatInterval={100}
+                            onHold={() => handleFuelAdd(fuelPerTick)}
+                            ariaLabel='Hold to score fuel'
+                            triggerOnPress={false}
+                            repeatDelay={FUEL_HOLD_INTERVAL_MS}
+                            repeatInterval={FUEL_HOLD_INTERVAL_MS}
                             className='rounded-lg bg-[#48c55c] px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
-                            +1
+                            HOLD TO SCORE
                         </HoldButton>
                         <HoldButton
-                            onHold={() => handleFuelAdd(5)}
-                            ariaLabel='Add 5 fuel'
-                            repeatInterval={100}
+                            onHold={() => handleFuelAdd(-fuelPerTick)}
+                            ariaLabel='Hold to remove fuel'
+                            triggerOnPress={false}
+                            repeatDelay={FUEL_HOLD_INTERVAL_MS}
+                            repeatInterval={FUEL_HOLD_INTERVAL_MS}
                             className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
-                            +5
-                        </HoldButton>
-                        <HoldButton
-                            onHold={() => handleFuelAdd(10)}
-                            ariaLabel='Add 10 fuel'
-                            repeatInterval={100}
-                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
-                            +10
+                            HOLD TO REMOVE
                         </HoldButton>
                     </div>
                     <div className='mt-4 grid gap-2 text-sm text-gray-200 sm:grid-cols-2'>
                         <div>
                             Auto Fuel:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {autoFuelScored}
+                                {formatFuelValue(autoFuelScored)}
                             </span>
                         </div>
                         <div>
                             Transition:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {teleFuelBySegment.transition}
+                                {formatFuelValue(teleFuelBySegment.transition)}
                             </span>
                         </div>
                         <div>
                             Shift 1:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {teleFuelBySegment.shift1}
+                                {formatFuelValue(teleFuelBySegment.shift1)}
                             </span>
                         </div>
                         <div>
                             Shift 2:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {teleFuelBySegment.shift2}
+                                {formatFuelValue(teleFuelBySegment.shift2)}
                             </span>
                         </div>
                         <div>
                             Shift 3:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {teleFuelBySegment.shift3}
+                                {formatFuelValue(teleFuelBySegment.shift3)}
                             </span>
                         </div>
                         <div>
                             Shift 4:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {teleFuelBySegment.shift4}
+                                {formatFuelValue(teleFuelBySegment.shift4)}
                             </span>
                         </div>
                         <div>
                             Endgame:{' '}
                             <span className='font-semibold tabular-nums'>
-                                {teleFuelBySegment.endgame}
+                                {formatFuelValue(teleFuelBySegment.endgame)}
                             </span>
                         </div>
                     </div>
