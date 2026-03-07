@@ -47,7 +47,6 @@ function useScrollValue(threshold = 86) {
         return () => window.removeEventListener("scroll", onScroll);
     }, [threshold]);
 
-
     return scrolled;
 }
 
@@ -504,7 +503,7 @@ function MatchApp() {
                                 onClick={() => {
                                     genFakeFuel();
                                 }}
-                                className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]">
+                                className="select-none rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]">
                                 Fake Data
                             </button>
                             <button
@@ -514,12 +513,12 @@ function MatchApp() {
                                     setManualSegment('auto');
                                     previousSegment.current = 'auto';
                                 }}
-                                className='rounded-lg bg-[#48c55c] px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
+                                className='select-none rounded-lg bg-[#48c55c] px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                                 Start Match
                             </button>
                             <button
                                 onClick={() => setIsRunning(false)}
-                                className='rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition hover:bg-gray-500 active:scale-[0.98]'>
+                                className='select-none rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition hover:bg-gray-500 active:scale-[0.98]'>
                                 Pause
                             </button>
                             <button
@@ -528,13 +527,13 @@ function MatchApp() {
                                     setRemainingSec(gameConfig.matchDurationSec);
                                     setManualSegment('auto');
                                 }}
-                                className='rounded-lg border border-white/20 px-4 py-2 font-semibold text-white transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
+                                className='select-none rounded-lg border border-white/20 px-4 py-2 font-semibold text-white transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
                                 Reset Timer
                             </button>
                         </div>
                     </div>
                     <div className='mt-4 space-y-3'>
-                        <div className='relative h-12 overflow-hidden rounded-xl border border-white/10 bg-[#1b2030]'>
+                        <div className='select-none relative h-12 overflow-hidden rounded-xl border border-white/10 bg-[#1b2030]'>
                             {gameConfig.segments.map(segment => {
                                 const segmentWidth =
                                     ((segment.endSec - segment.startSec) /
@@ -608,7 +607,7 @@ function MatchApp() {
                                         );
                                     }
                                 }}
-                                className={`rounded-full px-3 py-1 text-sm ${
+                                className={`select-none rounded-full px-3 py-1 text-sm ${
                                     activeSegment === segment.id
                                         ? 'bg-[#48c55c] text-black shadow shadow-black/30'
                                         : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
@@ -646,7 +645,7 @@ function MatchApp() {
                     <div className='sm:col-span-2'>
                         <button
                             onClick={handleAbsentRobot}
-                            className='rounded-lg bg-green-500 px-3 py-2 font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
+                            className='select-none rounded-lg bg-green-500 px-3 py-2 font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
                             Robot Absent
                         </button>
                     </div>
@@ -734,7 +733,7 @@ function MatchApp() {
                         </h2>
                         <button
                             onClick={handleAutoEnd}
-                            className='rounded-lg border border-white/20 px-3 py-2 text-sm transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
+                            className='select-none rounded-lg border border-white/20 px-3 py-2 text-sm transition hover:border-white/40 hover:bg-white/5 active:scale-[0.98]'>
                             AUTO End
                         </button>
                     </div>
@@ -749,8 +748,8 @@ function MatchApp() {
                                     value={autoStartingPosition}
                                     labels={autoStartingOptions.map(option => option.label)}
                                     values={autoStartingOptions.map(option => option.value)}
-                                    selectedClassName='bg-[#48c55c] text-black'
-                                    unSelectedClassName='bg-gray-700 text-white'
+                                    selectedClassName='select-none bg-[#48c55c] text-black'
+                                    unSelectedClassName='select-none bg-gray-700 text-white'
                                 />
                             </div>
                         </div>
@@ -764,8 +763,8 @@ function MatchApp() {
                                         option.replace('level', 'Level ')
                                     )}
                                     values={autoTowerOptions}
-                                    selectedClassName='bg-[#48c55c] text-black'
-                                    unSelectedClassName='bg-gray-700 text-white'
+                                    selectedClassName='select-none bg-[#48c55c] text-black'
+                                    unSelectedClassName='select-none bg-gray-700 text-white'
                                 />
                             </div>
                         </div>
@@ -779,7 +778,7 @@ function MatchApp() {
                         </span>
                         <button
                             onClick={() => setShowAutoWinnerPrompt(true)}
-                            className='rounded-lg border border-white/20 px-2 py-1 text-xs transition hover:border-white/40 hover:bg-white/5'>
+                            className='select-none rounded-lg border border-white/20 px-2 py-1 text-xs transition hover:border-white/40 hover:bg-white/5'>
                             Edit
                         </button>
                     </div>
@@ -789,7 +788,7 @@ function MatchApp() {
                             <p className='text-sm text-gray-300'>
                                 Who won AUTO fuel?
                             </p>
-                            <div className='mt-2 flex flex-wrap gap-2'>
+                            <div className='select-none mt-2 flex flex-wrap gap-2'>
                                 <MultiButton
                                     onChange={value => {
                                         setAutoFuelWinner(value);
@@ -846,10 +845,10 @@ function MatchApp() {
                         TELEOP / ENDGAME
                     </h2>
                         <div>
-                            <p className=' mt-1 text-sm text-gray-300'>
+                            <p className='mt-1 text-sm text-gray-300'>
                                 Driver Quality
                             </p>
-                            <div className='flex flex-wrap gap-2'>
+                            <div className='select-none flex flex-wrap gap-2'>
                                 <MultiButton
                                     onChange={setDriverQuality}
                                     value={driverQuality}
@@ -881,7 +880,7 @@ function MatchApp() {
                             handleSubmit();
                             scrollTo(0, 0);
                         }}
-                        className='rounded-lg bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
+                        className='select-none rounded-lg bg-[#48c55c] px-4 py-3 text-lg font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
                         Submit
                     </button>
                     <div className='text-sm text-gray-300'>
@@ -889,7 +888,7 @@ function MatchApp() {
                     </div>
                     <button
                         onClick={sendAll}
-                        className='rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
+                        className='select-none rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-black transition hover:brightness-105 active:scale-[0.98]'>
                         {sending ? 'Sending...' : 'Resend All'}
                     </button>
                 </section>
