@@ -6,6 +6,7 @@ function HoldButton({
     children,
     ariaLabel,
     disabled = false,
+    triggerOnPress = true,
     repeatDelay = 300,
     repeatInterval = 70,
 }: {
@@ -14,6 +15,7 @@ function HoldButton({
     children?: ReactNode;
     ariaLabel?: string;
     disabled?: boolean;
+    triggerOnPress?: boolean;
     repeatDelay?: number;
     repeatInterval?: number;
 }) {
@@ -46,7 +48,9 @@ function HoldButton({
     const startHold = () => {
         if (disabled) return;
         ignoreClickRef.current = true;
-        onHold();
+        if (triggerOnPress) {
+            onHold();
+        }
         clearHoldTimers();
         holdTimeoutRef.current = window.setTimeout(() => {
             holdIntervalRef.current = window.setInterval(() => {
@@ -68,7 +72,9 @@ function HoldButton({
             ignoreClickRef.current = false;
             return;
         }
-        onHold();
+        if (triggerOnPress) {
+            onHold();
+        }
     };
 
     return (
