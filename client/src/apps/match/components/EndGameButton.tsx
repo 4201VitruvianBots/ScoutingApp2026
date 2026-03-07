@@ -39,7 +39,7 @@ function EndgameButton({
                     onChange={handleClimb}
                     value={climbPosition}
                     labels={['Failed', 'None']}
-                    values={['failed', 'none']}
+                    values={['Failed', 'None']}
                     className={[
                         'h-[60px] w-[217px] text-3xl ',
                         'h-[60px] w-[217px] text-3xl ',
