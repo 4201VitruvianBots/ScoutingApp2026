@@ -348,9 +348,14 @@ function MatchApp() {
         }, 3000);
     };
 
+    const genFakeStartInfo = () => {
+        setScouterName('Fake Scouter');
+        setBallsPerSecond(Number((Math.random() * 10).toFixed(1)));
+        setMatchNumber(-1);
+        setTeamNumber(-1)
+    }
+
     const genFakeFuel = () => {
-        //setFakeMatchNumber(-1);
-        //setFakeTeamNumber(0);
         for (let segArrIndex = 0; segArrIndex < segmentArr.length; segArrIndex++) {
             const segment = segmentArr[segArrIndex];
             if (segment === 'auto') {
@@ -365,6 +370,17 @@ function MatchApp() {
             }
         }
     };
+
+    const genFakeAutoPosition = () => {
+        setAutoStartingPosition(autoStartingOptions[RNGenerator(0, autoStartingOptions.length - 2)].value);
+        setAutoTower(autoTowerOptions[RNGenerator(0, autoTowerOptions.length - 1)]);
+        setAutoFuelWinner(autoFuelWinnerOptions[RNGenerator(0, autoFuelWinnerOptions.length - 2)]);
+        setShift1ActiveHubIfTie(allianceOptions[RNGenerator(0, allianceOptions.length - 1)]);
+    }
+
+    const genFakeTeleop = () => {
+        setDriverQuality(driverQualityOptions[RNGenerator(0, driverQualityOptions.length - 1)]);
+    }
 
     const handleAbsentRobot = async () => {
         if (robotPosition == undefined || matchNumber == undefined) {
@@ -501,7 +517,10 @@ function MatchApp() {
                         <div className='flex flex-wrap gap-2'>
                             <button
                                 onClick={() => {
+                                    genFakeStartInfo();
                                     genFakeFuel();
+                                    genFakeAutoPosition();
+                                    genFakeTeleop();
                                 }}
                                 className="select-none rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]">
                                 Fake Data
