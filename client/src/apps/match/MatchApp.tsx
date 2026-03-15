@@ -33,6 +33,7 @@ import {
     getSegmentForRemaining,
     makeEmptyTeleFuelBySegment,
 } from '../../lib/gameConfig';
+import FuelPerMatchChart from '../../components/charts/FuelPerMatchChart';
 
 //import { useEffect, useState } from 'react';
 function useScrollValue(threshold = 86) {
@@ -395,6 +396,8 @@ function MatchApp() {
         }
     };
 
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
     return (
         <div className='min-h-screen bg-gradient-to-b from-[#171c26] via-[#161b22] to-[#12151d] pb-10 text-white'>
             <main className='mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 pb-16 pt-8'>
@@ -679,27 +682,40 @@ function MatchApp() {
                         </span>{' '}
                         balls/sec.
                     </p>
-                    <div className='mt-3 flex flex-wrap gap-3'>
+                    
+                    <button type="button" className='size-[60px] mt-1.5 text-center text-[10px] rounded-md bg-green-600' onClick={() => setIsFullscreen(!isFullscreen)}>
+                        {isFullscreen ? "Minimize" : "Fullscreen"}
+                        {/* Only says "Active" when isActive is true
+                        Onlys says "Not Active" when isActive is false */}
+                    </button>
+
+                    <div className={`select-none mt-3 ${isFullscreen ? '' : 'flex flex-wrap gap-3'}`}>
                         <HoldButton
                             onHold={() => handleFuelAdd(fuelPerTick)}
+                            
                             ariaLabel='Hold to score fuel'
-                            triggerOnPress={false}
+                            triggerOnPress={true}
                             repeatDelay={FUEL_HOLD_INTERVAL_MS}
                             repeatInterval={FUEL_HOLD_INTERVAL_MS}
-                            className='rounded-lg bg-[#48c55c] px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
+                            className={`rounded-lg bg-[#48c55c] text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98] ${isFullscreen ? 'px-[18.5%] py-60 mr-4' : 'px-6 py-3 '}`}>
                             HOLD TO SCORE
+                            {/*rounded-lg bg-[#48c55c] px-6 py-3 text-lg font-bold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]*/}
                         </HoldButton>
                         <HoldButton
                             onHold={() => handleFuelAdd(-fuelPerTick)}
                             ariaLabel='Hold to remove fuel'
-                            triggerOnPress={false}
+                            triggerOnPress={true}
                             repeatDelay={FUEL_HOLD_INTERVAL_MS}
                             repeatInterval={FUEL_HOLD_INTERVAL_MS}
-                            className='rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]'>
+                            className={`rounded-lg bg-gray-700 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98] ${isFullscreen ? 'px-2 py-60' : 'px-6 py-3'}`}>
                             HOLD TO REMOVE
+                            {/*rounded-lg bg-gray-700 px-6 py-3 text-lg font-bold text-white transition hover:bg-gray-600 active:scale-[0.98]*/}
                         </HoldButton>
                     </div>
-                    <div className='mt-4 grid gap-2 text-sm text-gray-200 sm:grid-cols-2'>
+
+                    {/* text-[0px] absolute */}
+
+                    <div className={`mt-4 grid text-gray-200 sm:grid-cols-2 ${isFullscreen ? 'text-[6px]' : 'text-sm gap-2'}`}> {/*Remember that the first one is true and last one is false. You can also add styling that's always active even when it's true or false by adding it before the $ sign*/}
                         <div>
                             Auto Fuel:{' '}
                             <span className='font-semibold tabular-nums'>
