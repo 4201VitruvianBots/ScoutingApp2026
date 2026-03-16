@@ -189,7 +189,7 @@ function MatchApp() {
     const RNGenerator = (min: number, max: number) => {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     };
-    const segmentArr = ['auto', 'transition', 'shift1', 'shift2', 'shift3', 'shift4', 'endgame'];
+    const segmentArr = ['auto', 'pause', 'transition', 'shift1', 'shift2', 'shift3', 'shift4', 'endgame'];
 
     useEffect(() => {
         if (!isRunning) return;
@@ -530,8 +530,9 @@ function MatchApp() {
                             </button>
                             <button
                                 onClick={() => {
-                                    setRemainingSec(gameConfig.matchDurationSec);
+                                    // setRemainingSec(gameConfig.matchDurationSec);
                                     setIsRunning(true);
+                                    // What do I do with these 2 lines though????
                                     setManualSegment('auto');
                                     previousSegment.current = 'auto';
                                 }}

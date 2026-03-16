@@ -15,6 +15,7 @@ export type ScouterPosition = 'red_right' | 'blue_right';
 
 export type MatchSegmentId =
     | 'auto'
+    | 'pause'
     | 'transition'
     | 'shift1'
     | 'shift2'
@@ -24,6 +25,7 @@ export type MatchSegmentId =
 
 export type TeleSegmentId =
     | 'transition'
+    | 'pause'
     | 'shift1'
     | 'shift2'
     | 'shift3'
@@ -86,6 +88,7 @@ export type AutoFuelWinner = AllianceColor | 'tie' | 'unknown';
 
 export interface TeleFuelBySegment {
     transition: number;
+    pause: number;
     shift1: number;
     shift2: number;
     shift3: number;

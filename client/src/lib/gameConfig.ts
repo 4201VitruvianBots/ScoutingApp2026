@@ -66,6 +66,7 @@ function getAlliancePositions(
 function makeEmptyTeleFuelBySegment(): TeleFuelBySegment {
     return {
         transition: 0,
+        pause: 0,
         shift1: 0,
         shift2: 0,
         shift3: 0,

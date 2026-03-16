@@ -1,29 +1,30 @@
 {
     "season": 2026,
     "game": "REBUILT",
-    "matchDurationSec": 160,
+    "matchDurationSec": 163,
     "segments": [
         { "id": "auto", "label": "AUTO", "startSec": 0, "endSec": 20 },
+        { "id": "pause", "label": "PAUSE", "startSec": 20, "endSec": 23},
         {
             "id": "transition",
             "label": "TRANSITION",
-            "startSec": 20,
-            "endSec": 30
+            "startSec": 23,
+            "endSec": 33
         },
-        { "id": "shift1", "label": "SHIFT 1", "startSec": 30, "endSec": 55 },
-        { "id": "shift2", "label": "SHIFT 2", "startSec": 55, "endSec": 80 },
-        { "id": "shift3", "label": "SHIFT 3", "startSec": 80, "endSec": 105 },
+        { "id": "shift1", "label": "SHIFT 1", "startSec": 33, "endSec": 58 },
+        { "id": "shift2", "label": "SHIFT 2", "startSec": 58, "endSec": 83 },
+        { "id": "shift3", "label": "SHIFT 3", "startSec": 83, "endSec": 108 },
         {
             "id": "shift4",
             "label": "SHIFT 4",
-            "startSec": 105,
-            "endSec": 130
+            "startSec": 108,
+            "endSec": 133
         },
         {
             "id": "endgame",
             "label": "ENDGAME",
-            "startSec": 130,
-            "endSec": 160
+            "startSec": 133,
+            "endSec": 163
         }
     ],
     "hubRule": {
