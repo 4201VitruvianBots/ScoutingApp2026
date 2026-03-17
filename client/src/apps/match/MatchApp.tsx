@@ -399,6 +399,24 @@ function MatchApp() {
 
     const [isFullscreen, setIsFullscreen] = useState(false);
 
+    const revealFakeData = false; //Change this value to true to access the Fake Data Generator
+
+    const handleButtonReveal = () => {
+        if (revealFakeData == true) {
+        return (
+            <button
+                onClick={() => {
+                    genFakeStartInfo();
+                    genFakeFuel();
+                    genFakeAutoPosition();
+                    genFakeTeleop();
+                }}
+                className='select-none rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]'>
+                Fake Data
+            </button>
+        )
+        }
+    }
     return (
         <div className='min-h-screen bg-gradient-to-b from-[#171c26] via-[#161b22] to-[#12151d] pb-10 text-white'>
             <main className='mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 pb-16 pt-8'>
@@ -519,16 +537,7 @@ function MatchApp() {
                             </div>
                         </div>
                         <div className='flex flex-wrap gap-2'>
-                            <button
-                                onClick={() => {
-                                    genFakeStartInfo();
-                                    genFakeFuel();
-                                    genFakeAutoPosition();
-                                    genFakeTeleop();
-                                }}
-                                className="select-none rounded-lg bg-orange-500 px-4 py-2 font-semibold text-black shadow-lg shadow-black/20 transition hover:brightness-105 active:scale-[0.98]">
-                                Fake Data
-                            </button>
+                                {handleButtonReveal()}
                             <button
                                 onClick={() => {
                                     setRemainingSec(gameConfig.matchDurationSec);
