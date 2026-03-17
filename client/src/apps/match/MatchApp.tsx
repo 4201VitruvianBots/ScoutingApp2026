@@ -34,6 +34,7 @@ import {
     makeEmptyTeleFuelBySegment,
 } from '../../lib/gameConfig';
 import FuelPerMatchChart from '../../components/charts/FuelPerMatchChart';
+import AutoPathDrawer from './components/AutoPathDrawer';
 
 //import { useEffect, useState } from 'react';
 function useScrollValue(threshold = 86) {
@@ -190,7 +191,7 @@ function MatchApp() {
         return Math.floor(Math.random() * (max - min + 1)) + min;
     };
     const segmentArr = ['auto', 'pause', 'transition', 'shift1', 'shift2', 'shift3', 'shift4', 'endgame'];
-
+    
     useEffect(() => {
         if (!isRunning) return;
         const interval = setInterval(() => {
@@ -204,7 +205,7 @@ function MatchApp() {
         }, 1000);
         return () => clearInterval(interval);
     }, [isRunning]);
-
+    
     useEffect(() => {
         if (!isRunning) return;
         if (previousSegment.current !== currentSegment) {
@@ -773,6 +774,7 @@ function MatchApp() {
                             AUTO End
                         </button>
                     </div>
+                    <AutoPathDrawer className='mt-4' />
                     <div className='mt-4 grid gap-4 sm:grid-cols-2'>
                         <div>
                             <p className='text-sm text-gray-300'>
