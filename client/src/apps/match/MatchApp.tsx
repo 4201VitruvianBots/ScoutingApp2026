@@ -18,13 +18,13 @@ import 'react-material-symbols/rounded';
 import SignIn from '../../components/SignIn';
 import Dialog from '../../components/Dialog';
 import NumberInput from '../../components/NumberInput';
+import BPSCounter from './components/BPSCounter';
 import { useStatus } from '../../lib/useStatus';
 import TeamDropdown from '../../components/TeamDropdown';
 import { useQueue } from '../../lib/useQueue';
 import scheduleFile from '../../assets/matchSchedule.json';
 import { usePreventUnload } from '../../lib/usePreventUnload';
 import MultiButton from '../../components/MultiButton';
-import Checkbox from '../../components/Checkbox';
 import TextInput from '../../components/TextInput';
 import HoldButton from '../../components/HoldButton';
 import {
@@ -33,7 +33,6 @@ import {
     getSegmentForRemaining,
     makeEmptyTeleFuelBySegment,
 } from '../../lib/gameConfig';
-import FuelPerMatchChart from '../../components/charts/FuelPerMatchChart';
 
 //import { useEffect, useState } from 'react';
 function useScrollValue(threshold = 86) {
@@ -88,14 +87,6 @@ const driverQualityOptions: DriverQuality[] = [
     'good',
     'ok',
     'rough',
-];
-
-
-const climbTimeOptions: Array<{ label: string; value: MatchData['climbTimeBucket'] }> = [
-    { label: 'Early', value: 'early' },
-    { label: 'Mid', value: 'mid' },
-    { label: 'Late', value: 'late' },
-    { label: 'N/A', value: null },
 ];
 
 const DEFAULT_BALLS_PER_SECOND = 5;
@@ -507,16 +498,11 @@ function MatchApp() {
                                     )?.label || 'AUTO'}
                                 </span>
                             </p>
-                            <div className='mt-3 flex items-center gap-2 text-sm'>
-                                <span className='text-gray-300'>Balls/sec</span>
-                                <NumberInput
-                                    value={ballsPerSecond}
-                                    onChange={handleBallsPerSecondChange}
-                                    min={0}
-                                    step={0.1}
-                                    className='w-24 rounded-lg border border-gray-700 bg-white px-2 py-1 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
-                                />
-                            </div>
+                            <BPSCounter
+                                value={ballsPerSecond}
+                                onChange={handleBallsPerSecondChange}
+                                className="h-36 w-96"
+                            />
                         </div>
                         <div className='flex flex-wrap gap-2'>
                             <button
