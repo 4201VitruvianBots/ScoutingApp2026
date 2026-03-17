@@ -63,13 +63,13 @@ const autoStartingOptions: Array<{
     { label: 'N/A', value: null },
 ];
 
-const autoTowerOptions: AutoTowerResult[] = ['None', 'level1', 'Failed'];
+const autoTowerOptions: AutoTowerResult[] = ['None', 'Failed', 'level1'];
 const teleTowerOptions: TeleTowerResult[] = [
     'None',
+    'Failed',
     'level1',
     'level2',
     'level3',
-    'Failed',
 ];
 const autoFuelWinnerOptions: AutoFuelWinner[] = ['red', 'blue', 'tie', 'unknown'];
 const allianceOptions: AllianceColor[] = ['red', 'blue'];
@@ -89,6 +89,7 @@ const driverQualityOptions: DriverQuality[] = [
     'ok',
     'rough',
 ];
+
 
 const climbTimeOptions: Array<{ label: string; value: MatchData['climbTimeBucket'] }> = [
     { label: 'Early', value: 'early' },
@@ -896,6 +897,24 @@ function MatchApp() {
                                 />
                             </div>
                         </div>
+                        <div>
+                            <p className='mt-1 text-sm text-gray-300'>
+                                Climb
+                            </p>
+                            <div className='select-none flex flex-wrap gap-2'>
+                                <MultiButton
+                                    onChange={setTeleTower}
+                                    value={teleTower}
+                                    labels={teleTowerOptions.map(option =>
+                                        option.replace('level', 'Level ')
+                                    )}
+                                    values={teleTowerOptions}
+                                    selectedClassName='bg-[#48c55c] text-black'
+                                    unSelectedClassName='bg-gray-700 text-white'
+                                />
+                            </div>
+                        </div>
+                        
                 </section>
                 <section className={sectionClass}>
                     <h2 className='text-xl font-semibold text-[#48c55c]'>
