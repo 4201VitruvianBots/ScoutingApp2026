@@ -28,11 +28,6 @@ function RootMenu() {
                 Match
             </LinkButton>
             <LinkButton
-                link='/super'
-                className='rounded-3xl bg-[#2f3646] text-5xl'>
-                Super
-            </LinkButton>
-            <LinkButton
                 link='/pit'
                 className='rounded-3xl bg-[#2f3646] text-5xl'>
                 Pit
@@ -48,9 +43,9 @@ function RootMenu() {
                 Picklist
             </LinkButton>
             <LinkButton
-                link='/scouting_leaderboard'
-                className='rounded-3xl bg-[#2f3646] text-4xl'>
-                Scouting Leaderboard
+                link='/admin'
+                className='rounded-3xl bg-[#2f3646] text-5xl'>
+                Admin
             </LinkButton>
             <div className='absolute opacity-0'>
                 {images.map(e => (
