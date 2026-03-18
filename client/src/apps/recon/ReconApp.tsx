@@ -171,7 +171,7 @@ function ReconApp() {
                             </div>
                             <div className='rounded-lg border border-white/10 bg-[#1f2432] p-2'>
                                 <p className='text-xs uppercase text-gray-400'>
-                                    Super Matches
+                                    Context Matches
                                 </p>
                                 <p className='text-lg font-semibold'>
                                     {superAgg?.matchCount ?? 0}
@@ -370,7 +370,7 @@ function ReconApp() {
 
                     <section className={sectionClass}>
                         <h2 className='text-lg font-semibold text-[#48c55c]'>
-                            Super Scout Averages
+                            Match Context Averages
                         </h2>
                         <div className='mt-3 grid gap-2 text-sm text-gray-200'>
                             <p>

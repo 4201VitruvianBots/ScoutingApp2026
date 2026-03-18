@@ -5,9 +5,8 @@ import {
     StatusRecieve,
     StatusReport,
     RobotPosition,
-    SuperPosition,
 } from 'requests';
-import { matchApp, superApp } from './Schema.js';
+import { matchApp } from './Schema.js';
 import fs from 'fs';
 import { gameConfig } from './gameConfig.js';
 
@@ -56,9 +55,6 @@ async function updateMatchStatus() {
         .select(
             'metadata.matchNumber metadata.robotTeam metadata.robotPosition'
         );
-    const superEntries = await superApp
-        .find()
-        .select('metadata.matchNumber metadata.robotPosition');
 
     const matchNumbers = [
         ...[...Object.keys(schedule ?? {})].map(number => parseInt(number)),
@@ -69,7 +65,6 @@ async function updateMatchStatus() {
         matchNumbers.map(matchNumber => [
             matchNumber,
             {
-                // Normal scouters
                 ...Object.fromEntries(
                     (
                         [...redPositions, ...bluePositions] satisfies RobotPosition[]
@@ -90,23 +85,6 @@ async function updateMatchStatus() {
                                 ),
                         },
                     ])
-                ),
-                // Super scouters
-                ...Object.fromEntries(
-                    (['red_ss', 'blue_ss'] satisfies SuperPosition[]).map(
-                        superPosition => [
-                            superPosition,
-                            superEntries.some(
-                                entry =>
-                                    entry.metadata.matchNumber ===
-                                        matchNumber &&
-                                    (superPosition === 'blue_ss'
-                                        ? bluePositions
-                                        : redPositions
-                                    ).includes(entry.metadata.robotPosition)
-                            ),
-                        ]
-                    )
                 ),
             },
         ])

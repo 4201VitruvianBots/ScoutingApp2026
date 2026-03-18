@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-    RobotPosition,
-    SuperPosition,
-    StatusReport,
-    StatusRecieve,
-} from 'requests';
+import { RobotPosition, StatusReport, StatusRecieve } from 'requests';
 import { useBattery } from './useBattery';
 
 function useStatus(
-    robotPosition: RobotPosition | SuperPosition | undefined,
+    robotPosition: RobotPosition | undefined,
     matchNumber: number | undefined,
     scouterName: string
 ) {
@@ -60,7 +55,7 @@ function useStatusRecieve() {
 
     // State to store the status
     const [state, setState] = useState<StatusRecieve>({
-        matches: [],
+        matches: {},
         scouters: [],
     });
 

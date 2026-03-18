@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
-import { CommentValues, MatchData, PitFile, SuperData, ScouterData } from 'requests';
+import {
+    BallsPerSecondSetting,
+    CommentValues,
+    MatchData,
+    PitFile,
+    ScouterData,
+} from 'requests';
 
 const robotPositions = [
     'red_1',
@@ -22,50 +28,58 @@ const matchappsMetaDataSchema = {
     },
 };
 
-const superappsMetaDataSchema = {
-    scouterName: String,
-    matchNumber: Number,
-    robotTeam: Number,
-    robotPosition: {
-        type: String,
-        enum: robotPositions,
-    },
+const actionTimeBySegmentSchema = {
+    auto: { type: Number, default: 0 },
+    transition: { type: Number, default: 0 },
+    shift1: { type: Number, default: 0 },
+    shift2: { type: Number, default: 0 },
+    shift3: { type: Number, default: 0 },
+    shift4: { type: Number, default: 0 },
+    endgame: { type: Number, default: 0 },
+};
+
+const teleFuelBySegmentSchema = {
+    transition: { type: Number, default: 0 },
+    shift1: { type: Number, default: 0 },
+    shift2: { type: Number, default: 0 },
+    shift3: { type: Number, default: 0 },
+    shift4: { type: Number, default: 0 },
+    endgame: { type: Number, default: 0 },
 };
 
 const matchDataSchema = new mongoose.Schema<MatchData>({
     metadata: matchappsMetaDataSchema,
-    robotAbsent: Boolean,
+    robotAbsent: { type: Boolean, default: false },
     autoStartingPosition: {
         type: String,
         enum: ['left', 'center', 'right', null],
         default: null,
     },
-    autoMoved: Boolean,
-    autoFuelScored: Number,
+    autoMoved: { type: Boolean, default: false },
+    shootTimeBySegment: actionTimeBySegmentSchema,
+    passTimeBySegment: actionTimeBySegmentSchema,
+    ballsPerSecondUsed: { type: Number, default: 5 },
+    autoFuelScored: { type: Number, default: 0 },
     autoTower: {
         type: String,
-        enum: ['none', 'level1', 'failed'],
+        enum: ['None', 'level1', 'Failed'],
+        default: 'None',
     },
     autoFuelWinner: {
         type: String,
         enum: ['red', 'blue', 'tie', 'unknown'],
+        default: 'unknown',
     },
     shift1ActiveHubIfTie: {
         type: String,
         enum: ['red', 'blue', null],
         default: null,
     },
-    teleFuelBySegment: {
-        transition: Number,
-        shift1: Number,
-        shift2: Number,
-        shift3: Number,
-        shift4: Number,
-        endgame: Number,
-    },
+    teleFuelBySegment: teleFuelBySegmentSchema,
     teleTower: {
         type: String,
-        enum: ['none', 'level1', 'level2', 'level3', 'failed'],
+        enum: ['None', 'level1', 'level2', 'level3', 'Failed'],
+        default: 'None',
     },
     climbTimeBucket: {
         type: String,
@@ -74,34 +88,32 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
     },
     breakdown: {
         type: String,
-        enum: ['none', 'stuck', 'tipped', 'comms', 'mechanism', 'other'],
+        enum: ['None', 'stuck', 'tipped', 'comms', 'mechanism', 'other'],
+        default: 'None',
     },
     driverQuality: {
         type: String,
         enum: ['great', 'good', 'ok', 'rough'],
+        default: 'ok',
     },
-    freeText: String,
-});
-
-const superScoutDataSchema = new mongoose.Schema<SuperData>({
-    metadata: superappsMetaDataSchema,
     defenseProvided: {
         type: String,
-        enum: ['none', 'some', 'heavy'],
+        enum: ['None', 'some', 'heavy'],
+        default: 'None',
     },
-    defenseReceived: Boolean,
+    defenseReceived: { type: Boolean, default: false },
     fouls: {
-        pinning: Number,
-        towerContactInEndgame: Number,
-        outOfZoneShooting: Number,
-        ejectedFuel: Number,
-        other: Number,
+        pinning: { type: Number, default: 0 },
+        towerContactInEndgame: { type: Number, default: 0 },
+        outOfZoneShooting: { type: Number, default: 0 },
+        ejectedFuel: { type: Number, default: 0 },
+        other: { type: Number, default: 0 },
     },
     breaks: {
-        mechanism: Number,
-        battery: Number,
-        comms: Number,
-        bumper: Number,
+        mechanism: { type: Number, default: 0 },
+        battery: { type: Number, default: 0 },
+        comms: { type: Number, default: 0 },
+        bumper: { type: Number, default: 0 },
     },
     comments: [
         {
@@ -124,13 +136,24 @@ const superScoutDataSchema = new mongoose.Schema<SuperData>({
             ] satisfies CommentValues[],
         },
     ],
-    humanPlayerFuelScored: Number,
+    freeText: { type: String, default: '' },
 });
 
 const leaderboardDataSchema = new mongoose.Schema<ScouterData>({
     scouterName: String,
     accuracy: Number,
 });
+
+const ballsPerSecondDataSchema = new mongoose.Schema<BallsPerSecondSetting>({
+    matchNumber: { type: Number, required: true },
+    robotTeam: { type: Number, required: true },
+    ballsPerSecond: { type: Number, required: true, min: 0, default: 5 },
+});
+
+ballsPerSecondDataSchema.index(
+    { matchNumber: 1, robotTeam: 1 },
+    { unique: true }
+);
 
 type PitDataSchemaType = {
     [K in keyof PitFile]: K extends 'photo' ? Buffer : PitFile[K];
@@ -168,10 +191,13 @@ const pitDataSchema = new mongoose.Schema<PitDataSchemaType>({
 
 const pitApp = mongoose.model<PitDataSchemaType>('pitApp', pitDataSchema);
 const matchApp = mongoose.model<MatchData>('matchApp', matchDataSchema);
-const superApp = mongoose.model<SuperData>('superApp', superScoutDataSchema);
 const leaderboardApp = mongoose.model<ScouterData>(
     'leaderboardApp',
     leaderboardDataSchema
+);
+const ballsPerSecondApp = mongoose.model<BallsPerSecondSetting>(
+    'ballsPerSecondApp',
+    ballsPerSecondDataSchema
 );
 
 export {
@@ -179,8 +205,8 @@ export {
     pitApp,
     matchDataSchema,
     pitDataSchema,
-    superApp,
-    superScoutDataSchema,
     leaderboardApp,
     leaderboardDataSchema,
+    ballsPerSecondApp,
+    ballsPerSecondDataSchema,
 };

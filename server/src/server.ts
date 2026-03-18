@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import chalk from 'chalk';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { matchApp, pitApp, superApp } from './Schema.js';
+import { ballsPerSecondApp, matchApp, pitApp } from './Schema.js';
 import {
     averageAndMax,
     superAverageAndMax,
@@ -10,16 +10,17 @@ import {
     scouterRankings,
     maxIndividual,
     superMaxIndividual,
-    matchOutlier
+    matchOutlier,
 } from './aggregate.js';
 import { setUpSocket, updateMatchStatus } from './status.js';
-import { MatchData, PitFile, PitResult, SuperData } from 'requests';
+import { BallsPerSecondSetting, MatchData, PitFile, PitResult } from 'requests';
 import { dataUriToBuffer } from 'data-uri-to-buffer';
 
 // import { MatchData } from 'requests';
 
 // If DEV is true then the app should forward requests to localhost:5173 instead of serving from /static
 const DEV = process.env.NODE_ENV === 'dev';
+const DEFAULT_BALLS_PER_SECOND = 5;
 
 const app = express();
 
@@ -27,34 +28,176 @@ app.use(express.json({ limit: '200mb' }));
 
 setUpSocket(app);
 
+const emptyActionTimeBySegment: MatchData['shootTimeBySegment'] = {
+    auto: 0,
+    transition: 0,
+    shift1: 0,
+    shift2: 0,
+    shift3: 0,
+    shift4: 0,
+    endgame: 0,
+};
+
+const emptyFouls: MatchData['fouls'] = {
+    pinning: 0,
+    towerContactInEndgame: 0,
+    outOfZoneShooting: 0,
+    ejectedFuel: 0,
+    other: 0,
+};
+
+const emptyBreaks: MatchData['breaks'] = {
+    mechanism: 0,
+    battery: 0,
+    comms: 0,
+    bumper: 0,
+};
+
+function roundToHundredth(value: number) {
+    return Math.round(value * 100) / 100;
+}
+
+function getActionTimeBySegment(
+    value: MatchData['shootTimeBySegment'] | undefined
+) {
+    return {
+        ...emptyActionTimeBySegment,
+        ...(value ?? {}),
+    };
+}
+
+function computeFuelFromShootTime(
+    shootTimeBySegment: MatchData['shootTimeBySegment'],
+    ballsPerSecond: number
+) {
+    const autoFuelScored = roundToHundredth(
+        shootTimeBySegment.auto * ballsPerSecond
+    );
+    const teleFuelBySegment: MatchData['teleFuelBySegment'] = {
+        transition: roundToHundredth(
+            shootTimeBySegment.transition * ballsPerSecond
+        ),
+        shift1: roundToHundredth(shootTimeBySegment.shift1 * ballsPerSecond),
+        shift2: roundToHundredth(shootTimeBySegment.shift2 * ballsPerSecond),
+        shift3: roundToHundredth(shootTimeBySegment.shift3 * ballsPerSecond),
+        shift4: roundToHundredth(shootTimeBySegment.shift4 * ballsPerSecond),
+        endgame: roundToHundredth(shootTimeBySegment.endgame * ballsPerSecond),
+    };
+    return { autoFuelScored, teleFuelBySegment };
+}
+
+async function getBallsPerSecond(
+    matchNumber: number,
+    robotTeam: number | undefined
+) {
+    if (robotTeam === undefined) return DEFAULT_BALLS_PER_SECOND;
+    const saved = await ballsPerSecondApp
+        .findOne({ matchNumber, robotTeam })
+        .lean();
+    return saved?.ballsPerSecond ?? DEFAULT_BALLS_PER_SECOND;
+}
+
 app.post('/data/match', async (req, res) => {
     const body = req.body as MatchData;
+    const shootTimeBySegment = getActionTimeBySegment(body.shootTimeBySegment);
+    const passTimeBySegment = getActionTimeBySegment(body.passTimeBySegment);
+    const ballsPerSecondUsed = await getBallsPerSecond(
+        body.metadata.matchNumber,
+        body.metadata.robotTeam
+    );
+    const estimatedFuel = computeFuelFromShootTime(
+        shootTimeBySegment,
+        ballsPerSecondUsed
+    );
 
-    await matchApp.replaceOne ({ 'metadata.robotTeam' : body.metadata.robotTeam, 'metadata.matchNumber' : body.metadata.matchNumber }, body).setOptions({upsert: true});
+    const normalizedBody: MatchData = {
+        ...body,
+        shootTimeBySegment,
+        passTimeBySegment,
+        ballsPerSecondUsed,
+        autoFuelScored: estimatedFuel.autoFuelScored,
+        teleFuelBySegment: estimatedFuel.teleFuelBySegment,
+        defenseProvided: body.defenseProvided ?? 'None',
+        defenseReceived: body.defenseReceived ?? false,
+        fouls: {
+            ...emptyFouls,
+            ...(body.fouls ?? {}),
+        },
+        breaks: {
+            ...emptyBreaks,
+            ...(body.breaks ?? {}),
+        },
+        comments: body.comments ?? [],
+        freeText: body.freeText ?? '',
+    };
+
+    await matchApp
+        .replaceOne(
+            {
+                'metadata.robotTeam': body.metadata.robotTeam,
+                'metadata.matchNumber': body.metadata.matchNumber,
+            },
+            normalizedBody
+        )
+        .setOptions({ upsert: true });
 
     updateMatchStatus();
     console.log(
         chalk.gray(
-            `Match data recieved for team ${body.metadata.robotTeam} match ${body.metadata.matchNumber}`
+            `Match data received for team ${body.metadata.robotTeam} match ${body.metadata.matchNumber}`
         )
     );
 
     res.end();
 });
 
-app.post('/data/super', async (req, res) => {
-    const body = req.body as SuperData;
+app.get('/config/balls-per-second', async (req, res) => {
+    const matchNumber = Number.parseInt(String(req.query.matchNumber), 10);
+    const teamRaw = req.query.teamNumber ?? req.query.robotTeam;
+    const robotTeam = Number.parseInt(String(teamRaw), 10);
 
-    await superApp.replaceOne ({ 'metadata.robotTeam' : body.metadata.robotTeam, 'metadata.matchNumber' : body.metadata.matchNumber }, body).setOptions({upsert: true});
+    if (Number.isFinite(matchNumber) && Number.isFinite(robotTeam)) {
+        const ballsPerSecond = await getBallsPerSecond(matchNumber, robotTeam);
+        res.send({
+            matchNumber,
+            robotTeam,
+            ballsPerSecond,
+        } satisfies BallsPerSecondSetting);
+        return;
+    }
 
-    updateMatchStatus();
-    console.log(
-        chalk.gray(
-            `Super data recieved for team ${body.metadata.robotTeam} match ${body.metadata.matchNumber}`
+    const entries = await ballsPerSecondApp.find().select('-_id -__v').lean();
+    res.send(entries);
+});
+
+app.post('/config/balls-per-second', async (req, res) => {
+    const body = req.body as Partial<BallsPerSecondSetting>;
+    const matchNumber = Number(body.matchNumber);
+    const robotTeam = Number(body.robotTeam);
+    const ballsPerSecond = Number(body.ballsPerSecond);
+
+    if (
+        !Number.isFinite(matchNumber) ||
+        !Number.isFinite(robotTeam) ||
+        !Number.isFinite(ballsPerSecond) ||
+        ballsPerSecond < 0
+    ) {
+        res.status(400).send('Invalid balls per second config payload');
+        return;
+    }
+
+    await ballsPerSecondApp
+        .replaceOne(
+            { matchNumber, robotTeam },
+            { matchNumber, robotTeam, ballsPerSecond }
         )
-    );
+        .setOptions({ upsert: true });
 
-    res.end();
+    res.send({
+        matchNumber,
+        robotTeam,
+        ballsPerSecond,
+    } satisfies BallsPerSecondSetting);
 });
 
 app.post('/data/pit', async (req, res) => {

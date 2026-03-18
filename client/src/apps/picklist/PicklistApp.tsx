@@ -35,6 +35,11 @@ import {
 } from './fakeData';
 import { buildAnalyzedData } from './analysis';
 
+function averageNumbers(values: number[]) {
+    if (!values.length) return 0;
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function generateWindow(
     data: AnalysisEntry[],
     table: WindowData,
@@ -150,6 +155,25 @@ function PicklistApp() {
         pitData: pitDataValue,
         teamInfo: teamInfoValue,
     });
+
+    const expectedPointValues = analyzedData
+        .map(entry => entry.expectedPointsAvg)
+        .filter((value): value is number => typeof value === 'number');
+    const selectionScoreValues = analyzedData
+        .map(entry => entry.selectionScore)
+        .filter((value): value is number => typeof value === 'number');
+    const defenseValues = analyzedData
+        .map(entry => entry.defenseImpactExpectedPoints)
+        .filter((value): value is number => typeof value === 'number');
+    const matchCountValues = analyzedData
+        .map(entry => entry.matchCount)
+        .filter((value): value is number => typeof value === 'number');
+    const topSelectionTeam = [...analyzedData]
+        .filter(entry => typeof entry.selectionScore === 'number')
+        .sort(
+            (a, b) =>
+                (b.selectionScore as number) - (a.selectionScore as number)
+        )[0];
 
     return (
         <main className='relative grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-gradient-to-b from-[#141922] via-[#11161f] to-[#0d1118] text-white'>
@@ -327,6 +351,39 @@ function PicklistApp() {
                     Statistical Analysis
                 </h1>
             </div>
+            <section className='grid grid-cols-2 gap-3 border-b border-white/10 bg-[#131a27] px-4 py-3 text-sm md:grid-cols-5'>
+                <div className='rounded-lg border border-white/10 bg-[#1d2434] p-2'>
+                    <p className='text-xs uppercase text-gray-400'>Teams Loaded</p>
+                    <p className='text-lg font-semibold text-white'>{analyzedData.length}</p>
+                </div>
+                <div className='rounded-lg border border-white/10 bg-[#1d2434] p-2'>
+                    <p className='text-xs uppercase text-gray-400'>Avg Expected Pts</p>
+                    <p className='text-lg font-semibold text-white'>
+                        {averageNumbers(expectedPointValues).toFixed(1)}
+                    </p>
+                </div>
+                <div className='rounded-lg border border-white/10 bg-[#1d2434] p-2'>
+                    <p className='text-xs uppercase text-gray-400'>Avg Selection Score</p>
+                    <p className='text-lg font-semibold text-white'>
+                        {averageNumbers(selectionScoreValues).toFixed(1)}
+                    </p>
+                </div>
+                <div className='rounded-lg border border-white/10 bg-[#1d2434] p-2'>
+                    <p className='text-xs uppercase text-gray-400'>Avg Matches/Team</p>
+                    <p className='text-lg font-semibold text-white'>
+                        {averageNumbers(matchCountValues).toFixed(1)}
+                    </p>
+                </div>
+                <div className='rounded-lg border border-white/10 bg-[#1d2434] p-2'>
+                    <p className='text-xs uppercase text-gray-400'>Top Selection Team</p>
+                    <p className='text-lg font-semibold text-white'>
+                        {topSelectionTeam?.teamNumber ?? 'N/A'}
+                    </p>
+                    <p className='text-xs text-gray-400'>
+                        Avg defense impact {averageNumbers(defenseValues).toFixed(2)}
+                    </p>
+                </div>
+            </section>
             {loadingLiveData && (
                 <div className='absolute left-1/2 top-20 z-20 -translate-x-1/2 rounded-lg border border-white/20 bg-[#1d2330]/95 px-4 py-2 text-sm text-gray-200 shadow-lg shadow-black/40'>
                     Loading live scouting data...

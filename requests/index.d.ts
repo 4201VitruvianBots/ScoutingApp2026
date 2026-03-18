@@ -10,7 +10,6 @@ export type RobotPosition =
     | 'blue_3'
     | 'blue_4';
 
-export type SuperPosition = 'red_ss' | 'blue_ss';
 export type ScouterPosition = 'red_right' | 'blue_right';
 
 export type MatchSegmentId =
@@ -93,6 +92,16 @@ export interface TeleFuelBySegment {
     endgame: number;
 }
 
+export interface ActionTimeBySegment {
+    auto: number;
+    transition: number;
+    shift1: number;
+    shift2: number;
+    shift3: number;
+    shift4: number;
+    endgame: number;
+}
+
 export type BreakdownType =
     | 'None'
     | 'stuck'
@@ -108,6 +117,9 @@ export interface MatchData {
     robotAbsent: boolean;
     autoStartingPosition: AutoStartingPosition | null;
     autoMoved: boolean;
+    shootTimeBySegment: ActionTimeBySegment;
+    passTimeBySegment: ActionTimeBySegment;
+    ballsPerSecondUsed: number;
     autoFuelScored: number;
     autoTower: AutoTowerResult;
     autoFuelWinner: AutoFuelWinner;
@@ -117,6 +129,11 @@ export interface MatchData {
     climbTimeBucket: 'early' | 'mid' | 'late' | null;
     breakdown: BreakdownType;
     driverQuality: DriverQuality;
+    defenseProvided: DefenseProvided;
+    defenseReceived: boolean;
+    fouls: SuperFouls;
+    breaks: SuperBreaks;
+    comments: CommentValues[];
     freeText: string;
 }
 
@@ -248,6 +265,9 @@ export interface MatchIndividualDataAggregations {
     robotAbsent: boolean;
     autoStartingPosition: AutoStartingPosition | null;
     autoMoved: boolean;
+    shootTimeBySegment: ActionTimeBySegment;
+    passTimeBySegment: ActionTimeBySegment;
+    ballsPerSecondUsed: number;
     autoFuelScored: number;
     autoFuelWinner: AutoFuelWinner;
     shift1ActiveHubIfTie: AllianceColor | null;
@@ -259,6 +279,11 @@ export interface MatchIndividualDataAggregations {
     climbTimeBucket: 'early' | 'mid' | 'late' | null;
     breakdown: BreakdownType;
     driverQuality: DriverQuality;
+    defenseProvided: DefenseProvided;
+    defenseReceived: boolean;
+    fouls: SuperFouls;
+    breaks: SuperBreaks;
+    comments: CommentValues[];
     freeText: string;
 }
 
@@ -302,7 +327,7 @@ export interface matchOutliersAggregation {
 }
 
 export interface StatusReport {
-    robotPosition: RobotPosition | SuperPosition | undefined;
+    robotPosition: RobotPosition | undefined;
     matchNumber: number | undefined;
     scouterName: string;
     battery: number | undefined;
@@ -315,9 +340,14 @@ export interface StatusRecieve {
 
 export type MatchStatus = Record<
     number,
-    Record<RobotPosition, { schedule: number | undefined; real: number[] }> &
-        Record<SuperPosition, boolean>
+    Partial<Record<RobotPosition, { schedule: number | undefined; real: number[] }>>
 >;
+
+export interface BallsPerSecondSetting {
+    matchNumber: number;
+    robotTeam: number;
+    ballsPerSecond: number;
+}
 
 export type MatchSchedule = Record<
     number,

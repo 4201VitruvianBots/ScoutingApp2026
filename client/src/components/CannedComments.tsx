@@ -67,7 +67,6 @@ const colourStyles: StylesConfig<ColourOption, true> = {
                       : 'black'
                   : data.color,
             cursor: isDisabled ? 'not-allowed' : 'default',
-
             ':active': {
                 ...styles[':active'],
                 backgroundColor: !isDisabled
@@ -99,7 +98,7 @@ const colourStyles: StylesConfig<ColourOption, true> = {
     }),
 };
 
-function CannedCommentBox({
+function CannedComments({
     value,
     onChange,
 }: {
@@ -114,10 +113,10 @@ function CannedCommentBox({
                 isMulti
                 value={value}
                 options={commentOptions}
-                onChange={value =>
-                    onChange?.(value as SelectOption<CommentValues>[])
+                onChange={nextValue =>
+                    onChange?.(nextValue as SelectOption<CommentValues>[])
                 }
-                className='w-full text-sm'
+                className='w-full text-sm text-black'
                 styles={colourStyles}
                 isSearchable={false}
             />
@@ -125,4 +124,4 @@ function CannedCommentBox({
     );
 }
 
-export default CannedCommentBox;
+export default CannedComments;

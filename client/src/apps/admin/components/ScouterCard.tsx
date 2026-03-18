@@ -23,7 +23,11 @@ function ScouterCard({
 }) {
     return (
         <div
-            className={`${red ? 'border-red-900 bg-red-500' : 'border-blue-900 bg-blue-500'} content-center items-center rounded-md border-2 px-4 text-center text-lg text-white`}>
+            className={`${
+                red
+                    ? 'border-red-500/60 bg-red-500/30'
+                    : 'border-blue-500/60 bg-blue-500/30'
+            } content-center items-center rounded-md border px-4 py-3 text-center text-sm text-white`}>
             <div className='mb-2 mt-4 font-semibold'>{title}</div>
             {scouter.length === 0 ? (
                 <MaterialSymbol icon='wifi_off' size={32} />
@@ -48,8 +52,11 @@ function ScouterCard({
                             className='text-yellow-300'
                         />
                     </div>
-                    {scouter.map(e => (
-                        <div>{e.scouterName}</div>
+                    {scouter.map(entry => (
+                        <div
+                            key={`${entry.scouterName}-${entry.matchNumber ?? 'unknown'}`}>
+                            {entry.scouterName}
+                        </div>
                     ))}
                 </>
             )}

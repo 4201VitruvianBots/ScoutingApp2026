@@ -2,6 +2,8 @@ import { ReactNode, useEffect, useRef } from 'react';
 
 function HoldButton({
     onHold,
+    onHoldStart,
+    onHoldEnd,
     className = '',
     children,
     ariaLabel,
@@ -11,6 +13,8 @@ function HoldButton({
     repeatInterval = 70,
 }: {
     onHold: () => void;
+    onHoldStart?: () => void;
+    onHoldEnd?: () => void;
     className?: string;
     children?: ReactNode;
     ariaLabel?: string;
@@ -22,6 +26,7 @@ function HoldButton({
     const holdTimeoutRef = useRef<number | null>(null);
     const holdIntervalRef = useRef<number | null>(null);
     const ignoreClickRef = useRef(false);
+    const isHoldingRef = useRef(false);
 
     useEffect(() => {
         return () => {
@@ -31,6 +36,7 @@ function HoldButton({
             if (holdIntervalRef.current !== null) {
                 window.clearInterval(holdIntervalRef.current);
             }
+            isHoldingRef.current = false;
         };
     }, []);
 
@@ -46,7 +52,9 @@ function HoldButton({
     };
 
     const startHold = () => {
-        if (disabled) return;
+        if (disabled || isHoldingRef.current) return;
+        isHoldingRef.current = true;
+        onHoldStart?.();
         ignoreClickRef.current = true;
         if (triggerOnPress) {
             onHold();
@@ -60,7 +68,10 @@ function HoldButton({
     };
 
     const stopHold = () => {
+        if (!isHoldingRef.current) return;
+        isHoldingRef.current = false;
         clearHoldTimers();
+        onHoldEnd?.();
         window.setTimeout(() => {
             ignoreClickRef.current = false;
         }, 0);

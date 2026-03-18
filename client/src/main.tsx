@@ -10,7 +10,6 @@ import AdminApp from './apps/admin/AdminApp';
 import MatchApp from './apps/match/MatchApp';
 import PitApp from './apps/pit/PitApp';
 import ReconApp from './apps/recon/ReconApp';
-import SuperApp from './apps/super/SuperApp';
 import PublicApp from './apps/public/PublicApp';
 import 'react-material-symbols/rounded';
 import LeaderboardApp from './apps/scouting_leaderboard/LeaderboardApp';
@@ -50,10 +49,6 @@ const router = createBrowserRouter([
             {
                 path: 'recon',
                 element: <ReconApp />,
-            },
-            {
-                path: 'super',
-                element: <SuperApp />,
             },
             {
                 path: 'picklist',

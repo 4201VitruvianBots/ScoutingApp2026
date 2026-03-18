@@ -5,13 +5,14 @@ import {
     MatchDataAggregations,
     MatchIndividualDataAggregations,
     RobotPosition,
-    SuperData,
+    SuperBreaks,
     SuperDataAggregations,
+    SuperFouls,
     SuperIndividualDataAggregations,
     matchOutliersAggregation,
     ScouterData,
 } from 'requests';
-import { matchApp, superApp, pitApp, leaderboardApp } from './Schema.js';
+import { matchApp, pitApp, leaderboardApp } from './Schema.js';
 
 function getAllianceFromPosition(position: RobotPosition): AllianceColor {
     return position.startsWith('red') ? 'red' : 'blue';
@@ -72,6 +73,66 @@ function computeTeleFuelActiveWasted(entry: MatchData) {
     );
 
     return { active, wasted };
+}
+
+const emptyFouls: SuperFouls = {
+    pinning: 0,
+    towerContactInEndgame: 0,
+    outOfZoneShooting: 0,
+    ejectedFuel: 0,
+    other: 0,
+};
+
+const emptyBreaks: SuperBreaks = {
+    mechanism: 0,
+    battery: 0,
+    comms: 0,
+    bumper: 0,
+};
+
+const emptyActionTimeBySegment: MatchData['shootTimeBySegment'] = {
+    auto: 0,
+    transition: 0,
+    shift1: 0,
+    shift2: 0,
+    shift3: 0,
+    shift4: 0,
+    endgame: 0,
+};
+
+function getActionTimeBySegment(
+    value: MatchData['shootTimeBySegment'] | undefined
+) {
+    return {
+        ...emptyActionTimeBySegment,
+        ...(value ?? {}),
+    };
+}
+
+function getFouls(entry: MatchData): SuperFouls {
+    return {
+        ...emptyFouls,
+        ...(entry.fouls ?? {}),
+    };
+}
+
+function getBreaks(entry: MatchData): SuperBreaks {
+    return {
+        ...emptyBreaks,
+        ...(entry.breaks ?? {}),
+    };
+}
+
+function getDefenseProvided(entry: MatchData): MatchData['defenseProvided'] {
+    return entry.defenseProvided ?? 'None';
+}
+
+function getDefenseReceived(entry: MatchData): boolean {
+    return entry.defenseReceived ?? false;
+}
+
+function getComments(entry: MatchData): CommentValues[] {
+    return entry.comments ?? [];
 }
 
 async function averageAndMax(): Promise<MatchDataAggregations[]> {
@@ -303,6 +364,13 @@ async function maxIndividual(): Promise<MatchIndividualDataAggregations[]> {
                 robotAbsent: entry.robotAbsent,
                 autoStartingPosition: entry.autoStartingPosition,
                 autoMoved: entry.autoMoved,
+                shootTimeBySegment: getActionTimeBySegment(
+                    entry.shootTimeBySegment
+                ),
+                passTimeBySegment: getActionTimeBySegment(
+                    entry.passTimeBySegment
+                ),
+                ballsPerSecondUsed: entry.ballsPerSecondUsed ?? 0,
                 autoFuelScored: entry.autoFuelScored,
                 autoFuelWinner: entry.autoFuelWinner,
                 shift1ActiveHubIfTie: entry.shift1ActiveHubIfTie,
@@ -314,17 +382,22 @@ async function maxIndividual(): Promise<MatchIndividualDataAggregations[]> {
                 climbTimeBucket: entry.climbTimeBucket,
                 breakdown: entry.breakdown,
                 driverQuality: entry.driverQuality,
+                defenseProvided: getDefenseProvided(entry),
+                defenseReceived: getDefenseReceived(entry),
+                fouls: getFouls(entry),
+                breaks: getBreaks(entry),
+                comments: getComments(entry),
                 freeText: entry.freeText,
             };
         });
 }
 
 async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
-    const entries = (await superApp.find().lean()) as SuperData[];
-    const byTeam = new Map<number, SuperData[]>();
+    const entries = (await matchApp.find().lean()) as MatchData[];
+    const byTeam = new Map<number, MatchData[]>();
 
     entries.forEach(entry => {
-        if (!entry.metadata.robotTeam) return;
+        if (!entry.metadata.robotTeam || entry.robotAbsent) return;
         const teamEntries = byTeam.get(entry.metadata.robotTeam) ?? [];
         teamEntries.push(entry);
         byTeam.set(entry.metadata.robotTeam, teamEntries);
@@ -377,30 +450,36 @@ async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
         const commentCounts: Partial<Record<CommentValues, number>> = {};
 
         teamEntries.forEach(entry => {
-            pinning += entry.fouls.pinning;
-            towerContact += entry.fouls.towerContactInEndgame;
-            outOfZone += entry.fouls.outOfZoneShooting;
-            ejectedFuel += entry.fouls.ejectedFuel;
-            other += entry.fouls.other;
-            humanFuel += entry.humanPlayerFuelScored;
+            const fouls = getFouls(entry);
+            const breaks = getBreaks(entry);
+            const defenseProvided = getDefenseProvided(entry);
+            const defenseReceivedForEntry = getDefenseReceived(entry);
+            const comments = getComments(entry);
 
-            breaksMechanism += entry.breaks.mechanism;
-            breaksBattery += entry.breaks.battery;
-            breaksComms += entry.breaks.comms;
-            breaksBumper += entry.breaks.bumper;
+            pinning += fouls.pinning;
+            towerContact += fouls.towerContactInEndgame;
+            outOfZone += fouls.outOfZoneShooting;
+            ejectedFuel += fouls.ejectedFuel;
+            other += fouls.other;
+            humanFuel += 0;
+
+            breaksMechanism += breaks.mechanism;
+            breaksBattery += breaks.battery;
+            breaksComms += breaks.comms;
+            breaksBumper += breaks.bumper;
             const breakTotal =
-                entry.breaks.mechanism +
-                entry.breaks.battery +
-                entry.breaks.comms +
-                entry.breaks.bumper;
+                breaks.mechanism +
+                breaks.battery +
+                breaks.comms +
+                breaks.bumper;
             if (breakTotal > 0) breaksAny += 1;
 
-            if (entry.defenseProvided === 'heavy') heavyDefense += 1;
-            if (entry.defenseProvided === 'some') someDefense += 1;
-            if (entry.defenseProvided === 'None') noneDefense += 1;
-            if (entry.defenseReceived) defenseReceived += 1;
-            totalCommentTags += entry.comments.length;
-            entry.comments.forEach(comment => {
+            if (defenseProvided === 'heavy') heavyDefense += 1;
+            if (defenseProvided === 'some') someDefense += 1;
+            if (defenseProvided === 'None') noneDefense += 1;
+            if (defenseReceivedForEntry) defenseReceived += 1;
+            totalCommentTags += comments.length;
+            comments.forEach(comment => {
                 commentCounts[comment] = (commentCounts[comment] ?? 0) + 1;
             });
         });
@@ -436,9 +515,9 @@ async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
 }
 
 async function superMaxIndividual(): Promise<SuperIndividualDataAggregations[]> {
-    const entries = (await superApp.find().lean()) as SuperData[];
+    const entries = (await matchApp.find().lean()) as MatchData[];
     return entries
-        .filter(entry => entry.metadata.robotTeam)
+        .filter(entry => entry.metadata.robotTeam && !entry.robotAbsent)
         .map(entry => ({
             _id: {
                 teamNumber: entry.metadata.robotTeam!,
@@ -446,12 +525,12 @@ async function superMaxIndividual(): Promise<SuperIndividualDataAggregations[]> 
                 robotPosition: entry.metadata.robotPosition,
             },
             scouterName: entry.metadata.scouterName,
-            defenseProvided: entry.defenseProvided,
-            defenseReceived: entry.defenseReceived,
-            fouls: entry.fouls,
-            breaks: entry.breaks,
-            comments: entry.comments,
-            humanPlayerFuelScored: entry.humanPlayerFuelScored,
+            defenseProvided: getDefenseProvided(entry),
+            defenseReceived: getDefenseReceived(entry),
+            fouls: getFouls(entry),
+            breaks: getBreaks(entry),
+            comments: getComments(entry),
+            humanPlayerFuelScored: 0,
         }));
 }
 
