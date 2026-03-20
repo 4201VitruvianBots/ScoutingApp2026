@@ -1,108 +1,376 @@
-# Team 4201 Scouting System
+# Team 4201 Scouting System (2026)
 
-[![Build all components](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/build.yml/badge.svg)](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/build.yml) [![Format with Prettier](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/format.yml/badge.svg)](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/format.yml)
+[![Build all components](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/build.yml/badge.svg)](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/build.yml)
+[![Format with Prettier](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/format.yml/badge.svg)](https://github.com/4201VitruvianBots/ScoutingApp2026/actions/workflows/format.yml)
 
-## Overview
+This README is an operations runbook for setup, competition use, tablets, data export/analysis, fake data generation, and development.
 
-Over the past several years, our team has designed an all-in-one system for robot scouting. Everything for the system has been packed into a rolling tote (Keter Masterloader Pro 24" Rolling Tool Box) that we can easily take into competition. The full system is connected as shown below:
+## 1) What This System Runs
 
-![full scouting tote diagram](images/scouting_tote_diagram.png)
+- `client` (React + Vite + PWA): scouting tablet UI and analysis UIs
+- `server` (Node + Express + TypeScript): API, status sockets, static hosting
+- `database` (Docker-managed MongoDB image): local MongoDB container startup/build helpers
+- `data-analysis` (Python): exports Mongo collections into CSV/JSON analysis outputs
 
-## System Setup
+## 2) Required Software
 
-Once everything is connected correctly based on the diagram above, follow the steps below to get everything running.
+Install these on the scouting laptop before anything else:
 
-On the Scouting Laptop, do the following:
+1. Git
+2. Node.js 20+ (recommended: latest LTS)
+3. npm (comes with Node)
+4. Docker Desktop (must be running before starting server)
+5. Visual Studio Code (recommended)
+6. Python 3.10+ (for data-analysis scripts)
+7. Google Chrome on tablets
 
--   Set the static IP on your computer to `192.168.1.200`. If you don't know how to do this, search on Google "how to set static IP on " + the operating system you're running on.
--   Install Visual Studio Code (VSCode) on the computer [(Visual Studio Code Install)](https://code.visualstudio.com/download)
--   Install Node Version Manager (nvm) on the computer [(nvm for Linux)](https://github.com/nvm-sh/nvm), [(nvm for Windows)](https://github.com/coreybutler/nvm-windows)
--   Following the instructions provided by nvm in the prior step, install the latest Node version with the command `nvm install node`. Once installed, run `nvm use node`.
--   Install Docker Desktop on the computer [(Docker Desktop for Linux)](https://docs.docker.com/desktop/setup/install/linux/), [(Docker Desktop for Windows)](https://docs.docker.com/desktop/setup/install/windows-install/)
--   Install GitKraken on the computer [(GitKraken Install)](https://www.gitkraken.com/download)
--   Clone the `ScoutingApp2026` repository using Git to the laptop
--   Open the `ScoutingApp2026` folder in VSCode. Once open, create a new terminal (`Terminal` > `New Terminal`), and run the command `npm install`
--   Once the install command completes, run the command `npm run build --workspace database` to build our database image
--   As long as the previous command completed successfully, run the command `npm run start` to start the server.
+Optional but useful:
 
-If all the steps above complete correctly, after running `npm run start` you should see something similar to the following in your terminal:
+1. MongoDB Compass (inspect local DB at `mongodb://localhost:27017`)
+2. nvm / nvm-windows (manage Node versions)
 
-```bash
-$ npm run start
+Note on MongoDB: this project runs MongoDB in Docker. You do not need a separate MongoDB server install to run scouting.
 
-> ScoutingApp2026@1.0.0 start
-> npm run start --workspace server
+## 3) Network and Hardware Requirements (Competition)
 
+- Scouting laptop static IP: `192.168.1.200`
+- Tablets connect via ethernet adapters to the tote network
+- Laptop and tablets must be on the same local subnet (255.255.255.0 is fine I think)
 
-> server@1.0.0 start
-> node dist/index.js
+## 4) One-Time Project Setup (Fresh Machine)
 
-Container "cala-quals" does not exist.
-Creating and starting a new container...
-Started container
-Server running at http://localhost:8080
+Run this once per laptop.
+
+### 4.1 Clone and install
+
+```powershell
+git clone https://github.com/4201VitruvianBots/ScoutingApp2026.git
+cd ScoutingApp2026
+npm install
 ```
 
-To load the scouting apps on tablets, follow these steps:
+### 4.2 Configure `.env`
 
--   Connect each tablet to the system via ethernet adapter (as pictured above)
--   On each tablet, go into Google Chrome and type `192.168.1.200:8080` into the search bar, which should load the scouting app
--   Once the scouting app loads, select the app you want the tablet to run on the home screen (for example, the match scouting app)
--   Once the desired app is loaded, you can now unplug the tablet and start using it to scout
+Repository root has `.env` used by Docker helper scripts.
 
-Once you load the scouting apps onto each tablet, you can unplug the tablets and let the scouters record data while being unconnected to the system. Data submitted on the tablets while not plugged into the system will remain stored on the tablet, until you reconnect the tablet and upload it.
+Current required values:
 
-To upload scouting data back to the scouting laptop:
-
--   Connect each tablet to the system via ethernet adapter (as pictured above)
--   In the desired scouting app, scroll to the bottom. You should see a small yellow button called "Resend All" with text above saying "Queue: _N_". The number of unsubmitted, stored matches will match the value of _N_
--   Click the yellow "Resend All" button at the bottom of the app. _N_ should go to 0
--   In the terminal on the scouting laptop, you should see a bunch (_N_ total lines) saying "Match data received for team _X_ match _Y_", for each of the _N_ matches that were stored on the tablet
-
-## Exporting Data
-
-To easily use the collected, we provide a python script to convert our database contents to a CSV file.
-
-To export all currently collected data, do the following:
-
--   Open the `ScoutingApp2026` folder in VSCode. Once open, create a new terminal (`Terminal` > `New Terminal`). **Press 'New Terminal' twice to create two separate terminals, which should show up as separate tabs on the bottom right of your screen.**
--   In the first terminal, _as long as the scouting app isn't currently running on the laptop_, run `npm run start` to start the backend application
--   Switch to the second terminal without stopping `npm` from the first. In the second terminal, run the command `cd data-analysis`
--   Run the command `python -m venv venv` to create a new Python virtual environment
--   Load in the virtual environment. On **Linux**, do this by running `. venv/bin/activate`. On **Windows**, do this by running `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, then `.\venv\Scripts\Activate.ps1`
--   Run the command `pip install -r requirements.txt`
--   Once complete, run `python export_csv.py`. This should generate 4 CSV files and drop them in the `data-analysis` directory
--   For each of the CSV files, you can now upload these to Google Drive and treat them like a normal spreadsheet.
--   Whenever data changes, re-run the `python export_csv.py` command to refresh the CSVs, and re-upload them to Google Drive.
-
-## Development
-
-These instructions are specific to users who want to develop in the system. **Never run the system in dev mode at competition, as this can cause loss of data!**
-
-### Running the Client/Server
-
-1. Running the client
-
-```
-npm run dev --workspace client
+```env
+CONTAINER_NAME=cala-quals
+IMAGE_NAME=scouting-database:latest
 ```
 
-2. Running the server
+If you need event/TBA scripts or remote sync, add these in `.env.local` (root):
 
-```
-npm run dev --workspace server
+```env
+API_KEY=your_tba_api_key
+EVENT_KEY=2026xxxx
+NGROK_TOKEN=your_ngrok_token
+REMOTE_SERVER_URL=https://your-remote-server
+MONGO_URL=mongodb://0.0.0.0:27017/
 ```
 
-3. Running both the server and the client
+### 4.3 Build database image (required before first start)
 
+From repo root:
+
+```powershell
+npm run build --workspace database
 ```
+
+## 5) Competition Startup Procedure (Initial Scouting Setup)
+
+Use this at events.
+
+### 5.1 Start Docker Desktop
+
+- Open Docker Desktop and wait until it reports running.
+
+### 5.2 Start scouting server stack
+
+From repo root:
+
+```powershell
+npm run start
+```
+
+Expected success line:
+
+- `Server running at http://localhost:8080`
+
+This basically:
+- Starts/creates MongoDB Docker container named `cala-quals` or whatever
+- Starts Node server on port `8080`
+- Serves built client from `client/dist`
+
+### 5.3 Stop safely when done
+
+In the same terminal, press `Ctrl + C` once.
+
+The app handles shutdown and stops the Mongo container cleanly.
+
+## 6) Tablet Procedure (Load App, Scout Offline, Re-Send Queue)
+
+### 6.1 Load app on each tablet
+
+1. Connect tablet ethernet adapter into scouting network.
+2. Open Chrome on tablet.
+3. Go to `http://192.168.1.200:8080`.
+4. Open desired app (Match / Pit / etc.).
+5. Keep page loaded; tablet can continue scouting even if briefly disconnected.
+
+### 6.2 During scouting (offline behavior)
+
+- Submissions are queued locally on the tablet when network is unavailable.
+- Queue count appears in UI (`Queue: N`).
+
+### 6.3 Upload queued data from tablet back to laptop
+
+1. Reconnect tablet to scouting network.
+2. Open scouting app page again.
+3. Scroll to bottom and press yellow `Resend All` button.
+4. Confirm queue returns to `0`.
+
+Repeat for every tablet.
+
+## 7) Data Export and Analysis Procedure
+
+Use this when you need CSV/JSON outputs for strategy and picklist work.
+
+### 7.1 Keep backend running
+
+In terminal #1 (repo root):
+
+```powershell
+npm run start
+```
+
+### 7.2 Run analysis script
+
+In terminal #2:
+
+```powershell
+cd ScoutingApp2026\data-analysis
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python export_csv.py
+```
+
+### 7.3 Output locations
+
+Primary outputs go to:
+
+- `data-analysis/output`
+
+Legacy CSV outputs are also written to:
+
+- `data-analysis/match_raw_2026.csv`
+- `data-analysis/super_raw_2026.csv`
+- `data-analysis/pit_2026.csv`
+- `data-analysis/team_agg_2026.csv`
+- `data-analysis/metric_summary_2026.csv`
+
+### 7.4 Optional analysis flags
+
+```powershell
+python export_csv.py --mongo-url mongodb://localhost:27017/ --db test --output-dir .\output
+```
+
+## 8) Generate Fake Data (for Testing Picklist/Recon)
+
+There are two fake-data paths.
+
+### 8.1 Database fake scouting data (recommended)
+
+Populates Mongo collections with synthetic match/pit/leaderboard entries.
+
+From repo root:
+
+```powershell
+npm run --workspace server gen-fake-data
+```
+
+Optional environment overrides (PowerShell examples):
+
+```powershell
+$env:FAKE_MATCH_COUNT='80'
+$env:FAKE_TEAM_COUNT='40'
+$env:FAKE_SCOUTER_COUNT='16'
+$env:FAKE_CLEAR='true'
+$env:FAKE_INCLUDE_PIT='true'
+$env:FAKE_INCLUDE_LEADERBOARD='true'
+$env:FAKE_INCLUDE_AUTO_PATH='true'
+npm run --workspace server gen-fake-data
+```
+
+### 8.2 Static analysis JSON file
+
+Writes `server/static/output_analysis.json`.
+
+From repo root:
+
+```powershell
+npm run --workspace server gen-fake-json
+```
+
+## 9) Development Procedures (Non-Competition)
+
+Do not use dev mode for live event scouting.
+
+### 9.1 Run both client and server (preferred dev workflow)
+
+From repo root:
+
+```powershell
 npm run dev
 ```
 
-### Generate Fake Data
+- Vite client: `http://localhost:5173`
+- Server API: `http://localhost:8081`
+- In dev mode, server proxies frontend requests to Vite.
 
-If you don't have real scouting data to use to test the picklist interface/other interfaces, run the following to generate some fake data:
+### 9.2 Run only one side
 
+Client only:
+
+```powershell
+npm run dev --workspace client
 ```
+
+Server only:
+
+```powershell
+npm run dev --workspace server
+```
+
+### 9.3 Build all workspaces
+
+```powershell
+npm run build
+```
+
+### 9.4 Lint/format
+
+```powershell
+npm run lint:check
+npm run format:check
+```
+
+## 10) Event Data Utilities (TBA + Team Metadata)
+
+These require `.env.local` with `API_KEY` and `EVENT_KEY`.
+
+Run from repo root.
+
+### 10.1 Download event team list
+
+```powershell
+npm run --workspace server download-teams
+```
+
+Writes: `client/src/assets/teams.txt`
+
+### 10.2 Download event match schedule
+
+```powershell
+npm run --workspace server download-schedule
+```
+
+Writes: `client/src/assets/matchSchedule.json`
+
+### 10.3 Generate team metadata/colors/avatars
+
+Requires `server/static/output_analysis.json` (generate with `gen-fake-json` or provide your own).
+
+```powershell
+npm run --workspace server gen-team-info
+```
+
+Writes: `server/static/team_info.json`
+
+## 11) Backup Procedure
+
+From repo root:
+
+```powershell
+npm run --workspace server backup
+```
+
+Writes: `server/static/backup.json`
+
+## 12) Remote/Ngrok Modes
+
+### 12.1 Start production-style server with ngrok
+
+Requires `NGROK_TOKEN`.
+
+```powershell
+npm run start:remote
+```
+
+### 12.2 Start dev mode with remote flag
+
+```powershell
+npm run dev:remote
+```
+
+## 13) Quick Command Index
+
+```powershell
+# First-time
+npm install
+npm run build --workspace database
+
+# Competition run
+npm run start
+
+# Dev run
+npm run dev
+
+# Analysis
+cd data-analysis
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python export_csv.py
+
+# Fake data
+cd ..
+npm run --workspace server gen-fake-data
 npm run --workspace server gen-fake-json
+
+# Event utilities
+npm run --workspace server download-teams
+npm run --workspace server download-schedule
+npm run --workspace server gen-team-info
+
+# Backup
+npm run --workspace server backup
 ```
+
+## 14) Troubleshooting
+
+### Docker errors on startup
+
+- Ensure Docker Desktop is running.
+- Rebuild DB image:
+
+```powershell
+npm run build --workspace database
+```
+
+### Tablets cannot load app
+
+- Confirm laptop IP is `192.168.1.200`.
+- Confirm server is running on laptop (`npm run start`).
+- Verify tablet URL exactly `http://192.168.1.200:8080`.
+
+### Analysis script cannot connect to Mongo
+
+- Ensure backend is running (`npm run start`) or Mongo container is up.
+- Check mongo URL (`mongodb://localhost:27017/`).
+
+### `sendExport` script note
+
+- `server/scripts/sendExport.ts` currently connects to `mongodb://0.0.0.0:27107/` (port typo vs `27017`). Update that file before relying on this script.
