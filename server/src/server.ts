@@ -2,7 +2,12 @@ import express from 'express';
 import path from 'path';
 import chalk from 'chalk';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { ballsPerSecondApp, matchApp, pitApp } from './Schema.js';
+import {
+    autoFieldOrientationApp,
+    ballsPerSecondApp,
+    matchApp,
+    pitApp,
+} from './Schema.js';
 import {
     averageAndMax,
     superAverageAndMax,
@@ -15,7 +20,9 @@ import {
 import { setUpSocket, updateMatchStatus } from './status.js';
 import {
     AllianceColor,
+    AutoFieldOrientationSetting,
     BallsPerSecondSetting,
+    FieldOrientation,
     MatchData,
     PitFile,
     PitResult,
@@ -27,6 +34,10 @@ import { dataUriToBuffer } from 'data-uri-to-buffer';
 // If DEV is true then the app should forward requests to localhost:5173 instead of serving from /static
 const DEV = process.env.NODE_ENV === 'dev';
 const DEFAULT_BALLS_PER_SECOND = 5;
+const defaultAutoFieldOrientation: Record<AllianceColor, FieldOrientation> = {
+    red: 'orientation1',
+    blue: 'orientation1',
+};
 
 const app = express();
 
@@ -236,6 +247,21 @@ async function getBallsPerSecond(
     return saved?.ballsPerSecond ?? DEFAULT_BALLS_PER_SECOND;
 }
 
+async function getAutoFieldOrientationMap() {
+    const rows = await autoFieldOrientationApp.find().lean();
+    const next = { ...defaultAutoFieldOrientation };
+    rows.forEach(row => {
+        if (
+            (row.side === 'red' || row.side === 'blue') &&
+            (row.orientation === 'orientation1' ||
+                row.orientation === 'orientation2')
+        ) {
+            next[row.side] = row.orientation;
+        }
+    });
+    return next;
+}
+
 app.post('/data/match', async (req, res) => {
     const body = req.body as MatchData;
     const shootTimeBySegment = getActionTimeBySegment(body.shootTimeBySegment);
@@ -345,6 +371,49 @@ app.post('/config/balls-per-second', async (req, res) => {
         robotTeam,
         ballsPerSecond,
     } satisfies BallsPerSecondSetting);
+});
+
+app.get('/config/auto-field-orientation', async (req, res) => {
+    const side = String(req.query.side ?? '');
+    const map = await getAutoFieldOrientationMap();
+
+    if (side === 'red' || side === 'blue') {
+        res.send({
+            side,
+            orientation: map[side],
+        } satisfies AutoFieldOrientationSetting);
+        return;
+    }
+
+    res.send(
+        (['red', 'blue'] as const).map(currentSide => ({
+            side: currentSide,
+            orientation: map[currentSide],
+        } satisfies AutoFieldOrientationSetting))
+    );
+});
+
+app.post('/config/auto-field-orientation', async (req, res) => {
+    const body = req.body as Partial<AutoFieldOrientationSetting>;
+    const side = body.side;
+    const orientation = body.orientation;
+
+    if (
+        (side !== 'red' && side !== 'blue') ||
+        (orientation !== 'orientation1' && orientation !== 'orientation2')
+    ) {
+        res.status(400).send('Invalid auto field orientation payload');
+        return;
+    }
+
+    await autoFieldOrientationApp
+        .replaceOne({ side }, { side, orientation })
+        .setOptions({ upsert: true });
+
+    res.send({
+        side,
+        orientation,
+    } satisfies AutoFieldOrientationSetting);
 });
 
 app.post('/data/pit', async (req, res) => {

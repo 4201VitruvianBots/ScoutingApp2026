@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import {
+    AutoFieldOrientationSetting,
     BallsPerSecondSetting,
     CommentValues,
     MatchData,
@@ -180,6 +181,22 @@ ballsPerSecondDataSchema.index(
     { unique: true }
 );
 
+const autoFieldOrientationSchema = new mongoose.Schema<AutoFieldOrientationSetting>({
+    side: {
+        type: String,
+        enum: ['red', 'blue'],
+        required: true,
+    },
+    orientation: {
+        type: String,
+        enum: ['orientation1', 'orientation2'],
+        required: true,
+        default: 'orientation1',
+    },
+});
+
+autoFieldOrientationSchema.index({ side: 1 }, { unique: true });
+
 type PitDataSchemaType = {
     [K in keyof PitFile]: K extends 'photo' ? Buffer : PitFile[K];
 };
@@ -224,6 +241,10 @@ const ballsPerSecondApp = mongoose.model<BallsPerSecondSetting>(
     'ballsPerSecondApp',
     ballsPerSecondDataSchema
 );
+const autoFieldOrientationApp = mongoose.model<AutoFieldOrientationSetting>(
+    'autoFieldOrientationApp',
+    autoFieldOrientationSchema
+);
 
 export {
     matchApp,
@@ -234,4 +255,6 @@ export {
     leaderboardDataSchema,
     ballsPerSecondApp,
     ballsPerSecondDataSchema,
+    autoFieldOrientationApp,
+    autoFieldOrientationSchema,
 };

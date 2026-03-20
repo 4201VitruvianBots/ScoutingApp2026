@@ -9,9 +9,11 @@ import { MaterialSymbol } from 'react-material-symbols';
 import 'react-material-symbols/rounded';
 import {
     AllianceColor,
+    AutoFieldOrientationSetting,
     AutoStartingPosition,
     BreakdownType,
     DriverQuality,
+    FieldOrientation,
     MatchData,
     MatchSchedule,
     RobotPosition,
@@ -42,7 +44,7 @@ const SHIFT_SEC = (TELEOP_COUNTDOWN_SEC - ENDGAME_SEC) / 4;
 const MATCH_TOTAL_SEC = AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + TELEOP_COUNTDOWN_SEC;
 const INTERVAL_MERGE_GAP_SEC = 0.08;
 const HOLD_INTERVAL_MS = 100;
-const AUTO_POINT_MIN_DISTANCE = 0.004;
+const AUTO_POINT_MIN_DISTANCE = 0.008;
 
 type ActionKind = 'shoot' | 'pass';
 type FullSegmentId = keyof MatchData['shootTimeBySegment'];
@@ -150,6 +152,10 @@ const autoFieldImageByAlliance: Record<AllianceColor, string> = {
     red: '/redsidematch.png',
     blue: '/bluesidematch.png',
 };
+const defaultFieldOrientationBySide: Record<AllianceColor, FieldOrientation> = {
+    red: 'orientation1',
+    blue: 'orientation1',
+};
 
 const autoStartDotByAlliance: Record<
     AllianceColor,
@@ -216,21 +222,21 @@ function getDistance(
 
 function makeSmoothPath(points: Array<{ x: number; y: number }>) {
     if (points.length === 0) return '';
-    if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
-    if (points.length === 2) {
-        return `M ${points[0]!.x} ${points[0]!.y} L ${points[1]!.x} ${points[1]!.y}`;
-    }
+    const smoothed = points.map((point, index) => {
+        const previous = points[index - 1];
+        const next = points[index + 1];
+        if (!previous || !next) return point;
+        return {
+            x: previous.x * 0.2 + point.x * 0.6 + next.x * 0.2,
+            y: previous.y * 0.2 + point.y * 0.6 + next.y * 0.2,
+        };
+    });
 
-    let path = `M ${points[0]!.x} ${points[0]!.y}`;
-    for (let index = 1; index < points.length - 1; index++) {
-        const current = points[index]!;
-        const next = points[index + 1]!;
-        const midpointX = (current.x + next.x) / 2;
-        const midpointY = (current.y + next.y) / 2;
-        path += ` Q ${current.x} ${current.y} ${midpointX} ${midpointY}`;
+    let path = `M ${smoothed[0]!.x} ${smoothed[0]!.y}`;
+    for (let index = 1; index < smoothed.length; index++) {
+        const point = smoothed[index]!;
+        path += ` L ${point.x} ${point.y}`;
     }
-    const last = points[points.length - 1]!;
-    path += ` T ${last.x} ${last.y}`;
     return path;
 }
 
@@ -355,12 +361,17 @@ function MatchApp() {
     const [scrubbingTimeline, setScrubbingTimeline] = useState(false);
     const timelineRef = useRef<HTMLDivElement>(null);
     const autoFieldRef = useRef<HTMLDivElement>(null);
+    const autoFieldImageRef = useRef<HTMLImageElement>(null);
     const autoDrawingPointerIdRef = useRef<number | null>(null);
     const [autoPanelManualOverride, setAutoPanelManualOverride] = useState<boolean | null>(null);
     const [autoPathPoints, setAutoPathPoints] = useState<AutoPathPoint[]>([]);
     const [autoShotMarkers, setAutoShotMarkers] = useState<AutoShotMarker[]>([]);
     const [autoResumePoint, setAutoResumePoint] = useState<AutoPathPoint | null>(null);
     const [autoDrawing, setAutoDrawing] = useState(false);
+    const [fieldOrientationBySide, setFieldOrientationBySide] = useState<
+        Record<AllianceColor, FieldOrientation>
+    >(defaultFieldOrientationBySide);
+    const [autoFieldSize, setAutoFieldSize] = useState({ width: 1000, height: 1000 });
 
     const elapsedSec = clamp(MATCH_TOTAL_SEC - remainingSec, 0, MATCH_TOTAL_SEC);
     const currentSegment = getSegmentForElapsed(elapsedSec);
@@ -368,6 +379,8 @@ function MatchApp() {
         matchTimelineSegments.find(segment => segment.id === currentSegment)?.label ?? 'AUTO';
     const allianceColor = getAllianceFromRobotPosition(robotPosition);
     const autoFieldImage = autoFieldImageByAlliance[allianceColor];
+    const fieldOrientation = fieldOrientationBySide[allianceColor];
+    const fieldIsFlipped = fieldOrientation === 'orientation2';
     const autoPanelOpen = autoPanelManualOverride ?? currentSegment === 'auto';
     const autoStartDots = autoStartDotByAlliance[allianceColor];
     const canDrawAutoPath = isRunning && currentSegment === 'auto' && !robotAbsent;
@@ -385,10 +398,10 @@ function MatchApp() {
     const autoPathViewPoints = useMemo(
         () =>
             autoPathPoints.map(point => ({
-                x: point.x * 1000,
-                y: point.y * 1000,
+                x: point.x * autoFieldSize.width,
+                y: point.y * autoFieldSize.height,
             })),
-        [autoPathPoints]
+        [autoFieldSize.height, autoFieldSize.width, autoPathPoints]
     );
     const autoPathSvg = useMemo(
         () => makeSmoothPath(autoPathViewPoints),
@@ -457,6 +470,17 @@ function MatchApp() {
     const sectionClass = 'rounded-2xl border border-white/10 bg-[#1d2433]/95 p-4 shadow-lg shadow-black/25';
     const inputClass =
         'mt-1 w-full rounded-lg border border-white/15 bg-[#0f1522] px-3 py-2 text-sm text-white outline-none focus:border-[#48c55c]/60 focus:ring-2 focus:ring-[#48c55c]/30';
+    const syncAutoFieldSize = () => {
+        const image = autoFieldImageRef.current;
+        if (!image) return;
+        const width = image.naturalWidth || image.clientWidth || 1000;
+        const height = image.naturalHeight || image.clientHeight || 1000;
+        setAutoFieldSize(prev =>
+            prev.width === width && prev.height === height
+                ? prev
+                : { width, height }
+        );
+    };
 
     useStatus(robotPosition, matchNumber, scouterName);
 
@@ -496,6 +520,42 @@ function MatchApp() {
             cancelled = true;
         };
     }, [matchNumber, teamNumber]);
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadOrientationConfig = async () => {
+            try {
+                const response = await fetch('/config/auto-field-orientation');
+                if (!response.ok) throw new Error('Failed to load orientation config');
+                const payload = (await response.json()) as AutoFieldOrientationSetting[];
+                if (cancelled || !Array.isArray(payload)) return;
+
+                const next = { ...defaultFieldOrientationBySide };
+                payload.forEach(entry => {
+                    if (
+                        (entry.side === 'red' || entry.side === 'blue') &&
+                        (entry.orientation === 'orientation1' ||
+                            entry.orientation === 'orientation2')
+                    ) {
+                        next[entry.side] = entry.orientation;
+                    }
+                });
+                setFieldOrientationBySide(next);
+            } catch {
+                if (!cancelled) {
+                    setFieldOrientationBySide(defaultFieldOrientationBySide);
+                }
+            }
+        };
+        loadOrientationConfig();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        syncAutoFieldSize();
+    }, [autoFieldImage]);
 
     useEffect(() => {
         if (!isRunning) return;
@@ -566,11 +626,12 @@ function MatchApp() {
     };
 
     const getAutoPointFromClient = (clientX: number, clientY: number) => {
-        const field = autoFieldRef.current;
+        const field = autoFieldImageRef.current;
         if (!field) return null;
         const rect = field.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return null;
-        const x = roundToTenThousandth(clamp((clientX - rect.left) / rect.width, 0, 1));
+        const rawX = clamp((clientX - rect.left) / rect.width, 0, 1);
+        const x = roundToTenThousandth(fieldIsFlipped ? 1 - rawX : rawX);
         const y = roundToTenThousandth(clamp((clientY - rect.top) / rect.height, 0, 1));
         return { x, y };
     };
@@ -581,7 +642,13 @@ function MatchApp() {
             if (last && getDistance(last, point) < AUTO_POINT_MIN_DISTANCE) {
                 return prev;
             }
-            return [...prev, point];
+            if (!last) return [...prev, point];
+            const blendedPoint: AutoPathPoint = {
+                x: roundToTenThousandth(last.x * 0.12 + point.x * 0.88),
+                y: roundToTenThousandth(last.y * 0.12 + point.y * 0.88),
+                tSec: point.tSec,
+            };
+            return [...prev, blendedPoint];
         });
     };
 
@@ -652,6 +719,7 @@ function MatchApp() {
 
     const handleAutoFieldPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
         if (!autoDrawing) return;
+        event.preventDefault();
         if (
             autoDrawingPointerIdRef.current != null &&
             event.pointerId !== autoDrawingPointerIdRef.current
@@ -1019,6 +1087,9 @@ function MatchApp() {
                                     Alliance: {allianceColor.toUpperCase()}
                                 </span>
                                 <span className='rounded border border-white/15 bg-[#111827] px-2 py-1'>
+                                    Field: {fieldOrientation === 'orientation1' ? 'Orientation 1' : 'Orientation 2'}
+                                </span>
+                                <span className='rounded border border-white/15 bg-[#111827] px-2 py-1'>
                                     Draw: {canDrawAutoPath ? 'Enabled (AUTO phase)' : 'Disabled'}
                                 </span>
                                 <span className='rounded border border-white/15 bg-[#111827] px-2 py-1'>
@@ -1035,83 +1106,92 @@ function MatchApp() {
                                 onPointerUp={event => stopAutoDrawing(event)}
                                 onPointerCancel={event => stopAutoDrawing(event)}
                                 className='relative mx-auto w-full max-w-xl touch-none overflow-hidden rounded-xl border border-white/15 bg-[#0f1522]'>
-                                <img
-                                    src={autoFieldImage}
-                                    alt={`${allianceColor} auto field`}
-                                    className='block w-full select-none'
-                                    draggable={false}
-                                />
-                                <svg
-                                    viewBox='0 0 1000 1000'
-                                    preserveAspectRatio='none'
-                                    className='pointer-events-none absolute inset-0'>
-                                    {autoPathSvg && (
-                                        <path
-                                            d={autoPathSvg}
-                                            fill='none'
-                                            stroke='rgba(72,197,92,0.95)'
-                                            strokeWidth='10'
-                                            strokeLinecap='round'
-                                            strokeLinejoin='round'
-                                        />
-                                    )}
-
-                                    {autoShotMarkers.map((marker, index) => (
-                                        <circle
-                                            key={`shot-${index}`}
-                                            cx={marker.x * 1000}
-                                            cy={marker.y * 1000}
-                                            r='12'
-                                            fill='rgba(245, 158, 11, 0.95)'
-                                            stroke='rgba(0, 0, 0, 0.6)'
-                                            strokeWidth='4'
-                                        />
-                                    ))}
-                                </svg>
-
-                                {autoPathPoints.length === 0 &&
-                                    (Object.keys(autoStartDots) as AutoStartingPosition[]).map(
-                                        position => {
-                                            const dot = autoStartDots[position];
-                                            const selected = autoStartingPosition === position;
-                                            return (
-                                                <button
-                                                    key={`start-dot-${position}`}
-                                                    type='button'
-                                                    onPointerDown={event =>
-                                                        handleStartDotPointerDown(position, event)
-                                                    }
-                                                    className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${
-                                                        selected
-                                                            ? 'h-6 w-6 border-white bg-[#48c55c]'
-                                                            : 'h-5 w-5 border-white/80 bg-[#4aa3ff]'
-                                                    } ${canDrawAutoPath ? '' : 'cursor-not-allowed opacity-70'}`}
-                                                    style={{
-                                                        left: `${dot.x * 100}%`,
-                                                        top: `${dot.y * 100}%`,
-                                                    }}
-                                                    disabled={!canDrawAutoPath}
-                                                    aria-label={`Auto start ${position}`}
-                                                />
-                                            );
-                                        }
-                                    )}
-
-                                {autoResumePoint && !autoDrawing && (
-                                    <button
-                                        type='button'
-                                        onPointerDown={handleResumeDotPointerDown}
-                                        className={`absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#f59e0b] ${
-                                            canDrawAutoPath ? '' : 'cursor-not-allowed opacity-70'
-                                        }`}
-                                        style={{
-                                            left: `${autoResumePoint.x * 100}%`,
-                                            top: `${autoResumePoint.y * 100}%`,
-                                        }}
-                                        disabled={!canDrawAutoPath}
-                                        aria-label='Resume auto path'
+                                <div
+                                    className='relative'
+                                    style={{
+                                        transform: fieldIsFlipped ? 'scaleX(-1)' : 'scaleX(1)',
+                                        transformOrigin: 'center',
+                                    }}>
+                                    <img
+                                        ref={autoFieldImageRef}
+                                        src={autoFieldImage}
+                                        alt={`${allianceColor} auto field`}
+                                        className='block w-full select-none'
+                                        draggable={false}
+                                        onLoad={syncAutoFieldSize}
                                     />
-                                )}
+                                    <svg
+                                        viewBox={`0 0 ${autoFieldSize.width} ${autoFieldSize.height}`}
+                                        preserveAspectRatio='none'
+                                        className='pointer-events-none absolute inset-0'>
+                                        {autoPathSvg && (
+                                            <path
+                                                d={autoPathSvg}
+                                                fill='none'
+                                                stroke='rgba(72,197,92,0.95)'
+                                                strokeWidth='10'
+                                                strokeLinecap='round'
+                                                strokeLinejoin='round'
+                                            />
+                                        )}
+
+                                        {autoShotMarkers.map((marker, index) => (
+                                            <circle
+                                                key={`shot-${index}`}
+                                                cx={marker.x * autoFieldSize.width}
+                                                cy={marker.y * autoFieldSize.height}
+                                                r='12'
+                                                fill='rgba(245, 158, 11, 0.95)'
+                                                stroke='rgba(0, 0, 0, 0.6)'
+                                                strokeWidth='4'
+                                            />
+                                        ))}
+                                    </svg>
+
+                                    {autoPathPoints.length === 0 &&
+                                        (Object.keys(autoStartDots) as AutoStartingPosition[]).map(
+                                            position => {
+                                                const dot = autoStartDots[position];
+                                                const selected = autoStartingPosition === position;
+                                                return (
+                                                    <button
+                                                        key={`start-dot-${position}`}
+                                                        type='button'
+                                                        onPointerDown={event =>
+                                                            handleStartDotPointerDown(position, event)
+                                                        }
+                                                        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${
+                                                            selected
+                                                                ? 'h-6 w-6 border-white bg-[#48c55c]'
+                                                                : 'h-5 w-5 border-white/80 bg-[#4aa3ff]'
+                                                        } ${canDrawAutoPath ? '' : 'cursor-not-allowed opacity-70'}`}
+                                                        style={{
+                                                            left: `${dot.x * 100}%`,
+                                                            top: `${dot.y * 100}%`,
+                                                        }}
+                                                        disabled={!canDrawAutoPath}
+                                                        aria-label={`Auto start ${position}`}
+                                                    />
+                                                );
+                                            }
+                                        )}
+
+                                    {autoResumePoint && !autoDrawing && (
+                                        <button
+                                            type='button'
+                                            onPointerDown={handleResumeDotPointerDown}
+                                            className={`absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#f59e0b] ${
+                                                canDrawAutoPath ? '' : 'cursor-not-allowed opacity-70'
+                                            }`}
+                                            style={{
+                                                left: `${autoResumePoint.x * 100}%`,
+                                                top: `${autoResumePoint.y * 100}%`,
+                                            }}
+                                            disabled={!canDrawAutoPath}
+                                            aria-label='Resume auto path'
+                                        />
+                                    )}
+                                </div>
                             </div>
 
                             <div className='grid gap-2 sm:grid-cols-2'>

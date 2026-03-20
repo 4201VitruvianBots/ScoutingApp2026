@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MaterialSymbol } from 'react-material-symbols';
-import { BallsPerSecondSetting } from 'requests';
+import {
+    AllianceColor,
+    AutoFieldOrientationSetting,
+    BallsPerSecondSetting,
+    FieldOrientation,
+} from 'requests';
 import LinkButton from '../../components/LinkButton';
 import NumberInput from '../../components/NumberInput';
 import { useStatusRecieve } from '../../lib/useStatus';
@@ -11,6 +16,14 @@ import scheduleFile from '../../assets/matchSchedule.json';
 import { getAlliancePositions } from '../../lib/gameConfig';
 
 const DEFAULT_BALLS_PER_SECOND = 5;
+const defaultOrientationMap: Record<AllianceColor, FieldOrientation> = {
+    red: 'orientation1',
+    blue: 'orientation1',
+};
+const fieldPreviewImageBySide: Record<AllianceColor, string> = {
+    red: '/redsidematch.png',
+    blue: '/bluesidematch.png',
+};
 
 type MatchScheduleMap = Record<number, Partial<Record<string, number>>>;
 
@@ -24,6 +37,9 @@ function AdminApp() {
         '/config/balls-per-second',
         []
     );
+    const [orientationRows, reloadOrientationRows] = useFetchJson<
+        AutoFieldOrientationSetting[]
+    >('/config/auto-field-orientation', []);
 
     const schedule = scheduleFile as MatchScheduleMap;
     const matchNumbers = useMemo(
@@ -40,6 +56,9 @@ function AdminApp() {
     );
     const [draftValues, setDraftValues] = useState<Record<string, number>>({});
     const [saving, setSaving] = useState(false);
+    const [orientationSaving, setOrientationSaving] = useState<
+        Partial<Record<AllianceColor, boolean>>
+    >({});
     const [showLegacy, setShowLegacy] = useState(false);
 
     useEffect(() => {
@@ -58,6 +77,20 @@ function AdminApp() {
             ),
         [configRows]
     );
+    const orientationMap = useMemo(() => {
+        const next = { ...defaultOrientationMap };
+        orientationRows.forEach(row => {
+            if (row.side === 'red' || row.side === 'blue') {
+                if (
+                    row.orientation === 'orientation1' ||
+                    row.orientation === 'orientation2'
+                ) {
+                    next[row.side] = row.orientation;
+                }
+            }
+        });
+        return next;
+    }, [orientationRows]);
 
     const orderedPositions = useMemo(
         () => [...getAlliancePositions('red'), ...getAlliancePositions('blue')],
@@ -125,6 +158,23 @@ function AdminApp() {
         }
     };
 
+    const saveOrientation = async (
+        side: AllianceColor,
+        orientation: FieldOrientation
+    ) => {
+        setOrientationSaving(prev => ({ ...prev, [side]: true }));
+        try {
+            await fetch('/config/auto-field-orientation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ side, orientation }),
+            });
+            reloadOrientationRows();
+        } finally {
+            setOrientationSaving(prev => ({ ...prev, [side]: false }));
+        }
+    };
+
     const selectedMatchIndex =
         selectedMatch == undefined
             ? -1
@@ -189,6 +239,7 @@ function AdminApp() {
                         <button
                             onClick={() => {
                                 reloadConfigRows();
+                                reloadOrientationRows();
                             }}
                             className='rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10'>
                             Refresh Config
@@ -238,6 +289,72 @@ function AdminApp() {
                         <div className='mt-3 max-h-[58vh] overflow-auto rounded-lg border border-white/10'>
                             <MatchTable matches={status.matches} />
                         </div>
+                    </div>
+                </section>
+
+                <section className='rounded-xl border border-white/10 bg-[#1c2434] p-4'>
+                    <div className='flex flex-wrap items-center justify-between gap-2'>
+                        <h2 className='text-lg font-semibold text-[#48c55c]'>
+                            Auto Field Orientation
+                        </h2>
+                        <p className='text-xs text-gray-300'>
+                            Orientation 1 = current image, Orientation 2 = horizontal flip
+                        </p>
+                    </div>
+                    <div className='mt-4 grid gap-4 lg:grid-cols-2'>
+                        {(['red', 'blue'] as const).map(side => {
+                            const orientation = orientationMap[side];
+                            const flipped = orientation === 'orientation2';
+                            const savingSide = orientationSaving[side] === true;
+                            return (
+                                <div
+                                    key={side}
+                                    className='rounded-lg border border-white/10 bg-[#131b2a] p-3'>
+                                    <div className='flex items-center justify-between gap-2'>
+                                        <p className='text-sm font-semibold text-white'>
+                                            {side.toUpperCase()} Scouter Side
+                                        </p>
+                                        <p className='text-xs text-gray-300'>
+                                            Active: {orientation}
+                                        </p>
+                                    </div>
+                                    <div className='mt-2 flex flex-wrap gap-2'>
+                                        {(['orientation1', 'orientation2'] as const).map(
+                                            option => (
+                                                <button
+                                                    key={`${side}-${option}`}
+                                                    onClick={() =>
+                                                        saveOrientation(side, option)
+                                                    }
+                                                    disabled={savingSide}
+                                                    className={`rounded px-3 py-1.5 text-xs font-semibold ${
+                                                        orientation === option
+                                                            ? 'bg-[#48c55c] text-black'
+                                                            : 'bg-[#2c374d] text-white'
+                                                    }`}>
+                                                    {option === 'orientation1'
+                                                        ? 'Orientation 1'
+                                                        : 'Orientation 2'}
+                                                </button>
+                                            )
+                                        )}
+                                    </div>
+                                    <div className='mt-3 overflow-hidden rounded border border-white/10 bg-[#0f1522] p-2'>
+                                        <img
+                                            src={fieldPreviewImageBySide[side]}
+                                            alt={`${side} auto field preview`}
+                                            className='w-full select-none rounded'
+                                            draggable={false}
+                                            style={{
+                                                transform: flipped
+                                                    ? 'scaleX(-1)'
+                                                    : 'scaleX(1)',
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </section>
 

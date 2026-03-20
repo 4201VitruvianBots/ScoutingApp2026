@@ -82,6 +82,7 @@ export type AutoStartingPosition = 'left' | 'center' | 'right';
 export type AutoTowerResult = 'None' | 'level1' | 'Failed';
 export type TeleTowerResult = 'None' | 'level1' | 'level2' | 'level3' | 'Failed';
 export type AutoFuelWinner = AllianceColor | 'tie' | 'unknown';
+export type FieldOrientation = 'orientation1' | 'orientation2';
 
 export interface AutoPathPoint {
     x: number;
@@ -369,6 +370,11 @@ export interface BallsPerSecondSetting {
     matchNumber: number;
     robotTeam: number;
     ballsPerSecond: number;
+}
+
+export interface AutoFieldOrientationSetting {
+    side: AllianceColor;
+    orientation: FieldOrientation;
 }
 
 export type MatchSchedule = Record<
