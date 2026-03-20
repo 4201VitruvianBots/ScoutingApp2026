@@ -13,7 +13,7 @@ dotenv.load({ path: '.env.local' });
 
 const REMOTE = process.env.LOCATION === 'remote';
 
-process.env.CONTAINER_NAME = 'cala-quals';
+process.env.CONTAINER_NAME ??= 'cala-quals';
 
 const container = await startDockerContainer(process.env.CONTAINER_NAME);
 

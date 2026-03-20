@@ -133,19 +133,82 @@ const teleTowerOptions: TeleTowerResult[] = ['None', 'Failed', 'level1', 'level2
 const driverQualityOptions: DriverQuality[] = ['great', 'good', 'ok', 'rough'];
 const breakdownOptions: BreakdownType[] = ['None', 'stuck', 'tipped', 'comms', 'mechanism', 'other'];
 
-const foulLabels: Array<{ key: keyof MatchData['fouls']; label: string }> = [
-    { key: 'pinning', label: 'Pinning' },
-    { key: 'towerContactInEndgame', label: 'Tower Contact (Endgame)' },
-    { key: 'outOfZoneShooting', label: 'Out-of-Zone Shooting' },
-    { key: 'ejectedFuel', label: 'Ejected Fuel' },
-    { key: 'other', label: 'Other' },
+const foulLabels: Array<{
+    key: keyof MatchData['fouls'];
+    label: string;
+    definition: string;
+    example: string;
+}> = [
+    {
+        key: 'pinning',
+        label: 'Pinning',
+        definition:
+            'Illegal restriction of an opponent robot’s movement by trapping it against a field element or another robot beyond the allowed time limit.',
+        example: 'Holding a robot against the wall for more than 5 seconds.',
+    },
+    {
+        key: 'towerContactInEndgame',
+        label: 'Tower Contact (Endgame)',
+        definition:
+            'Contacting or interfering with an opponent’s tower or climbing mechanism during the protected endgame period when such interactions are prohibited.',
+        example: 'Hitting a robot while it is climbing in endgame.',
+    },
+    {
+        key: 'outOfZoneShooting',
+        label: 'Out-of-Zone Shooting',
+        definition:
+            'Launching game pieces from a location on the field where scoring actions are not permitted by game rules.',
+        example: 'Shooting while outside the designated scoring zone.',
+    },
+    {
+        key: 'ejectedFuel',
+        label: 'Ejected Fuel',
+        definition:
+            'Intentionally or negligently expelling game pieces in a way that violates control, safety, or scoring rules.',
+        example: 'Dumping balls across the field instead of scoring.',
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        definition:
+            'Any rule violation not explicitly categorized that results in a referee-assessed foul based on game rules.',
+        example: 'Entering a protected zone illegally.',
+    },
 ];
 
-const breakLabels: Array<{ key: keyof MatchData['breaks']; label: string }> = [
-    { key: 'mechanism', label: 'Mechanism' },
-    { key: 'battery', label: 'Battery' },
-    { key: 'comms', label: 'Comms' },
-    { key: 'bumper', label: 'Bumper' },
+const breakLabels: Array<{
+    key: keyof MatchData['breaks'];
+    label: string;
+    definition: string;
+    example: string;
+}> = [
+    {
+        key: 'mechanism',
+        label: 'Mechanism',
+        definition: 'Failure of a robot’s mechanical subsystem that impairs functionality.',
+        example: 'Intake arm breaks and cannot collect game pieces.',
+    },
+    {
+        key: 'battery',
+        label: 'Battery',
+        definition:
+            'Power loss or electrical failure due to battery issues such as depletion, disconnection, or voltage drop.',
+        example: 'Robot shuts off mid-match.',
+    },
+    {
+        key: 'comms',
+        label: 'Comms',
+        definition:
+            'Loss or degradation of communication between the robot and driver station, preventing control.',
+        example: 'Robot stops responding due to radio disconnect.',
+    },
+    {
+        key: 'bumper',
+        label: 'Bumper',
+        definition:
+            'Damage, detachment, or illegal configuration of bumpers that affects compliance or robot interaction.',
+        example: 'Bumper falls off during defense.',
+    },
 ];
 
 const autoFieldImageByAlliance: Record<AllianceColor, string> = {
@@ -349,6 +412,8 @@ function MatchApp() {
     const [defenseReceived, setDefenseReceived] = useState(false);
     const [fouls, setFouls] = useState<MatchData['fouls']>(makeEmptyFouls());
     const [breaks, setBreaks] = useState<MatchData['breaks']>(makeEmptyBreaks());
+    const [activeFoulInfo, setActiveFoulInfo] = useState<keyof MatchData['fouls'] | null>(null);
+    const [activeBreakInfo, setActiveBreakInfo] = useState<keyof MatchData['breaks'] | null>(null);
     const [freeText, setFreeText] = useState('');
     const [actionTicks, setActionTicks] = useState<ActionTick[]>([]);
     const nextTickIdRef = useRef(1);
@@ -1478,25 +1543,48 @@ function MatchApp() {
                                 {foulLabels.map(entry => (
                                     <div
                                         key={entry.key}
-                                        className='flex items-center gap-2 rounded-lg border border-white/10 bg-[#121a28] px-2 py-2'>
-                                        <HoldButton
-                                            onHold={() => adjustFoul(entry.key, -1)}
-                                            repeatDelay={120}
-                                            repeatInterval={90}
-                                            className='rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
-                                            -
-                                        </HoldButton>
-                                        <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
-                                        <span className='w-8 text-right text-sm font-semibold tabular-nums text-white'>
-                                            {fouls[entry.key]}
-                                        </span>
-                                        <HoldButton
-                                            onHold={() => adjustFoul(entry.key, 1)}
-                                            repeatDelay={120}
-                                            repeatInterval={90}
-                                            className='rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
-                                            +
-                                        </HoldButton>
+                                        className='rounded-lg border border-white/10 bg-[#121a28]'>
+                                        <div className='flex items-center gap-2 px-2 py-2'>
+                                            <HoldButton
+                                                onHold={() => adjustFoul(entry.key, -1)}
+                                                repeatDelay={120}
+                                                repeatInterval={90}
+                                                className='rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
+                                                -
+                                            </HoldButton>
+                                            <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
+                                            <button
+                                                type='button'
+                                                onClick={() =>
+                                                    setActiveFoulInfo(previous =>
+                                                        previous === entry.key ? null : entry.key
+                                                    )
+                                                }
+                                                aria-expanded={activeFoulInfo === entry.key}
+                                                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                                                    activeFoulInfo === entry.key
+                                                        ? 'border-sky-300/70 bg-sky-300/15 text-sky-100'
+                                                        : 'border-white/25 bg-white/5 text-gray-300 hover:bg-white/10'
+                                                }`}>
+                                                Info
+                                            </button>
+                                            <span className='w-8 text-right text-sm font-semibold tabular-nums text-white'>
+                                                {fouls[entry.key]}
+                                            </span>
+                                            <HoldButton
+                                                onHold={() => adjustFoul(entry.key, 1)}
+                                                repeatDelay={120}
+                                                repeatInterval={90}
+                                                className='rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
+                                                +
+                                            </HoldButton>
+                                        </div>
+                                        {activeFoulInfo === entry.key ? (
+                                            <div className='border-t border-white/10 bg-[#0f1522] px-3 py-2 text-[11px] text-gray-200'>
+                                                <p>{entry.definition}</p>
+                                                <p className='mt-1 text-gray-300'>Example: {entry.example}</p>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 ))}
                             </div>
@@ -1510,25 +1598,48 @@ function MatchApp() {
                                 {breakLabels.map(entry => (
                                     <div
                                         key={entry.key}
-                                        className='flex items-center gap-2 rounded-lg border border-white/10 bg-[#121a28] px-2 py-2'>
-                                        <HoldButton
-                                            onHold={() => adjustBreak(entry.key, -1)}
-                                            repeatDelay={120}
-                                            repeatInterval={90}
-                                            className='rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
-                                            -
-                                        </HoldButton>
-                                        <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
-                                        <span className='w-8 text-right text-sm font-semibold tabular-nums text-white'>
-                                            {breaks[entry.key]}
-                                        </span>
-                                        <HoldButton
-                                            onHold={() => adjustBreak(entry.key, 1)}
-                                            repeatDelay={120}
-                                            repeatInterval={90}
-                                            className='rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
-                                            +
-                                        </HoldButton>
+                                        className='rounded-lg border border-white/10 bg-[#121a28]'>
+                                        <div className='flex items-center gap-2 px-2 py-2'>
+                                            <HoldButton
+                                                onHold={() => adjustBreak(entry.key, -1)}
+                                                repeatDelay={120}
+                                                repeatInterval={90}
+                                                className='rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
+                                                -
+                                            </HoldButton>
+                                            <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
+                                            <button
+                                                type='button'
+                                                onClick={() =>
+                                                    setActiveBreakInfo(previous =>
+                                                        previous === entry.key ? null : entry.key
+                                                    )
+                                                }
+                                                aria-expanded={activeBreakInfo === entry.key}
+                                                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                                                    activeBreakInfo === entry.key
+                                                        ? 'border-sky-300/70 bg-sky-300/15 text-sky-100'
+                                                        : 'border-white/25 bg-white/5 text-gray-300 hover:bg-white/10'
+                                                }`}>
+                                                Info
+                                            </button>
+                                            <span className='w-8 text-right text-sm font-semibold tabular-nums text-white'>
+                                                {breaks[entry.key]}
+                                            </span>
+                                            <HoldButton
+                                                onHold={() => adjustBreak(entry.key, 1)}
+                                                repeatDelay={120}
+                                                repeatInterval={90}
+                                                className='rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
+                                                +
+                                            </HoldButton>
+                                        </div>
+                                        {activeBreakInfo === entry.key ? (
+                                            <div className='border-t border-white/10 bg-[#0f1522] px-3 py-2 text-[11px] text-gray-200'>
+                                                <p>{entry.definition}</p>
+                                                <p className='mt-1 text-gray-300'>Example: {entry.example}</p>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 ))}
                             </div>
