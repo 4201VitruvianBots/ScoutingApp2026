@@ -30,6 +30,23 @@ TELE_TOWER_POINTS: Dict[str, float] = {
     "level2": float(GAME_CONFIG["scoring"]["towerTele"]["level2"]),
     "level3": float(GAME_CONFIG["scoring"]["towerTele"]["level3"]),
 }
+MATCH_TOTAL_SEC = float(GAME_CONFIG.get("matchDurationSec", 163))
+AUTO_END_SEC = float(
+    next(
+        (segment.get("endSec", 20) for segment in GAME_CONFIG.get("segments", []) if segment.get("id") == "auto"),
+        20,
+    )
+)
+DELAY_END_SEC = float(
+    next(
+        (
+            segment.get("endSec", 23)
+            for segment in GAME_CONFIG.get("segments", [])
+            if segment.get("id") == "transition"
+        ),
+        23,
+    )
+)
 
 COMMENT_VALUES = [
     "great_driving",
@@ -261,6 +278,86 @@ def climb_points_from_tele_tower(tele_tower: str | None) -> float:
     return TELE_TOWER_POINTS.get(tele_tower, 0.0)
 
 
+def parse_action_intervals(
+    timeline: Mapping[str, Any] | None,
+) -> List[Dict[str, float | str]]:
+    if not timeline:
+        return []
+    raw_intervals = timeline.get("intervals")
+    if not isinstance(raw_intervals, list):
+        return []
+
+    intervals: List[Dict[str, float | str]] = []
+    for raw in raw_intervals:
+        if not isinstance(raw, Mapping):
+            continue
+        action = raw.get("action")
+        if action not in ("shoot", "pass"):
+            continue
+        start = float(raw.get("startSec", 0) or 0)
+        end = float(raw.get("endSec", 0) or 0)
+        start = clamp(start, 0.0, MATCH_TOTAL_SEC)
+        end = clamp(end, 0.0, MATCH_TOTAL_SEC)
+        if end <= start:
+            continue
+        duration = float(raw.get("durationSec", end - start) or 0)
+        if duration <= 0:
+            duration = end - start
+        intervals.append(
+            {
+                "action": action,
+                "startSec": round(start, 2),
+                "endSec": round(end, 2),
+                "durationSec": round(max(0.0, duration), 2),
+            }
+        )
+
+    intervals.sort(key=lambda entry: (float(entry["startSec"]), str(entry["action"])))
+    return intervals
+
+
+def timeline_metrics(match_entry: Mapping[str, Any]) -> Dict[str, float | int | bool | str]:
+    raw_timeline = match_entry.get("actionTimeline")
+    timeline = raw_timeline if isinstance(raw_timeline, Mapping) else None
+    intervals = parse_action_intervals(timeline)
+
+    shoot = [interval for interval in intervals if interval["action"] == "shoot"]
+    passed = [interval for interval in intervals if interval["action"] == "pass"]
+
+    shoot_durations = [float(interval["durationSec"]) for interval in shoot]
+    pass_durations = [float(interval["durationSec"]) for interval in passed]
+    shoot_starts = sorted(float(interval["startSec"]) for interval in shoot)
+    shoot_gaps = [
+        shoot_starts[index] - shoot_starts[index - 1]
+        for index in range(1, len(shoot_starts))
+        if shoot_starts[index] - shoot_starts[index - 1] > 0
+    ]
+
+    return {
+        "hasActionTimeline": timeline is not None,
+        "timelineTotalSec": float(timeline.get("totalSec", MATCH_TOTAL_SEC)) if timeline else MATCH_TOTAL_SEC,
+        "timelineAutoEndSec": float(timeline.get("autoEndSec", AUTO_END_SEC)) if timeline else AUTO_END_SEC,
+        "timelineDelayEndSec": float(timeline.get("delayEndSec", DELAY_END_SEC)) if timeline else DELAY_END_SEC,
+        "timelineIntervalCount": len(intervals),
+        "shootIntervalCount": len(shoot),
+        "passIntervalCount": len(passed),
+        "shootActiveSec": sum(shoot_durations),
+        "passActiveSec": sum(pass_durations),
+        "shootMedianIntervalSec": statistics.median(shoot_durations) if shoot_durations else 0.0,
+        "passMedianIntervalSec": statistics.median(pass_durations) if pass_durations else 0.0,
+        "shootCycleMedianGapSec": statistics.median(shoot_gaps) if shoot_gaps else 0.0,
+        "actionTimelineJson": json.dumps(
+            {
+                "totalSec": float(timeline.get("totalSec", MATCH_TOTAL_SEC)) if timeline else MATCH_TOTAL_SEC,
+                "autoEndSec": float(timeline.get("autoEndSec", AUTO_END_SEC)) if timeline else AUTO_END_SEC,
+                "delayEndSec": float(timeline.get("delayEndSec", DELAY_END_SEC)) if timeline else DELAY_END_SEC,
+                "intervals": intervals,
+            },
+            sort_keys=True,
+        ),
+    }
+
+
 def flatten_match_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
     metadata = entry.get("metadata") or {}
     tele = entry.get("teleFuelBySegment") or {}
@@ -276,6 +373,7 @@ def flatten_match_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
         + AUTO_TOWER_POINTS.get(auto_tower, 0.0)
         + TELE_TOWER_POINTS.get(tele_tower, 0.0)
     )
+    timeline = timeline_metrics(entry)
 
     return {
         "scouterName": metadata.get("scouterName", ""),
@@ -312,6 +410,19 @@ def flatten_match_entry(entry: Mapping[str, Any]) -> Dict[str, Any]:
             0.0,
         ),
         "expectedPoints": expected_points,
+        "hasActionTimeline": timeline["hasActionTimeline"],
+        "timelineTotalSec": timeline["timelineTotalSec"],
+        "timelineAutoEndSec": timeline["timelineAutoEndSec"],
+        "timelineDelayEndSec": timeline["timelineDelayEndSec"],
+        "timelineIntervalCount": timeline["timelineIntervalCount"],
+        "shootIntervalCount": timeline["shootIntervalCount"],
+        "passIntervalCount": timeline["passIntervalCount"],
+        "shootActiveSec": timeline["shootActiveSec"],
+        "passActiveSec": timeline["passActiveSec"],
+        "shootMedianIntervalSec": timeline["shootMedianIntervalSec"],
+        "passMedianIntervalSec": timeline["passMedianIntervalSec"],
+        "shootCycleMedianGapSec": timeline["shootCycleMedianGapSec"],
+        "actionTimelineJson": timeline["actionTimelineJson"],
         "notes": entry.get("freeText", ""),
     }
 
@@ -577,6 +688,30 @@ def build_team_profiles(
             "driverQualityScore": [
                 float(row.get("driverQualityScore", 0) or 0) for row in team_matches
             ],
+            "shootActiveSec": [
+                float(row.get("shootActiveSec", 0) or 0) for row in team_matches
+            ],
+            "passActiveSec": [
+                float(row.get("passActiveSec", 0) or 0) for row in team_matches
+            ],
+            "shootIntervalCount": [
+                float(row.get("shootIntervalCount", 0) or 0) for row in team_matches
+            ],
+            "passIntervalCount": [
+                float(row.get("passIntervalCount", 0) or 0) for row in team_matches
+            ],
+            "shootMedianIntervalSec": [
+                float(row.get("shootMedianIntervalSec", 0) or 0)
+                for row in team_matches
+            ],
+            "passMedianIntervalSec": [
+                float(row.get("passMedianIntervalSec", 0) or 0)
+                for row in team_matches
+            ],
+            "shootCycleMedianGapSec": [
+                float(row.get("shootCycleMedianGapSec", 0) or 0)
+                for row in team_matches
+            ],
             "foulsTotal": [
                 float(row.get("foulsTotal", 0) or 0) for row in team_super
             ],
@@ -758,6 +893,16 @@ def build_team_profiles(
                 "defenseImpactConfidence": defense_confidence,
                 "reliabilityIndex": reliability_index,
                 "disciplineIndex": foul_discipline,
+                "timelineMatchCount": sum(
+                    1 for row in team_matches if bool(row.get("hasActionTimeline"))
+                ),
+                "avgShootActiveSec": quantitative_stats["shootActiveSec"]["mean"],
+                "avgPassActiveSec": quantitative_stats["passActiveSec"]["mean"],
+                "avgShootIntervalCount": quantitative_stats["shootIntervalCount"]["mean"],
+                "avgPassIntervalCount": quantitative_stats["passIntervalCount"]["mean"],
+                "avgShootIntervalDurationSec": quantitative_stats["shootMedianIntervalSec"]["mean"],
+                "avgPassIntervalDurationSec": quantitative_stats["passMedianIntervalSec"]["mean"],
+                "avgShootCycleGapSec": quantitative_stats["shootCycleMedianGapSec"]["mean"],
                 "offensiveExpectedPointsAboveField": (
                     quantitative_stats["expectedPoints"]["mean"]
                     - field_expected_points_mean
@@ -898,6 +1043,14 @@ def build_picklist_feature_rows(
             "defenseImpactConfidence": custom["defenseImpactConfidence"],
             "reliabilityIndex": custom["reliabilityIndex"],
             "disciplineIndex": custom["disciplineIndex"],
+            "timelineMatchCount": custom["timelineMatchCount"],
+            "avgShootActiveSec": custom["avgShootActiveSec"],
+            "avgPassActiveSec": custom["avgPassActiveSec"],
+            "avgShootIntervalCount": custom["avgShootIntervalCount"],
+            "avgPassIntervalCount": custom["avgPassIntervalCount"],
+            "avgShootIntervalDurationSec": custom["avgShootIntervalDurationSec"],
+            "avgPassIntervalDurationSec": custom["avgPassIntervalDurationSec"],
+            "avgShootCycleGapSec": custom["avgShootCycleGapSec"],
             "expectedPointsTrendPerMatch": custom["expectedPointsTrendPerMatch"],
             "selectionScore": custom["selectionScore"],
             "teleTower_mode": categorical["teleTower"]["mode"],
@@ -998,7 +1151,11 @@ def main() -> None:
     )
 
     categorical_summary: List[Dict[str, Any]] = []
-    categorical_summary += summarize_categorical_rows(match_rows, "match", {"notes"})
+    categorical_summary += summarize_categorical_rows(
+        match_rows,
+        "match",
+        {"notes", "actionTimelineJson"},
+    )
     categorical_summary += summarize_categorical_rows(super_rows, "super", {"comments"})
     categorical_summary += summarize_categorical_rows(pit_rows, "pit", {"notes"})
     categorical_summary += summarize_categorical_rows(picklist_feature_rows, "picklist")

@@ -8,6 +8,7 @@ import {
 import { MaterialSymbol } from 'react-material-symbols';
 import 'react-material-symbols/rounded';
 import {
+    ActionKind,
     AllianceColor,
     AutoFieldOrientationSetting,
     AutoStartingPosition,
@@ -32,21 +33,20 @@ import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import { usePreventUnload } from '../../lib/usePreventUnload';
 import scheduleFile from '../../assets/matchSchedule.json';
-import { formatMatchTime } from '../../lib/gameConfig';
+import { formatMatchTime, gameConfig } from '../../lib/gameConfig';
 
 const DEFAULT_BALLS_PER_SECOND = 5;
 const TIMER_INTERVAL_MS = 50;
-const AUTO_COUNTDOWN_SEC = 20;
-const TRANSITION_COUNTDOWN_SEC = 3;
-const TELEOP_COUNTDOWN_SEC = 140;
-const ENDGAME_SEC = 30;
-const SHIFT_SEC = (TELEOP_COUNTDOWN_SEC - ENDGAME_SEC) / 4;
-const MATCH_TOTAL_SEC = AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + TELEOP_COUNTDOWN_SEC;
+const MATCH_TOTAL_SEC = gameConfig.matchDurationSec;
+const AUTO_END_SEC =
+    gameConfig.segments.find(segment => segment.id === 'auto')?.endSec ?? 20;
+const DELAY_END_SEC =
+    gameConfig.segments.find(segment => segment.id === 'transition')?.endSec ?? 23;
+const TELEOP_COUNTDOWN_SEC = MATCH_TOTAL_SEC - DELAY_END_SEC;
 const INTERVAL_MERGE_GAP_SEC = 0.08;
 const HOLD_INTERVAL_MS = 100;
 const AUTO_POINT_MIN_DISTANCE = 0.008;
 
-type ActionKind = 'shoot' | 'pass';
 type FullSegmentId = keyof MatchData['shootTimeBySegment'];
 type AutoPathPoint = NonNullable<MatchData['autoPath']>['points'][number];
 type AutoShotMarker = NonNullable<MatchData['autoPath']>['shotMarkers'][number];
@@ -61,7 +61,7 @@ type ActionTick = {
     durationSec: number;
 };
 
-type ActionInterval = {
+type RenderedActionInterval = {
     action: ActionKind;
     startSec: number;
     endSec: number;
@@ -80,45 +80,14 @@ type ActiveHold = {
     startMs: number;
 };
 
-const matchTimelineSegments: MatchTimelineSegment[] = [
-    { id: 'auto', label: 'AUTO', startSec: 0, endSec: AUTO_COUNTDOWN_SEC },
-    {
-        id: 'transition',
-        label: 'DELAY',
-        startSec: AUTO_COUNTDOWN_SEC,
-        endSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC,
-    },
-    {
-        id: 'shift1',
-        label: 'SHIFT 1',
-        startSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC,
-        endSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + SHIFT_SEC,
-    },
-    {
-        id: 'shift2',
-        label: 'SHIFT 2',
-        startSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + SHIFT_SEC,
-        endSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + SHIFT_SEC * 2,
-    },
-    {
-        id: 'shift3',
-        label: 'SHIFT 3',
-        startSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + SHIFT_SEC * 2,
-        endSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + SHIFT_SEC * 3,
-    },
-    {
-        id: 'shift4',
-        label: 'SHIFT 4',
-        startSec: AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC + SHIFT_SEC * 3,
-        endSec: MATCH_TOTAL_SEC - ENDGAME_SEC,
-    },
-    {
-        id: 'endgame',
-        label: 'ENDGAME',
-        startSec: MATCH_TOTAL_SEC - ENDGAME_SEC,
-        endSec: MATCH_TOTAL_SEC,
-    },
-];
+const matchTimelineSegments: MatchTimelineSegment[] = gameConfig.segments.map(
+    segment => ({
+        id: segment.id as FullSegmentId,
+        label: segment.label.toUpperCase(),
+        startSec: segment.startSec,
+        endSec: segment.endSec,
+    })
+);
 
 const schedule = scheduleFile as MatchSchedule;
 
@@ -341,18 +310,15 @@ function splitIntervalAcrossSegments(startSec: number, endSec: number) {
 function formatMatchTimerDisplay(remainingSec: number): string {
     const elapsedSec = clamp(MATCH_TOTAL_SEC - remainingSec, 0, MATCH_TOTAL_SEC);
 
-    if (elapsedSec < AUTO_COUNTDOWN_SEC) {
-        return `${Math.max(0, Math.ceil(AUTO_COUNTDOWN_SEC - elapsedSec))}`;
+    if (elapsedSec < AUTO_END_SEC) {
+        return `${Math.max(0, Math.ceil(AUTO_END_SEC - elapsedSec))}`;
     }
 
-    if (elapsedSec < AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC) {
-        return `${Math.max(
-            0,
-            Math.ceil(AUTO_COUNTDOWN_SEC + TRANSITION_COUNTDOWN_SEC - elapsedSec)
-        )}`;
+    if (elapsedSec < DELAY_END_SEC) {
+        return `${Math.max(0, Math.ceil(DELAY_END_SEC - elapsedSec))}`;
     }
 
-    const teleElapsed = elapsedSec - AUTO_COUNTDOWN_SEC - TRANSITION_COUNTDOWN_SEC;
+    const teleElapsed = elapsedSec - DELAY_END_SEC;
     const teleRemaining = clamp(
         TELEOP_COUNTDOWN_SEC - teleElapsed,
         0,
@@ -361,10 +327,10 @@ function formatMatchTimerDisplay(remainingSec: number): string {
     return formatMatchTime(teleRemaining);
 }
 
-function mergeActionTicks(ticks: ActionTick[]): ActionInterval[] {
+function mergeActionTicks(ticks: ActionTick[]): RenderedActionInterval[] {
     if (ticks.length === 0) return [];
     const sorted = [...ticks].sort((a, b) => a.startSec - b.startSec);
-    const output: ActionInterval[] = [];
+    const output: RenderedActionInterval[] = [];
     sorted.forEach(tick => {
         const last = output[output.length - 1];
         if (
@@ -392,6 +358,46 @@ function getActionTimeBySegmentFromTicks(
         totals[segment] = roundToHundredth(totals[segment]);
     });
     return totals;
+}
+
+function buildActionTimelineFromTicks(ticks: ActionTick[]): MatchData['actionTimeline'] {
+    const grouped = new Map<number, { action: ActionKind; startSec: number; endSec: number }>();
+    ticks.forEach(tick => {
+        const previous = grouped.get(tick.groupId);
+        if (!previous) {
+            grouped.set(tick.groupId, {
+                action: tick.action,
+                startSec: tick.startSec,
+                endSec: tick.endSec,
+            });
+            return;
+        }
+        grouped.set(tick.groupId, {
+            action: previous.action,
+            startSec: Math.min(previous.startSec, tick.startSec),
+            endSec: Math.max(previous.endSec, tick.endSec),
+        });
+    });
+
+    const intervals = Array.from(grouped.values())
+        .sort((a, b) => a.startSec - b.startSec)
+        .map(interval => ({
+            action: interval.action,
+            startSec: roundToHundredth(clamp(interval.startSec, 0, MATCH_TOTAL_SEC)),
+            endSec: roundToHundredth(clamp(interval.endSec, 0, MATCH_TOTAL_SEC)),
+            durationSec: roundToHundredth(
+                clamp(interval.endSec, 0, MATCH_TOTAL_SEC) -
+                    clamp(interval.startSec, 0, MATCH_TOTAL_SEC)
+            ),
+        }))
+        .filter(interval => interval.endSec > interval.startSec);
+
+    return {
+        totalSec: MATCH_TOTAL_SEC,
+        autoEndSec: AUTO_END_SEC,
+        delayEndSec: DELAY_END_SEC,
+        intervals,
+    };
 }
 
 function MatchApp() {
@@ -977,6 +983,8 @@ function MatchApp() {
             return;
         }
 
+        const actionTimeline = buildActionTimelineFromTicks(actionTicks);
+
         const data: MatchData = {
             metadata: { scouterName, robotPosition, matchNumber, robotTeam: teamNumber },
             robotAbsent,
@@ -985,6 +993,7 @@ function MatchApp() {
             autoMoved: false,
             shootTimeBySegment,
             passTimeBySegment,
+            actionTimeline,
             ballsPerSecondUsed,
             autoFuelScored: 0,
             autoTower: 'None',

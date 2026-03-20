@@ -439,6 +439,16 @@ export function buildAnalyzedData({
             breakdownRateComms: matchEntry?.breakdownRateComms ?? 0,
             breakdownRateMechanism: matchEntry?.breakdownRateMechanism ?? 0,
             breakdownRateOther: matchEntry?.breakdownRateOther ?? 0,
+            timelineMatchCount: matchEntry?.timelineMatchCount ?? 0,
+            avgShootActiveSec: matchEntry?.avgShootActiveSec ?? 0,
+            avgPassActiveSec: matchEntry?.avgPassActiveSec ?? 0,
+            avgShootIntervalsPerMatch: matchEntry?.avgShootIntervalsPerMatch ?? 0,
+            avgPassIntervalsPerMatch: matchEntry?.avgPassIntervalsPerMatch ?? 0,
+            avgShootIntervalDurationSec:
+                matchEntry?.avgShootIntervalDurationSec ?? 0,
+            avgPassIntervalDurationSec:
+                matchEntry?.avgPassIntervalDurationSec ?? 0,
+            avgShootCycleGapSec: matchEntry?.avgShootCycleGapSec ?? 0,
             driverQualityGreatRate: matchEntry?.driverQualityGreatRate ?? 0,
             driverQualityGoodRate: matchEntry?.driverQualityGoodRate ?? 0,
             driverQualityOkRate: matchEntry?.driverQualityOkRate ?? 0,

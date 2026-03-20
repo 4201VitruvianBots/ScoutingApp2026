@@ -139,6 +139,30 @@ function getAutoPath(entry: MatchData): MatchData['autoPath'] {
     return entry.autoPath ?? null;
 }
 
+function getActionTimeline(entry: MatchData): MatchData['actionTimeline'] {
+    return entry.actionTimeline ?? null;
+}
+
+function median(values: number[]) {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+        return (sorted[middle - 1]! + sorted[middle]!) / 2;
+    }
+    return sorted[middle]!;
+}
+
+function getTimelineIntervalsByAction(
+    timeline: MatchData['actionTimeline'],
+    action: 'shoot' | 'pass'
+) {
+    if (!timeline) return [];
+    return timeline.intervals
+        .filter(interval => interval.action === action)
+        .sort((a, b) => a.startSec - b.startSec);
+}
+
 async function averageAndMax(): Promise<MatchDataAggregations[]> {
     const entries = (await matchApp.find().lean()) as MatchData[];
     const byTeam = new Map<number, MatchData[]>();
@@ -196,6 +220,14 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
                 breakdownRateComms: 0,
                 breakdownRateMechanism: 0,
                 breakdownRateOther: 0,
+                timelineMatchCount: 0,
+                avgShootActiveSec: 0,
+                avgPassActiveSec: 0,
+                avgShootIntervalsPerMatch: 0,
+                avgPassIntervalsPerMatch: 0,
+                avgShootIntervalDurationSec: 0,
+                avgPassIntervalDurationSec: 0,
+                avgShootCycleGapSec: 0,
                 matchCount: 0,
             };
         }
@@ -236,6 +268,17 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
         let breakdownComms = 0;
         let breakdownMechanism = 0;
         let breakdownOther = 0;
+        let timelineMatchCount = 0;
+        let shootActiveSec = 0;
+        let passActiveSec = 0;
+        let shootIntervalsPerMatch = 0;
+        let passIntervalsPerMatch = 0;
+        let shootIntervalDurationPerMatch = 0;
+        let passIntervalDurationPerMatch = 0;
+        let shootIntervalDurationMatchCount = 0;
+        let passIntervalDurationMatchCount = 0;
+        let shootCycleGapMedianSum = 0;
+        let shootCycleGapMatchCount = 0;
 
         validEntries.forEach(entry => {
             autoFuel += entry.autoFuelScored;
@@ -293,6 +336,61 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             if (entry.breakdown === 'comms') breakdownComms += 1;
             if (entry.breakdown === 'mechanism') breakdownMechanism += 1;
             if (entry.breakdown === 'other') breakdownOther += 1;
+
+            const actionTimeline = getActionTimeline(entry);
+            if (!actionTimeline) {
+                return;
+            }
+
+            timelineMatchCount += 1;
+
+            const shootIntervals = getTimelineIntervalsByAction(
+                actionTimeline,
+                'shoot'
+            );
+            const passIntervals = getTimelineIntervalsByAction(
+                actionTimeline,
+                'pass'
+            );
+
+            const shootDurations = shootIntervals.map(interval => interval.durationSec);
+            const passDurations = passIntervals.map(interval => interval.durationSec);
+
+            const shootActive = shootDurations.reduce(
+                (sum, duration) => sum + duration,
+                0
+            );
+            const passActive = passDurations.reduce(
+                (sum, duration) => sum + duration,
+                0
+            );
+            shootActiveSec += shootActive;
+            passActiveSec += passActive;
+
+            shootIntervalsPerMatch += shootIntervals.length;
+            passIntervalsPerMatch += passIntervals.length;
+
+            if (shootDurations.length) {
+                shootIntervalDurationPerMatch +=
+                    shootActive / shootDurations.length;
+                shootIntervalDurationMatchCount += 1;
+            }
+
+            if (passDurations.length) {
+                passIntervalDurationPerMatch += passActive / passDurations.length;
+                passIntervalDurationMatchCount += 1;
+            }
+
+            if (shootIntervals.length >= 2) {
+                const startGaps = shootIntervals
+                    .slice(1)
+                    .map((interval, index) => interval.startSec - shootIntervals[index]!.startSec)
+                    .filter(gap => gap > 0);
+                if (startGaps.length) {
+                    shootCycleGapMedianSum += median(startGaps);
+                    shootCycleGapMatchCount += 1;
+                }
+            }
         });
 
         const teleFuelTotal =
@@ -347,6 +445,33 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             breakdownRateComms: breakdownComms / matchCount,
             breakdownRateMechanism: breakdownMechanism / matchCount,
             breakdownRateOther: breakdownOther / matchCount,
+            timelineMatchCount,
+            avgShootActiveSec:
+                timelineMatchCount === 0 ? 0 : shootActiveSec / timelineMatchCount,
+            avgPassActiveSec:
+                timelineMatchCount === 0 ? 0 : passActiveSec / timelineMatchCount,
+            avgShootIntervalsPerMatch:
+                timelineMatchCount === 0
+                    ? 0
+                    : shootIntervalsPerMatch / timelineMatchCount,
+            avgPassIntervalsPerMatch:
+                timelineMatchCount === 0
+                    ? 0
+                    : passIntervalsPerMatch / timelineMatchCount,
+            avgShootIntervalDurationSec:
+                shootIntervalDurationMatchCount === 0
+                    ? 0
+                    : shootIntervalDurationPerMatch /
+                      shootIntervalDurationMatchCount,
+            avgPassIntervalDurationSec:
+                passIntervalDurationMatchCount === 0
+                    ? 0
+                    : passIntervalDurationPerMatch /
+                      passIntervalDurationMatchCount,
+            avgShootCycleGapSec:
+                shootCycleGapMatchCount === 0
+                    ? 0
+                    : shootCycleGapMedianSum / shootCycleGapMatchCount,
             matchCount,
         };
     });
@@ -375,6 +500,7 @@ async function maxIndividual(): Promise<MatchIndividualDataAggregations[]> {
                 passTimeBySegment: getActionTimeBySegment(
                     entry.passTimeBySegment
                 ),
+                actionTimeline: getActionTimeline(entry),
                 ballsPerSecondUsed: entry.ballsPerSecondUsed ?? 0,
                 autoFuelScored: entry.autoFuelScored,
                 autoFuelWinner: entry.autoFuelWinner,

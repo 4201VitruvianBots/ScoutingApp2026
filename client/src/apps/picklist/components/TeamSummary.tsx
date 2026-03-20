@@ -18,6 +18,7 @@ import {
     CartesianGrid,
     Line,
     LineChart,
+    ReferenceLine,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -77,6 +78,140 @@ function expectedPoints(entry: MatchIndividualDataAggregations) {
 }
 
 type TeamAutoPathTrace = NonNullable<MatchIndividualDataAggregations['autoPath']>;
+type TeamActionTimeline = NonNullable<
+    MatchIndividualDataAggregations['actionTimeline']
+>;
+type TeamActionInterval = TeamActionTimeline['intervals'][number];
+
+function median(values: number[]) {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+        return (sorted[middle - 1]! + sorted[middle]!) / 2;
+    }
+    return sorted[middle]!;
+}
+
+function buildActionTimelineSummary(
+    entries: MatchIndividualDataAggregations[]
+) {
+    const timelineEntries = entries
+        .map(entry => ({
+            matchNumber: entry._id.matchNumber,
+            timeline: entry.actionTimeline,
+        }))
+        .filter(
+            (
+                row
+            ): row is {
+                matchNumber: number;
+                timeline: TeamActionTimeline;
+            } => row.timeline != null
+        )
+        .sort((a, b) => a.matchNumber - b.matchNumber);
+
+    if (!timelineEntries.length) {
+        return null;
+    }
+
+    const totalSec = Math.max(
+        1,
+        Math.round(timelineEntries[0]!.timeline.totalSec)
+    );
+    const autoEndSec = timelineEntries[0]!.timeline.autoEndSec;
+    const delayEndSec = timelineEntries[0]!.timeline.delayEndSec;
+    const shootBins = Array.from({ length: totalSec }, () => 0);
+    const passBins = Array.from({ length: totalSec }, () => 0);
+    const shootDurations: number[] = [];
+    const passDurations: number[] = [];
+    const shootActivePerMatch: number[] = [];
+    const passActivePerMatch: number[] = [];
+    const shootCycleGapMedians: number[] = [];
+
+    const rows = timelineEntries.map(entry => {
+        const intervals = entry.timeline.intervals
+            .filter(interval => interval.endSec > interval.startSec)
+            .sort((a, b) => a.startSec - b.startSec);
+
+        let shootActive = 0;
+        let passActive = 0;
+        const shootStarts: number[] = [];
+
+        intervals.forEach(interval => {
+            const startBin = Math.max(0, Math.floor(interval.startSec));
+            const endBin = Math.min(totalSec, Math.ceil(interval.endSec));
+            for (let second = startBin; second < endBin; second++) {
+                const bucketStart = second;
+                const bucketEnd = second + 1;
+                if (
+                    interval.endSec <= bucketStart ||
+                    interval.startSec >= bucketEnd
+                ) {
+                    continue;
+                }
+                if (interval.action === 'shoot') {
+                    shootBins[second] += 1;
+                } else {
+                    passBins[second] += 1;
+                }
+            }
+
+            if (interval.action === 'shoot') {
+                shootDurations.push(interval.durationSec);
+                shootActive += interval.durationSec;
+                shootStarts.push(interval.startSec);
+            } else {
+                passDurations.push(interval.durationSec);
+                passActive += interval.durationSec;
+            }
+        });
+
+        shootActivePerMatch.push(shootActive);
+        passActivePerMatch.push(passActive);
+
+        if (shootStarts.length >= 2) {
+            const sortedStarts = [...shootStarts].sort((a, b) => a - b);
+            const gaps = sortedStarts
+                .slice(1)
+                .map((start, index) => start - sortedStarts[index]!)
+                .filter(gap => gap > 0);
+            if (gaps.length) {
+                shootCycleGapMedians.push(median(gaps));
+            }
+        }
+
+        return {
+            matchNumber: entry.matchNumber,
+            intervals,
+        };
+    });
+
+    const chartData = Array.from({ length: totalSec }, (_, second) => ({
+        second,
+        shootRate: shootBins[second]! / timelineEntries.length,
+        passRate: passBins[second]! / timelineEntries.length,
+    }));
+
+    const mean = (values: number[]) =>
+        values.length
+            ? values.reduce((sum, value) => sum + value, 0) / values.length
+            : 0;
+
+    return {
+        totalSec,
+        autoEndSec,
+        delayEndSec,
+        timelineMatchCount: timelineEntries.length,
+        chartData,
+        rows,
+        avgShootCycleGapSec: mean(shootCycleGapMedians),
+        medianShootIntervalSec: median(shootDurations),
+        medianPassIntervalSec: median(passDurations),
+        avgShootActiveSec: mean(shootActivePerMatch),
+        avgPassActiveSec: mean(passActivePerMatch),
+    };
+}
 
 const autoFieldImageByAlliance = {
     red: '/redsidematch.png',
@@ -245,6 +380,7 @@ function TeamSummary({
     const teamSuperEntries = superIndividualData
         .filter(entry => entry._id.teamNumber === table.teamNumber)
         .sort((a, b) => a._id.matchNumber - b._id.matchNumber);
+    const actionTimelineSummary = buildActionTimelineSummary(teamMatchEntries);
 
     const teamAutoPathTraces = teamMatchEntries
         .map(entry => entry.autoPath)
@@ -504,6 +640,206 @@ function TeamSummary({
                     </div>
                 </section>
             </div>
+
+            <section className='rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
+                    <h2 className='text-lg font-semibold text-[#48c55c]'>
+                        Action Timeline
+                    </h2>
+                    <p className='text-xs text-gray-300'>
+                        {actionTimelineSummary
+                            ? `${actionTimelineSummary.timelineMatchCount} timeline-enabled matches`
+                            : 'No timeline-enabled matches'}
+                    </p>
+                </div>
+
+                {actionTimelineSummary ? (
+                    <>
+                        <div className='mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5'>
+                            <div className='rounded-lg border border-white/10 bg-[#1b2230] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Shoot Cycle Gap</p>
+                                <p className='text-xl font-semibold'>
+                                    {formatNumber(
+                                        actionTimelineSummary.avgShootCycleGapSec
+                                    )}
+                                    s
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#1b2230] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Median Shoot Hold</p>
+                                <p className='text-xl font-semibold'>
+                                    {formatNumber(
+                                        actionTimelineSummary.medianShootIntervalSec
+                                    )}
+                                    s
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#1b2230] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Median Pass Hold</p>
+                                <p className='text-xl font-semibold'>
+                                    {formatNumber(
+                                        actionTimelineSummary.medianPassIntervalSec
+                                    )}
+                                    s
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#1b2230] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Avg Shoot Active</p>
+                                <p className='text-xl font-semibold'>
+                                    {formatNumber(actionTimelineSummary.avgShootActiveSec)}s
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#1b2230] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Avg Pass Active</p>
+                                <p className='text-xl font-semibold'>
+                                    {formatNumber(actionTimelineSummary.avgPassActiveSec)}s
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className='mt-4 grid gap-4 lg:grid-cols-2'>
+                            <div className='h-[260px] w-full'>
+                                <ResponsiveContainer width='100%' height='100%'>
+                                    <LineChart data={actionTimelineSummary.chartData}>
+                                        <CartesianGrid strokeDasharray='4 4' opacity={0.2} />
+                                        <XAxis
+                                            dataKey='second'
+                                            tick={{ fill: '#d1d5db' }}
+                                            tickFormatter={value => `${value}s`}
+                                        />
+                                        <YAxis
+                                            domain={[0, 1]}
+                                            tick={{ fill: '#d1d5db' }}
+                                            tickFormatter={value =>
+                                                `${Math.round(value * 100)}%`
+                                            }
+                                        />
+                                        <Tooltip
+                                            formatter={(value: number, name: string) => [
+                                                `${(Number(value) * 100).toFixed(1)}%`,
+                                                name === 'shootRate'
+                                                    ? 'Shooting Utilization'
+                                                    : 'Passing Utilization',
+                                            ]}
+                                            labelFormatter={label =>
+                                                `Second ${label} of ${actionTimelineSummary.totalSec}`
+                                            }
+                                            contentStyle={{
+                                                backgroundColor: '#10141d',
+                                                border: '1px solid rgba(255,255,255,0.15)',
+                                                color: '#f3f4f6',
+                                            }}
+                                        />
+                                        <ReferenceLine
+                                            x={actionTimelineSummary.autoEndSec}
+                                            stroke='rgba(248,250,252,0.45)'
+                                            strokeDasharray='4 4'
+                                        />
+                                        <ReferenceLine
+                                            x={actionTimelineSummary.delayEndSec}
+                                            stroke='rgba(248,250,252,0.45)'
+                                            strokeDasharray='4 4'
+                                        />
+                                        <Line
+                                            type='monotone'
+                                            dataKey='shootRate'
+                                            stroke='#48c55c'
+                                            strokeWidth={2}
+                                            dot={false}
+                                            name='Shooting Utilization'
+                                        />
+                                        <Line
+                                            type='monotone'
+                                            dataKey='passRate'
+                                            stroke='#4aa3ff'
+                                            strokeWidth={2}
+                                            dot={false}
+                                            name='Passing Utilization'
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            <div className='rounded-lg border border-white/10 bg-[#1b2230] p-3'>
+                                <p className='text-xs uppercase tracking-wide text-gray-300'>
+                                    Match Timeline Raster
+                                </p>
+                                <div className='mt-2 max-h-[210px] space-y-2 overflow-y-auto pr-1'>
+                                    {actionTimelineSummary.rows.map(row => (
+                                        <div
+                                            key={`timeline-row-${row.matchNumber}`}
+                                            className='grid grid-cols-[44px_1fr] items-center gap-2'>
+                                            <span className='text-xs font-semibold text-gray-300'>
+                                                M{row.matchNumber}
+                                            </span>
+                                            <div className='relative h-6 overflow-hidden rounded border border-white/10 bg-[#0f1522]'>
+                                                <div
+                                                    className='absolute inset-y-0 w-px bg-white/35'
+                                                    style={{
+                                                        left: `${
+                                                            (actionTimelineSummary.autoEndSec /
+                                                                actionTimelineSummary.totalSec) *
+                                                            100
+                                                        }%`,
+                                                    }}
+                                                />
+                                                <div
+                                                    className='absolute inset-y-0 w-px bg-white/35'
+                                                    style={{
+                                                        left: `${
+                                                            (actionTimelineSummary.delayEndSec /
+                                                                actionTimelineSummary.totalSec) *
+                                                            100
+                                                        }%`,
+                                                    }}
+                                                />
+                                                {row.intervals.map(
+                                                    (
+                                                        interval: TeamActionInterval,
+                                                        intervalIndex
+                                                    ) => {
+                                                        const left =
+                                                            (interval.startSec /
+                                                                actionTimelineSummary.totalSec) *
+                                                            100;
+                                                        const width = Math.max(
+                                                            0.35,
+                                                            ((interval.endSec - interval.startSec) /
+                                                                actionTimelineSummary.totalSec) *
+                                                                100
+                                                        );
+                                                        return (
+                                                            <div
+                                                                key={`${row.matchNumber}-${interval.action}-${intervalIndex}`}
+                                                                className={`absolute inset-y-0 ${
+                                                                    interval.action === 'shoot'
+                                                                        ? 'bg-emerald-400/80'
+                                                                        : 'bg-sky-400/80'
+                                                                }`}
+                                                                style={{
+                                                                    left: `${left}%`,
+                                                                    width: `${width}%`,
+                                                                }}
+                                                            />
+                                                        );
+                                                    }
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className='mt-2 text-[11px] text-gray-300'>
+                                    Green = shooting hold, blue = passing hold.
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <p className='mt-2 text-sm text-gray-300'>
+                        No action timeline data recorded yet for this team.
+                    </p>
+                )}
+            </section>
 
             <section className='rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>
                 <div className='flex flex-wrap items-center justify-between gap-2'>

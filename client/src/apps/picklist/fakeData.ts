@@ -35,6 +35,14 @@ type FakeMatchAggBase = Omit<
     | 'breakdownRateComms'
     | 'breakdownRateMechanism'
     | 'breakdownRateOther'
+    | 'timelineMatchCount'
+    | 'avgShootActiveSec'
+    | 'avgPassActiveSec'
+    | 'avgShootIntervalsPerMatch'
+    | 'avgPassIntervalsPerMatch'
+    | 'avgShootIntervalDurationSec'
+    | 'avgPassIntervalDurationSec'
+    | 'avgShootCycleGapSec'
 >;
 
 type FakeSuperAggBase = Omit<
@@ -54,6 +62,22 @@ const fakeRobotPositions: MatchIndividualDataAggregations['_id']['robotPosition'
     'blue_2',
     'red_3',
     'blue_1',
+];
+const MATCH_TOTAL_SEC = 163;
+const AUTO_END_SEC = 20;
+const DELAY_END_SEC = 23;
+const timelineSegments: Array<{
+    id: keyof MatchIndividualDataAggregations['shootTimeBySegment'];
+    startSec: number;
+    endSec: number;
+}> = [
+    { id: 'auto', startSec: 0, endSec: AUTO_END_SEC },
+    { id: 'transition', startSec: AUTO_END_SEC, endSec: DELAY_END_SEC },
+    { id: 'shift1', startSec: DELAY_END_SEC, endSec: 50.5 },
+    { id: 'shift2', startSec: 50.5, endSec: 78 },
+    { id: 'shift3', startSec: 78, endSec: 105.5 },
+    { id: 'shift4', startSec: 105.5, endSec: 133 },
+    { id: 'endgame', startSec: 133, endSec: MATCH_TOTAL_SEC },
 ];
 
 function clamp(value: number, minValue: number, maxValue: number) {
@@ -102,6 +126,86 @@ function makeFakeAutoPath(
         points,
         shotMarkers,
         fingerprint: `fake-${teamNumber}-${matchNumber}-${alliance}`,
+    };
+}
+
+function buildIntervalsFromTotals(
+    action: 'shoot' | 'pass',
+    totals: MatchIndividualDataAggregations['shootTimeBySegment'],
+    seedBase: number
+) {
+    const intervals: NonNullable<
+        MatchIndividualDataAggregations['actionTimeline']
+    >['intervals'] = [];
+
+    timelineSegments.forEach((segment, index) => {
+        let remaining = totals[segment.id];
+        if (remaining <= 0.03) return;
+
+        const intervalCount = Math.max(1, Math.min(4, Math.round(remaining / 0.7)));
+        let cursor =
+            segment.startSec +
+            seededValue(seedBase + index * 19) *
+                Math.min(0.4, (segment.endSec - segment.startSec) * 0.2);
+
+        for (
+            let intervalIndex = 0;
+            intervalIndex < intervalCount && remaining > 0.03;
+            intervalIndex++
+        ) {
+            const intervalsLeft = intervalCount - intervalIndex;
+            const maxDuration = Math.min(
+                1.7,
+                remaining - 0.03 * (intervalsLeft - 1)
+            );
+            if (maxDuration <= 0.03) break;
+            const minDuration = Math.min(maxDuration, 0.1);
+            const randomness =
+                seededValue(seedBase + index * 97 + intervalIndex * 13) *
+                    (maxDuration - minDuration) +
+                minDuration;
+            const durationSec = Math.round(randomness * 100) / 100;
+            const latestStart = segment.endSec - durationSec;
+            if (latestStart <= segment.startSec) break;
+            const startSec = Math.round(
+                clamp(cursor, segment.startSec, latestStart) * 100
+            ) / 100;
+            const endSec = Math.round((startSec + durationSec) * 100) / 100;
+            const safeDurationSec = Math.round((endSec - startSec) * 100) / 100;
+            if (safeDurationSec <= 0) break;
+            intervals.push({
+                action,
+                startSec,
+                endSec,
+                durationSec: safeDurationSec,
+            });
+            remaining = Math.round(Math.max(0, remaining - safeDurationSec) * 100) / 100;
+            cursor =
+                endSec +
+                0.08 +
+                seededValue(seedBase + index * 41 + intervalIndex * 17) * 0.55;
+            if (cursor >= segment.endSec) break;
+        }
+    });
+
+    return intervals;
+}
+
+function buildFakeActionTimeline(
+    shoot: MatchIndividualDataAggregations['shootTimeBySegment'],
+    pass: MatchIndividualDataAggregations['passTimeBySegment'],
+    seed: number
+): MatchIndividualDataAggregations['actionTimeline'] {
+    const intervals = [
+        ...buildIntervalsFromTotals('shoot', shoot, seed),
+        ...buildIntervalsFromTotals('pass', pass, seed + 997),
+    ].sort((a, b) => a.startSec - b.startSec || a.action.localeCompare(b.action));
+
+    return {
+        totalSec: MATCH_TOTAL_SEC,
+        autoEndSec: AUTO_END_SEC,
+        delayEndSec: DELAY_END_SEC,
+        intervals,
     };
 }
 
@@ -323,6 +427,16 @@ export const fakeMatchAgg: MatchDataAggregations[] = fakeMatchAggBase.map(
                 driverQualityOkRate * 1 +
                 driverQualityRoughRate * 0) /
             3;
+        const timelineMatchCount = entry.matchCount;
+        const avgShootActiveSec = avgFuelTotal / 5;
+        const avgPassActiveSec = avgShootActiveSec * 0.32;
+        const avgShootIntervalsPerMatch = Math.max(1, avgShootActiveSec / 0.92);
+        const avgPassIntervalsPerMatch = Math.max(1, avgPassActiveSec / 0.64);
+        const avgShootIntervalDurationSec =
+            avgShootActiveSec / avgShootIntervalsPerMatch;
+        const avgPassIntervalDurationSec =
+            avgPassActiveSec / avgPassIntervalsPerMatch;
+        const avgShootCycleGapSec = 163 / (avgShootIntervalsPerMatch + 1);
 
         return {
             ...entry,
@@ -352,6 +466,14 @@ export const fakeMatchAgg: MatchDataAggregations[] = fakeMatchAggBase.map(
             breakdownRateComms: entry.breakdownRate * 0.2,
             breakdownRateMechanism: entry.breakdownRate * 0.25,
             breakdownRateOther: entry.breakdownRate * 0.1,
+            timelineMatchCount,
+            avgShootActiveSec,
+            avgPassActiveSec,
+            avgShootIntervalsPerMatch,
+            avgPassIntervalsPerMatch,
+            avgShootIntervalDurationSec,
+            avgPassIntervalDurationSec,
+            avgShootCycleGapSec,
         };
     }
 );
@@ -617,6 +739,29 @@ export const fakeMatchIndividual: MatchIndividualDataAggregations[] =
                 shift4: Math.round(entry.avgTeleFuelShift4 * teleScale * 10) / 10,
                 endgame: Math.round(entry.avgTeleFuelEndgame * teleScale * 10) / 10,
             };
+            const shootTimeBySegment = {
+                auto: Math.round((1 + seededValue(matchNumber) * 2) * 100) / 100,
+                transition: Math.round((0.6 + seededValue(matchNumber + 1) * 1.4) * 100) / 100,
+                shift1: Math.round((1.2 + seededValue(matchNumber + 2) * 2.4) * 100) / 100,
+                shift2: Math.round((1.4 + seededValue(matchNumber + 3) * 2.8) * 100) / 100,
+                shift3: Math.round((1.2 + seededValue(matchNumber + 4) * 2.4) * 100) / 100,
+                shift4: Math.round((1.0 + seededValue(matchNumber + 5) * 2.1) * 100) / 100,
+                endgame: Math.round((0.7 + seededValue(matchNumber + 6) * 1.6) * 100) / 100,
+            } satisfies MatchIndividualDataAggregations['shootTimeBySegment'];
+            const passTimeBySegment = {
+                auto: 0,
+                transition: Math.round((0.2 + seededValue(matchNumber + 7) * 0.7) * 100) / 100,
+                shift1: Math.round((0.5 + seededValue(matchNumber + 8) * 1.1) * 100) / 100,
+                shift2: Math.round((0.6 + seededValue(matchNumber + 9) * 1.2) * 100) / 100,
+                shift3: Math.round((0.5 + seededValue(matchNumber + 10) * 1.0) * 100) / 100,
+                shift4: Math.round((0.4 + seededValue(matchNumber + 11) * 0.9) * 100) / 100,
+                endgame: Math.round((0.2 + seededValue(matchNumber + 12) * 0.8) * 100) / 100,
+            } satisfies MatchIndividualDataAggregations['passTimeBySegment'];
+            const actionTimeline = buildFakeActionTimeline(
+                shootTimeBySegment,
+                passTimeBySegment,
+                matchNumber + teamIndex * 31
+            );
             return {
                 _id: {
                     teamNumber: entry._id.teamNumber,
@@ -628,24 +773,9 @@ export const fakeMatchIndividual: MatchIndividualDataAggregations[] =
                 autoStartingPosition: autoPath?.startPosition ?? fallbackStartPosition,
                 autoPath,
                 autoMoved: true,
-                shootTimeBySegment: {
-                    auto: Math.round((1 + seededValue(matchNumber) * 2) * 100) / 100,
-                    transition: Math.round((0.6 + seededValue(matchNumber + 1) * 1.4) * 100) / 100,
-                    shift1: Math.round((1.2 + seededValue(matchNumber + 2) * 2.4) * 100) / 100,
-                    shift2: Math.round((1.4 + seededValue(matchNumber + 3) * 2.8) * 100) / 100,
-                    shift3: Math.round((1.2 + seededValue(matchNumber + 4) * 2.4) * 100) / 100,
-                    shift4: Math.round((1.0 + seededValue(matchNumber + 5) * 2.1) * 100) / 100,
-                    endgame: Math.round((0.7 + seededValue(matchNumber + 6) * 1.6) * 100) / 100,
-                },
-                passTimeBySegment: {
-                    auto: 0,
-                    transition: Math.round((0.2 + seededValue(matchNumber + 7) * 0.7) * 100) / 100,
-                    shift1: Math.round((0.5 + seededValue(matchNumber + 8) * 1.1) * 100) / 100,
-                    shift2: Math.round((0.6 + seededValue(matchNumber + 9) * 1.2) * 100) / 100,
-                    shift3: Math.round((0.5 + seededValue(matchNumber + 10) * 1.0) * 100) / 100,
-                    shift4: Math.round((0.4 + seededValue(matchNumber + 11) * 0.9) * 100) / 100,
-                    endgame: Math.round((0.2 + seededValue(matchNumber + 12) * 0.8) * 100) / 100,
-                },
+                shootTimeBySegment,
+                passTimeBySegment,
+                actionTimeline,
                 ballsPerSecondUsed: 5,
                 autoFuelScored: Math.round(entry.avgAutoFuel * teleScale * 10) / 10,
                 autoFuelWinner: seededValue(matchNumber + teamIndex) > 0.5 ? 'red' : 'blue',

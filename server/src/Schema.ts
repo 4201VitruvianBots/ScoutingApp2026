@@ -39,6 +39,24 @@ const actionTimeBySegmentSchema = {
     endgame: { type: Number, default: 0 },
 };
 
+const actionIntervalSchema = {
+    action: {
+        type: String,
+        enum: ['shoot', 'pass'],
+        required: true,
+    },
+    startSec: { type: Number, required: true, min: 0 },
+    endSec: { type: Number, required: true, min: 0 },
+    durationSec: { type: Number, required: true, min: 0 },
+};
+
+const matchActionTimelineSchema = {
+    totalSec: { type: Number, required: true, min: 0 },
+    autoEndSec: { type: Number, required: true, min: 0 },
+    delayEndSec: { type: Number, required: true, min: 0 },
+    intervals: [actionIntervalSchema],
+};
+
 const autoPathPointSchema = {
     x: { type: Number, required: true, min: 0, max: 1 },
     y: { type: Number, required: true, min: 0, max: 1 },
@@ -84,6 +102,10 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
     autoMoved: { type: Boolean, default: false },
     shootTimeBySegment: actionTimeBySegmentSchema,
     passTimeBySegment: actionTimeBySegmentSchema,
+    actionTimeline: {
+        type: matchActionTimelineSchema,
+        default: null,
+    },
     ballsPerSecondUsed: { type: Number, default: 5 },
     autoFuelScored: { type: Number, default: 0 },
     autoTower: {

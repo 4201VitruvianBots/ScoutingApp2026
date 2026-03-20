@@ -4,6 +4,7 @@ import { startDockerContainer } from 'database';
 import mongoose from 'mongoose';
 import { ballsPerSecondApp, leaderboardApp, matchApp, pitApp } from '../src/Schema.js';
 import {
+    ActionKind,
     AutoFuelWinner,
     Drivebase,
     MatchData,
@@ -131,6 +132,22 @@ const robotPositions = [
 ] as const;
 
 const segmentWeights = [0.15, 0.15, 0.18, 0.17, 0.15, 0.12, 0.08];
+const MATCH_TOTAL_SEC = 163;
+const AUTO_END_SEC = 20;
+const DELAY_END_SEC = 23;
+const matchTimelineSegments: Array<{
+    id: keyof MatchData['shootTimeBySegment'];
+    startSec: number;
+    endSec: number;
+}> = [
+    { id: 'auto', startSec: 0, endSec: AUTO_END_SEC },
+    { id: 'transition', startSec: AUTO_END_SEC, endSec: DELAY_END_SEC },
+    { id: 'shift1', startSec: DELAY_END_SEC, endSec: 50.5 },
+    { id: 'shift2', startSec: 50.5, endSec: 78 },
+    { id: 'shift3', startSec: 78, endSec: 105.5 },
+    { id: 'shift4', startSec: 105.5, endSec: 133 },
+    { id: 'endgame', startSec: 133, endSec: MATCH_TOTAL_SEC },
+];
 
 const scouterNamesBase = [
     'Vanessa',
@@ -286,6 +303,104 @@ function computeFuelFromShootTime(
     return { autoFuelScored, teleFuelBySegment };
 }
 
+function buildActionIntervalsFromSegmentTotals(
+    action: ActionKind,
+    totals: MatchData['shootTimeBySegment']
+) {
+    const intervals: NonNullable<MatchData['actionTimeline']>['intervals'] = [];
+
+    matchTimelineSegments.forEach(segment => {
+        let remaining = totals[segment.id];
+        if (remaining <= 0.03) {
+            return;
+        }
+
+        const segmentLength = segment.endSec - segment.startSec;
+        const intervalCount = Math.max(
+            1,
+            Math.min(4, Math.round(remaining / 0.7))
+        );
+        let cursor = segment.startSec + randfloat(Math.min(0.35, segmentLength * 0.2), 0);
+
+        for (
+            let intervalIndex = 0;
+            intervalIndex < intervalCount && remaining > 0.03;
+            intervalIndex++
+        ) {
+            const intervalsLeft = intervalCount - intervalIndex;
+            const maxDuration = Math.min(
+                1.8,
+                remaining - 0.03 * (intervalsLeft - 1)
+            );
+            if (maxDuration <= 0.03) break;
+            const minDuration = Math.min(maxDuration, 0.12);
+            const duration = roundToHundredth(
+                clamp(randfloat(maxDuration, minDuration), 0.05, maxDuration)
+            );
+            const latestStart = segment.endSec - duration;
+            if (latestStart <= segment.startSec) break;
+
+            const startSec = roundToHundredth(
+                clamp(cursor, segment.startSec, latestStart)
+            );
+            const endSec = roundToHundredth(clamp(startSec + duration, startSec, segment.endSec));
+            const durationSec = roundToHundredth(endSec - startSec);
+            if (durationSec <= 0) break;
+
+            intervals.push({
+                action,
+                startSec,
+                endSec,
+                durationSec,
+            });
+
+            remaining = roundToHundredth(Math.max(0, remaining - durationSec));
+            cursor = endSec + randfloat(0.6, 0.08);
+            if (cursor >= segment.endSec) break;
+        }
+
+        if (remaining > 0.03) {
+            const durationSec = roundToHundredth(
+                Math.min(remaining, segment.endSec - segment.startSec)
+            );
+            const endSec = roundToHundredth(
+                clamp(segment.endSec - randfloat(0.06, 0), segment.startSec, segment.endSec)
+            );
+            const startSec = roundToHundredth(
+                clamp(endSec - durationSec, segment.startSec, endSec)
+            );
+            const finalDurationSec = roundToHundredth(endSec - startSec);
+            if (finalDurationSec > 0) {
+                intervals.push({
+                    action,
+                    startSec,
+                    endSec,
+                    durationSec: finalDurationSec,
+                });
+            }
+        }
+    });
+
+    return intervals.sort((a, b) => a.startSec - b.startSec);
+}
+
+function buildActionTimeline(
+    shootTimeBySegment: MatchData['shootTimeBySegment'],
+    passTimeBySegment: MatchData['passTimeBySegment']
+): MatchData['actionTimeline'] {
+    const intervals = [
+        ...buildActionIntervalsFromSegmentTotals('shoot', shootTimeBySegment),
+        ...buildActionIntervalsFromSegmentTotals('pass', passTimeBySegment),
+    ].sort((a, b) => a.startSec - b.startSec || a.action.localeCompare(b.action));
+
+    return {
+        totalSec: MATCH_TOTAL_SEC,
+        autoEndSec: AUTO_END_SEC,
+        delayEndSec: DELAY_END_SEC,
+        intervals,
+    };
+}
+
 await startDockerContainer(process.env.CONTAINER_NAME);
 await mongoose.connect(mongoUrl);
 
@@ -351,6 +466,10 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
             shift4: weightedPass[5]!,
             endgame: weightedPass[6]!,
         };
+        const actionTimeline = buildActionTimeline(
+            shootTimeBySegment,
+            passTimeBySegment
+        );
         const fuel = computeFuelFromShootTime(shootTimeBySegment, ballsPerSecondUsed);
         const autoStartingPosition = robotAbsent
             ? null
@@ -378,6 +497,14 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
             autoMoved: robotAbsent ? false : chance(0.86),
             shootTimeBySegment: robotAbsent ? emptyActionTimeBySegment : shootTimeBySegment,
             passTimeBySegment: robotAbsent ? emptyActionTimeBySegment : passTimeBySegment,
+            actionTimeline: robotAbsent
+                ? {
+                      totalSec: MATCH_TOTAL_SEC,
+                      autoEndSec: AUTO_END_SEC,
+                      delayEndSec: DELAY_END_SEC,
+                      intervals: [],
+                  }
+                : actionTimeline,
             ballsPerSecondUsed,
             autoFuelScored: robotAbsent ? 0 : fuel.autoFuelScored,
             autoTower: robotAbsent

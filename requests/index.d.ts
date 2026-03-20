@@ -123,6 +123,22 @@ export interface ActionTimeBySegment {
     endgame: number;
 }
 
+export type ActionKind = 'shoot' | 'pass';
+
+export interface ActionInterval {
+    action: ActionKind;
+    startSec: number;
+    endSec: number;
+    durationSec: number;
+}
+
+export interface MatchActionTimeline {
+    totalSec: number;
+    autoEndSec: number;
+    delayEndSec: number;
+    intervals: ActionInterval[];
+}
+
 export type BreakdownType =
     | 'None'
     | 'stuck'
@@ -141,6 +157,7 @@ export interface MatchData {
     autoMoved: boolean;
     shootTimeBySegment: ActionTimeBySegment;
     passTimeBySegment: ActionTimeBySegment;
+    actionTimeline: MatchActionTimeline | null;
     ballsPerSecondUsed: number;
     autoFuelScored: number;
     autoTower: AutoTowerResult;
@@ -278,6 +295,14 @@ export interface MatchDataAggregations {
     breakdownRateComms: number;
     breakdownRateMechanism: number;
     breakdownRateOther: number;
+    timelineMatchCount: number;
+    avgShootActiveSec: number;
+    avgPassActiveSec: number;
+    avgShootIntervalsPerMatch: number;
+    avgPassIntervalsPerMatch: number;
+    avgShootIntervalDurationSec: number;
+    avgPassIntervalDurationSec: number;
+    avgShootCycleGapSec: number;
     matchCount: number;
 }
 
@@ -290,6 +315,7 @@ export interface MatchIndividualDataAggregations {
     autoMoved: boolean;
     shootTimeBySegment: ActionTimeBySegment;
     passTimeBySegment: ActionTimeBySegment;
+    actionTimeline: MatchActionTimeline | null;
     ballsPerSecondUsed: number;
     autoFuelScored: number;
     autoFuelWinner: AutoFuelWinner;

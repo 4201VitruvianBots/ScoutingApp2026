@@ -19,6 +19,7 @@ import {
 } from './aggregate.js';
 import { setUpSocket, updateMatchStatus } from './status.js';
 import {
+    ActionKind,
     AllianceColor,
     AutoFieldOrientationSetting,
     BallsPerSecondSetting,
@@ -28,6 +29,7 @@ import {
     PitResult,
 } from 'requests';
 import { dataUriToBuffer } from 'data-uri-to-buffer';
+import { gameConfig } from './gameConfig.js';
 
 // import { MatchData } from 'requests';
 
@@ -70,9 +72,23 @@ const emptyBreaks: MatchData['breaks'] = {
     bumper: 0,
 };
 const AUTO_PATH_MIN_POINT_DISTANCE = 0.003;
+const INTERVAL_MERGE_GAP_SEC = 0.08;
+const MATCH_TOTAL_SEC = gameConfig.matchDurationSec;
+const AUTO_END_SEC =
+    gameConfig.segments.find(segment => segment.id === 'auto')?.endSec ?? 20;
+const DELAY_END_SEC =
+    gameConfig.segments.find(segment => segment.id === 'transition')?.endSec ?? 23;
+const matchTimelineSegments = gameConfig.segments.map(segment => ({
+    id: segment.id as keyof MatchData['shootTimeBySegment'],
+    startSec: segment.startSec,
+    endSec: segment.endSec,
+}));
 
 type AutoPathTrace = NonNullable<MatchData['autoPath']>;
 type AutoPathPoint = AutoPathTrace['points'][number];
+type ActionTimelineInterval = NonNullable<
+    NonNullable<MatchData['actionTimeline']>['intervals']
+>[number];
 
 function roundToHundredth(value: number) {
     return Math.round(value * 100) / 100;
@@ -207,6 +223,144 @@ function normalizeAutoPath(
     };
 }
 
+function normalizeActionInterval(value: unknown): ActionTimelineInterval | null {
+    if (!value || typeof value !== 'object') return null;
+    const interval = value as Partial<ActionTimelineInterval>;
+
+    if (interval.action !== 'shoot' && interval.action !== 'pass') {
+        return null;
+    }
+
+    const rawStartSec = Number(interval.startSec);
+    const rawEndSec = Number(interval.endSec);
+    if (!Number.isFinite(rawStartSec) || !Number.isFinite(rawEndSec)) {
+        return null;
+    }
+
+    const startSec = roundToHundredth(clamp(rawStartSec, 0, MATCH_TOTAL_SEC));
+    const endSec = roundToHundredth(clamp(rawEndSec, 0, MATCH_TOTAL_SEC));
+    if (endSec <= startSec) {
+        return null;
+    }
+
+    return {
+        action: interval.action,
+        startSec,
+        endSec,
+        durationSec: roundToHundredth(endSec - startSec),
+    };
+}
+
+function mergeActionIntervalsByAction(
+    intervals: ActionTimelineInterval[],
+    action: ActionKind
+) {
+    const sorted = intervals
+        .filter(interval => interval.action === action)
+        .sort((a, b) => a.startSec - b.startSec);
+
+    const merged: ActionTimelineInterval[] = [];
+    sorted.forEach(interval => {
+        const last = merged[merged.length - 1];
+        if (
+            last &&
+            interval.startSec - last.endSec <= INTERVAL_MERGE_GAP_SEC
+        ) {
+            const nextEnd = Math.max(last.endSec, interval.endSec);
+            last.endSec = nextEnd;
+            last.durationSec = roundToHundredth(last.endSec - last.startSec);
+            return;
+        }
+        merged.push({
+            action,
+            startSec: interval.startSec,
+            endSec: interval.endSec,
+            durationSec: interval.durationSec,
+        });
+    });
+
+    return merged;
+}
+
+function normalizeActionTimeline(
+    input: MatchData['actionTimeline'] | undefined | null
+): MatchData['actionTimeline'] {
+    if (!input || !Array.isArray(input.intervals)) {
+        return null;
+    }
+
+    const normalizedIntervals = input.intervals
+        .map(normalizeActionInterval)
+        .filter(
+            (interval): interval is ActionTimelineInterval => interval !== null
+        );
+
+    const mergedIntervals = [
+        ...mergeActionIntervalsByAction(normalizedIntervals, 'shoot'),
+        ...mergeActionIntervalsByAction(normalizedIntervals, 'pass'),
+    ].sort((a, b) => a.startSec - b.startSec || a.action.localeCompare(b.action));
+
+    return {
+        totalSec: MATCH_TOTAL_SEC,
+        autoEndSec: AUTO_END_SEC,
+        delayEndSec: DELAY_END_SEC,
+        intervals: mergedIntervals,
+    };
+}
+
+function splitIntervalAcrossSegments(startSec: number, endSec: number) {
+    const clampedStart = clamp(startSec, 0, MATCH_TOTAL_SEC);
+    const clampedEnd = clamp(endSec, 0, MATCH_TOTAL_SEC);
+    if (clampedEnd <= clampedStart) return [];
+
+    return matchTimelineSegments
+        .map(segment => {
+            const overlapStart = Math.max(clampedStart, segment.startSec);
+            const overlapEnd = Math.min(clampedEnd, segment.endSec);
+            if (overlapEnd <= overlapStart) return null;
+            return {
+                segment: segment.id,
+                durationSec: roundToHundredth(overlapEnd - overlapStart),
+            };
+        })
+        .filter(
+            (
+                segment
+            ): segment is {
+                segment: keyof MatchData['shootTimeBySegment'];
+                durationSec: number;
+            } => segment !== null
+        );
+}
+
+function getActionTimeBySegmentFromTimeline(
+    timeline: MatchData['actionTimeline'],
+    action: ActionKind
+): MatchData['shootTimeBySegment'] {
+    const totals = { ...emptyActionTimeBySegment };
+
+    if (!timeline) {
+        return totals;
+    }
+
+    timeline.intervals.forEach(interval => {
+        if (interval.action !== action) return;
+        splitIntervalAcrossSegments(interval.startSec, interval.endSec).forEach(
+            segmentSlice => {
+                totals[segmentSlice.segment] += segmentSlice.durationSec;
+            }
+        );
+    });
+
+    (Object.keys(totals) as Array<keyof MatchData['shootTimeBySegment']>).forEach(
+        segment => {
+            totals[segment] = roundToHundredth(totals[segment]);
+        }
+    );
+
+    return totals;
+}
+
 function getActionTimeBySegment(
     value: MatchData['shootTimeBySegment'] | undefined
 ) {
@@ -264,8 +418,13 @@ async function getAutoFieldOrientationMap() {
 
 app.post('/data/match', async (req, res) => {
     const body = req.body as MatchData;
-    const shootTimeBySegment = getActionTimeBySegment(body.shootTimeBySegment);
-    const passTimeBySegment = getActionTimeBySegment(body.passTimeBySegment);
+    const normalizedActionTimeline = normalizeActionTimeline(body.actionTimeline);
+    const shootTimeBySegment = normalizedActionTimeline
+        ? getActionTimeBySegmentFromTimeline(normalizedActionTimeline, 'shoot')
+        : getActionTimeBySegment(body.shootTimeBySegment);
+    const passTimeBySegment = normalizedActionTimeline
+        ? getActionTimeBySegmentFromTimeline(normalizedActionTimeline, 'pass')
+        : getActionTimeBySegment(body.passTimeBySegment);
     const fallbackAlliance = getAllianceFromPosition(body.metadata.robotPosition);
     const normalizedAutoPath = normalizeAutoPath(
         body.autoPath,
@@ -287,6 +446,7 @@ app.post('/data/match', async (req, res) => {
         autoPath: normalizedAutoPath,
         shootTimeBySegment,
         passTimeBySegment,
+        actionTimeline: normalizedActionTimeline,
         ballsPerSecondUsed,
         autoFuelScored: estimatedFuel.autoFuelScored,
         teleFuelBySegment: estimatedFuel.teleFuelBySegment,
