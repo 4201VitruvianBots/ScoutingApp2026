@@ -76,6 +76,150 @@ function expectedPoints(entry: MatchIndividualDataAggregations) {
     return telePoints + autoPoints + autoTowerPoints + teleTowerPoints;
 }
 
+type TeamAutoPathTrace = NonNullable<MatchIndividualDataAggregations['autoPath']>;
+
+const autoFieldImageByAlliance = {
+    red: '/redsidematch.png',
+    blue: '/bluesidematch.png',
+} as const;
+
+function smoothPath(points: Array<{ x: number; y: number }>) {
+    if (points.length === 0) return '';
+    if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
+    if (points.length === 2) {
+        return `M ${points[0]!.x} ${points[0]!.y} L ${points[1]!.x} ${points[1]!.y}`;
+    }
+
+    let path = `M ${points[0]!.x} ${points[0]!.y}`;
+    for (let index = 1; index < points.length - 1; index++) {
+        const current = points[index]!;
+        const next = points[index + 1]!;
+        const midpointX = (current.x + next.x) / 2;
+        const midpointY = (current.y + next.y) / 2;
+        path += ` Q ${current.x} ${current.y} ${midpointX} ${midpointY}`;
+    }
+    const last = points[points.length - 1]!;
+    path += ` T ${last.x} ${last.y}`;
+    return path;
+}
+
+function buildDensityGrid(traces: TeamAutoPathTrace[], bins = 28) {
+    const values = Array.from({ length: bins * bins }, () => 0);
+    let max = 0;
+
+    const mark = (x: number, y: number) => {
+        const ix = Math.max(0, Math.min(bins - 1, Math.floor(x * bins)));
+        const iy = Math.max(0, Math.min(bins - 1, Math.floor(y * bins)));
+        const key = iy * bins + ix;
+        values[key] += 1;
+        if (values[key] > max) max = values[key];
+    };
+
+    traces.forEach(trace => {
+        for (let index = 0; index < trace.points.length; index++) {
+            const current = trace.points[index]!;
+            mark(current.x, current.y);
+
+            const next = trace.points[index + 1];
+            if (!next) continue;
+            const distance = Math.hypot(next.x - current.x, next.y - current.y);
+            const steps = Math.max(2, Math.ceil(distance * 90));
+            for (let step = 1; step < steps; step++) {
+                const ratio = step / steps;
+                mark(
+                    current.x + (next.x - current.x) * ratio,
+                    current.y + (next.y - current.y) * ratio
+                );
+            }
+        }
+    });
+
+    return { values, bins, max };
+}
+
+function AutoPathHeatmap({
+    traces,
+    alliance,
+}: {
+    traces: TeamAutoPathTrace[];
+    alliance: 'red' | 'blue';
+}) {
+    if (traces.length === 0) {
+        return <p className='text-sm text-gray-300'>No {alliance} auto paths logged.</p>;
+    }
+
+    const density = buildDensityGrid(traces);
+    const cellSize = 1000 / density.bins;
+
+    return (
+        <div className='space-y-2'>
+            <div className='relative overflow-hidden rounded-lg border border-white/15 bg-[#101826]'>
+                <img
+                    src={autoFieldImageByAlliance[alliance]}
+                    alt={`${alliance} field`}
+                    className='block w-full select-none'
+                    draggable={false}
+                />
+                <svg
+                    viewBox='0 0 1000 1000'
+                    preserveAspectRatio='none'
+                    className='pointer-events-none absolute inset-0'>
+                    {density.values.map((value, index) => {
+                        if (value === 0 || density.max === 0) return null;
+                        const intensity = value / density.max;
+                        const x = (index % density.bins) * cellSize;
+                        const y = Math.floor(index / density.bins) * cellSize;
+                        return (
+                            <rect
+                                key={`${alliance}-cell-${index}`}
+                                x={x}
+                                y={y}
+                                width={cellSize}
+                                height={cellSize}
+                                fill={`rgba(245, 158, 11, ${0.08 + intensity * 0.5})`}
+                            />
+                        );
+                    })}
+
+                    {traces.map((trace, index) => (
+                        <path
+                            key={`${trace.fingerprint}-${index}`}
+                            d={smoothPath(
+                                trace.points.map(point => ({
+                                    x: point.x * 1000,
+                                    y: point.y * 1000,
+                                }))
+                            )}
+                            fill='none'
+                            stroke='rgba(74, 163, 255, 0.38)'
+                            strokeWidth='6'
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        />
+                    ))}
+
+                    {traces.flatMap((trace, traceIndex) =>
+                        trace.shotMarkers.map((marker, markerIndex) => (
+                            <circle
+                                key={`${traceIndex}-shot-${markerIndex}`}
+                                cx={marker.x * 1000}
+                                cy={marker.y * 1000}
+                                r='8'
+                                fill='rgba(72, 197, 92, 0.95)'
+                                stroke='rgba(0,0,0,0.6)'
+                                strokeWidth='3'
+                            />
+                        ))
+                    )}
+                </svg>
+            </div>
+            <p className='text-xs text-gray-300'>
+                {traces.length} {alliance} traces
+            </p>
+        </div>
+    );
+}
+
 function TeamSummary({
     table,
     data,
@@ -102,6 +246,17 @@ function TeamSummary({
         .filter(entry => entry._id.teamNumber === table.teamNumber)
         .sort((a, b) => a._id.matchNumber - b._id.matchNumber);
 
+    const teamAutoPathTraces = teamMatchEntries
+        .map(entry => entry.autoPath)
+        .filter((path): path is TeamAutoPathTrace => path != null && path.points.length > 0);
+    const redAutoTraces = teamAutoPathTraces.filter(path => path.alliance === 'red');
+    const blueAutoTraces = teamAutoPathTraces.filter(path => path.alliance === 'blue');
+    const uniqueAutoPathCount = new Set(
+        teamAutoPathTraces.map(path =>
+            path.fingerprint || JSON.stringify(path.points.map(point => [point.x, point.y]))
+        )
+    ).size;
+
     const climbCounts = teamMatchEntries.reduce(
         (acc, entry) => {
             acc[entry.teleTower] = (acc[entry.teleTower] ?? 0) + 1;
@@ -125,11 +280,11 @@ function TeamSummary({
     );
 
     const climbChartData = [
-        { name: 'None', count: climbCounts.none ?? 0 },
+        { name: 'None', count: climbCounts.None ?? 0 },
         { name: 'L1', count: climbCounts.level1 ?? 0 },
         { name: 'L2', count: climbCounts.level2 ?? 0 },
         { name: 'L3', count: climbCounts.level3 ?? 0 },
-        { name: 'Fail', count: climbCounts.failed ?? 0 },
+        { name: 'Fail', count: climbCounts.Failed ?? 0 },
     ];
     const driverChartData = [
         { name: 'Great', count: driverCounts.great ?? 0 },
@@ -138,7 +293,7 @@ function TeamSummary({
         { name: 'Rough', count: driverCounts.rough ?? 0 },
     ];
     const breakdownChartData = [
-        { name: 'None', count: breakdownCounts.none ?? 0 },
+        { name: 'None', count: breakdownCounts.None ?? 0 },
         { name: 'Stuck', count: breakdownCounts.stuck ?? 0 },
         { name: 'Tipped', count: breakdownCounts.tipped ?? 0 },
         { name: 'Comms', count: breakdownCounts.comms ?? 0 },
@@ -171,7 +326,7 @@ function TeamSummary({
     );
 
     const defenseChartData = [
-        { name: 'None', count: defenseProvidedCounts.none ?? 0 },
+        { name: 'None', count: defenseProvidedCounts.None ?? 0 },
         { name: 'Some', count: defenseProvidedCounts.some ?? 0 },
         { name: 'Heavy', count: defenseProvidedCounts.heavy ?? 0 },
     ];
@@ -349,6 +504,21 @@ function TeamSummary({
                     </div>
                 </section>
             </div>
+
+            <section className='rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
+                    <h2 className='text-lg font-semibold text-[#48c55c]'>
+                        Auto Path Heatmap
+                    </h2>
+                    <p className='text-xs text-gray-300'>
+                        {uniqueAutoPathCount} unique / {teamAutoPathTraces.length} total traces
+                    </p>
+                </div>
+                <div className='mt-3 grid gap-4 lg:grid-cols-2'>
+                    <AutoPathHeatmap traces={redAutoTraces} alliance='red' />
+                    <AutoPathHeatmap traces={blueAutoTraces} alliance='blue' />
+                </div>
+            </section>
 
             <div className='grid gap-6 lg:grid-cols-2'>
                 <section className='rounded-xl border border-white/10 bg-[#2f3646] p-4 shadow-lg shadow-black/20'>

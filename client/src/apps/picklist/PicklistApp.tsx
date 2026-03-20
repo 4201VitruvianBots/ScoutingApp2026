@@ -29,7 +29,9 @@ import RadarGraphDialog from './components/RadarDialog';
 import RadarGraph from './components/RadarGraph';
 import {
     fakeMatchAgg,
+    fakeMatchIndividual,
     fakePitData,
+    fakeSuperIndividual,
     fakeSuperAgg,
     fakeTeamInfo,
 } from './fakeData';
@@ -144,8 +146,12 @@ function PicklistApp() {
     const superAggData = useFakeData ? fakeSuperAgg : superAgg ?? [];
     const pitDataValue = useFakeData ? fakePitData : pitData ?? {};
     const teamInfoValue = useFakeData ? fakeTeamInfo : teamInfo ?? {};
-    const matchIndividualData = useFakeData ? [] : matchIndividual ?? [];
-    const superIndividualData = useFakeData ? [] : superIndividual ?? [];
+    const matchIndividualData = useFakeData
+        ? fakeMatchIndividual
+        : matchIndividual ?? [];
+    const superIndividualData = useFakeData
+        ? fakeSuperIndividual
+        : superIndividual ?? [];
 
     const analyzedData: AnalysisEntry[] = buildAnalyzedData({
         matchAgg: matchAggData,

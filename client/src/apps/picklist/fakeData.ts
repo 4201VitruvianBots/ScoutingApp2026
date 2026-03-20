@@ -1,6 +1,8 @@
 import {
+    MatchIndividualDataAggregations,
     MatchDataAggregations,
     PitResult,
+    SuperIndividualDataAggregations,
     SuperDataAggregations,
     TeamData,
 } from 'requests';
@@ -46,6 +48,62 @@ type FakeSuperAggBase = Omit<
     | 'defenseNoneRate'
     | 'avgCommentTags'
 >;
+
+const fakeRobotPositions: MatchIndividualDataAggregations['_id']['robotPosition'][] = [
+    'red_1',
+    'blue_2',
+    'red_3',
+    'blue_1',
+];
+
+function clamp(value: number, minValue: number, maxValue: number) {
+    return Math.max(minValue, Math.min(value, maxValue));
+}
+
+function seededValue(seed: number) {
+    const x = Math.sin(seed * 12.9898) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+function makeFakeAutoPath(
+    teamNumber: number,
+    matchNumber: number,
+    robotPosition: MatchIndividualDataAggregations['_id']['robotPosition']
+): MatchIndividualDataAggregations['autoPath'] {
+    const alliance = robotPosition.startsWith('red') ? 'red' : 'blue';
+    const startX = alliance === 'red' ? 0.69 : 0.34;
+    const startY = 0.32 + seededValue(teamNumber + matchNumber) * 0.34;
+    const points = Array.from({ length: 14 }, (_, index) => {
+        const progress = index / 13;
+        const lateral =
+            (seededValue(teamNumber * 100 + matchNumber * 7 + index) - 0.5) * 0.08;
+        const towardCenter = alliance === 'red' ? -0.26 : 0.26;
+        return {
+            x: clamp(startX + towardCenter * progress + lateral, 0, 1),
+            y: clamp(startY + Math.sin(progress * Math.PI) * 0.12 + lateral * 0.3, 0, 1),
+            tSec: Math.round(progress * 20 * 100) / 100,
+        };
+    });
+    const shotMarkers = [
+        points[4],
+        points[9],
+    ].filter(
+        (
+            point
+        ): point is {
+            x: number;
+            y: number;
+            tSec: number;
+        } => point != null
+    );
+    return {
+        alliance,
+        startPosition: startY < 0.42 ? 'left' : startY < 0.58 ? 'center' : 'right',
+        points,
+        shotMarkers,
+        fingerprint: `fake-${teamNumber}-${matchNumber}-${alliance}`,
+    };
+}
 
 const fakeMatchAggBase: FakeMatchAggBase[] = [
     {
@@ -537,6 +595,136 @@ export const fakeSuperAgg: SuperDataAggregations[] = fakeSuperAggBase.map(
         };
     }
 );
+
+export const fakeMatchIndividual: MatchIndividualDataAggregations[] =
+    fakeMatchAgg.flatMap((entry, teamIndex) => {
+        return Array.from({ length: 4 }, (_, index) => {
+            const matchNumber = teamIndex * 4 + index + 1;
+            const robotPosition = fakeRobotPositions[index % fakeRobotPositions.length]!;
+            const autoPath = makeFakeAutoPath(
+                entry._id.teamNumber,
+                matchNumber,
+                robotPosition
+            );
+            const fallbackStartPosition =
+                index % 3 === 0 ? 'left' : index % 3 === 1 ? 'center' : 'right';
+            const teleScale = 0.82 + seededValue(matchNumber + teamIndex * 9) * 0.26;
+            const teleFuelBySegment = {
+                transition: Math.round(entry.avgTeleFuelTransition * teleScale * 10) / 10,
+                shift1: Math.round(entry.avgTeleFuelShift1 * teleScale * 10) / 10,
+                shift2: Math.round(entry.avgTeleFuelShift2 * teleScale * 10) / 10,
+                shift3: Math.round(entry.avgTeleFuelShift3 * teleScale * 10) / 10,
+                shift4: Math.round(entry.avgTeleFuelShift4 * teleScale * 10) / 10,
+                endgame: Math.round(entry.avgTeleFuelEndgame * teleScale * 10) / 10,
+            };
+            return {
+                _id: {
+                    teamNumber: entry._id.teamNumber,
+                    matchNumber,
+                    robotPosition,
+                },
+                scouterName: `Fake Scout ${(teamIndex % 6) + 1}`,
+                robotAbsent: false,
+                autoStartingPosition: autoPath?.startPosition ?? fallbackStartPosition,
+                autoPath,
+                autoMoved: true,
+                shootTimeBySegment: {
+                    auto: Math.round((1 + seededValue(matchNumber) * 2) * 100) / 100,
+                    transition: Math.round((0.6 + seededValue(matchNumber + 1) * 1.4) * 100) / 100,
+                    shift1: Math.round((1.2 + seededValue(matchNumber + 2) * 2.4) * 100) / 100,
+                    shift2: Math.round((1.4 + seededValue(matchNumber + 3) * 2.8) * 100) / 100,
+                    shift3: Math.round((1.2 + seededValue(matchNumber + 4) * 2.4) * 100) / 100,
+                    shift4: Math.round((1.0 + seededValue(matchNumber + 5) * 2.1) * 100) / 100,
+                    endgame: Math.round((0.7 + seededValue(matchNumber + 6) * 1.6) * 100) / 100,
+                },
+                passTimeBySegment: {
+                    auto: 0,
+                    transition: Math.round((0.2 + seededValue(matchNumber + 7) * 0.7) * 100) / 100,
+                    shift1: Math.round((0.5 + seededValue(matchNumber + 8) * 1.1) * 100) / 100,
+                    shift2: Math.round((0.6 + seededValue(matchNumber + 9) * 1.2) * 100) / 100,
+                    shift3: Math.round((0.5 + seededValue(matchNumber + 10) * 1.0) * 100) / 100,
+                    shift4: Math.round((0.4 + seededValue(matchNumber + 11) * 0.9) * 100) / 100,
+                    endgame: Math.round((0.2 + seededValue(matchNumber + 12) * 0.8) * 100) / 100,
+                },
+                ballsPerSecondUsed: 5,
+                autoFuelScored: Math.round(entry.avgAutoFuel * teleScale * 10) / 10,
+                autoFuelWinner: seededValue(matchNumber + teamIndex) > 0.5 ? 'red' : 'blue',
+                shift1ActiveHubIfTie: null,
+                teleFuelBySegment,
+                teleFuelActiveComputed:
+                    Math.round(entry.avgTeleFuelActiveComputed * teleScale * 10) / 10,
+                teleFuelWastedComputed:
+                    Math.round(entry.avgTeleFuelWastedComputed * teleScale * 10) / 10,
+                autoTower: seededValue(matchNumber + 33) > 0.7 ? 'level1' : 'None',
+                teleTower:
+                    seededValue(matchNumber + 20) > 0.72
+                        ? 'level3'
+                        : seededValue(matchNumber + 21) > 0.54
+                          ? 'level2'
+                          : seededValue(matchNumber + 22) > 0.3
+                            ? 'level1'
+                            : seededValue(matchNumber + 23) > 0.2
+                              ? 'Failed'
+                              : 'None',
+                climbTimeBucket:
+                    seededValue(matchNumber + 40) > 0.66
+                        ? 'late'
+                        : seededValue(matchNumber + 41) > 0.33
+                          ? 'mid'
+                          : 'early',
+                breakdown: seededValue(matchNumber + teamIndex * 3) > 0.9 ? 'comms' : 'None',
+                driverQuality:
+                    seededValue(matchNumber + 55) > 0.75
+                        ? 'great'
+                        : seededValue(matchNumber + 56) > 0.45
+                          ? 'good'
+                          : seededValue(matchNumber + 57) > 0.2
+                            ? 'ok'
+                            : 'rough',
+                defenseProvided:
+                    seededValue(matchNumber + 60) > 0.75
+                        ? 'heavy'
+                        : seededValue(matchNumber + 61) > 0.4
+                          ? 'some'
+                          : 'None',
+                defenseReceived: seededValue(matchNumber + 63) > 0.55,
+                fouls: {
+                    pinning: seededValue(matchNumber + 70) > 0.85 ? 1 : 0,
+                    towerContactInEndgame: seededValue(matchNumber + 71) > 0.9 ? 1 : 0,
+                    outOfZoneShooting: seededValue(matchNumber + 72) > 0.88 ? 1 : 0,
+                    ejectedFuel: seededValue(matchNumber + 73) > 0.9 ? 1 : 0,
+                    other: seededValue(matchNumber + 74) > 0.95 ? 1 : 0,
+                },
+                breaks: {
+                    mechanism: seededValue(matchNumber + 80) > 0.93 ? 1 : 0,
+                    battery: seededValue(matchNumber + 81) > 0.94 ? 1 : 0,
+                    comms: seededValue(matchNumber + 82) > 0.93 ? 1 : 0,
+                    bumper: seededValue(matchNumber + 83) > 0.93 ? 1 : 0,
+                },
+                comments: [],
+                freeText:
+                    seededValue(matchNumber + 91) > 0.65
+                        ? `Auto path looked clean in match ${matchNumber}.`
+                        : '',
+            };
+        });
+    });
+
+export const fakeSuperIndividual: SuperIndividualDataAggregations[] =
+    fakeMatchIndividual.map((entry, index) => ({
+        _id: {
+            teamNumber: entry._id.teamNumber,
+            matchNumber: entry._id.matchNumber,
+            robotPosition: entry._id.robotPosition,
+        },
+        scouterName: entry.scouterName,
+        defenseProvided: entry.defenseProvided,
+        defenseReceived: entry.defenseReceived,
+        fouls: entry.fouls,
+        breaks: entry.breaks,
+        comments: [],
+        humanPlayerFuelScored: Math.round((1 + seededValue(index + 101) * 5) * 10) / 10,
+    }));
 
 export const fakePitData: PitResult = {
     254: {

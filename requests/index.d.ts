@@ -83,6 +83,26 @@ export type AutoTowerResult = 'None' | 'level1' | 'Failed';
 export type TeleTowerResult = 'None' | 'level1' | 'level2' | 'level3' | 'Failed';
 export type AutoFuelWinner = AllianceColor | 'tie' | 'unknown';
 
+export interface AutoPathPoint {
+    x: number;
+    y: number;
+    tSec: number;
+}
+
+export interface AutoShotMarker {
+    x: number;
+    y: number;
+    tSec: number;
+}
+
+export interface AutoPathTrace {
+    alliance: AllianceColor;
+    startPosition: AutoStartingPosition | null;
+    points: AutoPathPoint[];
+    shotMarkers: AutoShotMarker[];
+    fingerprint: string;
+}
+
 export interface TeleFuelBySegment {
     transition: number;
     shift1: number;
@@ -116,6 +136,7 @@ export interface MatchData {
     metadata: MetaData;
     robotAbsent: boolean;
     autoStartingPosition: AutoStartingPosition | null;
+    autoPath: AutoPathTrace | null;
     autoMoved: boolean;
     shootTimeBySegment: ActionTimeBySegment;
     passTimeBySegment: ActionTimeBySegment;
@@ -264,6 +285,7 @@ export interface MatchIndividualDataAggregations {
     scouterName: string;
     robotAbsent: boolean;
     autoStartingPosition: AutoStartingPosition | null;
+    autoPath: AutoPathTrace | null;
     autoMoved: boolean;
     shootTimeBySegment: ActionTimeBySegment;
     passTimeBySegment: ActionTimeBySegment;

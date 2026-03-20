@@ -135,6 +135,10 @@ function getComments(entry: MatchData): CommentValues[] {
     return entry.comments ?? [];
 }
 
+function getAutoPath(entry: MatchData): MatchData['autoPath'] {
+    return entry.autoPath ?? null;
+}
+
 async function averageAndMax(): Promise<MatchDataAggregations[]> {
     const entries = (await matchApp.find().lean()) as MatchData[];
     const byTeam = new Map<number, MatchData[]>();
@@ -363,6 +367,7 @@ async function maxIndividual(): Promise<MatchIndividualDataAggregations[]> {
                 scouterName: entry.metadata.scouterName,
                 robotAbsent: entry.robotAbsent,
                 autoStartingPosition: entry.autoStartingPosition,
+                autoPath: getAutoPath(entry),
                 autoMoved: entry.autoMoved,
                 shootTimeBySegment: getActionTimeBySegment(
                     entry.shootTimeBySegment

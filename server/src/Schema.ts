@@ -38,6 +38,27 @@ const actionTimeBySegmentSchema = {
     endgame: { type: Number, default: 0 },
 };
 
+const autoPathPointSchema = {
+    x: { type: Number, required: true, min: 0, max: 1 },
+    y: { type: Number, required: true, min: 0, max: 1 },
+    tSec: { type: Number, required: true, min: 0 },
+};
+
+const autoPathTraceSchema = {
+    alliance: {
+        type: String,
+        enum: ['red', 'blue'],
+    },
+    startPosition: {
+        type: String,
+        enum: ['left', 'center', 'right', null],
+        default: null,
+    },
+    points: [autoPathPointSchema],
+    shotMarkers: [autoPathPointSchema],
+    fingerprint: { type: String, default: '' },
+};
+
 const teleFuelBySegmentSchema = {
     transition: { type: Number, default: 0 },
     shift1: { type: Number, default: 0 },
@@ -53,6 +74,10 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
     autoStartingPosition: {
         type: String,
         enum: ['left', 'center', 'right', null],
+        default: null,
+    },
+    autoPath: {
+        type: autoPathTraceSchema,
         default: null,
     },
     autoMoved: { type: Boolean, default: false },

@@ -13,7 +13,13 @@ import {
     matchOutlier,
 } from './aggregate.js';
 import { setUpSocket, updateMatchStatus } from './status.js';
-import { BallsPerSecondSetting, MatchData, PitFile, PitResult } from 'requests';
+import {
+    AllianceColor,
+    BallsPerSecondSetting,
+    MatchData,
+    PitFile,
+    PitResult,
+} from 'requests';
 import { dataUriToBuffer } from 'data-uri-to-buffer';
 
 // import { MatchData } from 'requests';
@@ -52,9 +58,142 @@ const emptyBreaks: MatchData['breaks'] = {
     comms: 0,
     bumper: 0,
 };
+const AUTO_PATH_MIN_POINT_DISTANCE = 0.003;
+
+type AutoPathTrace = NonNullable<MatchData['autoPath']>;
+type AutoPathPoint = AutoPathTrace['points'][number];
 
 function roundToHundredth(value: number) {
     return Math.round(value * 100) / 100;
+}
+
+function roundToTenThousandth(value: number) {
+    return Math.round(value * 10000) / 10000;
+}
+
+function clamp(value: number, minValue: number, maxValue: number) {
+    return Math.max(minValue, Math.min(value, maxValue));
+}
+
+function getAllianceFromPosition(
+    position: MatchData['metadata']['robotPosition']
+): AllianceColor {
+    return position.startsWith('red') ? 'red' : 'blue';
+}
+
+function normalizeAutoPoint(value: unknown): AutoPathPoint | null {
+    if (!value || typeof value !== 'object') return null;
+    const point = value as Partial<AutoPathPoint>;
+    const x = Number(point.x);
+    const y = Number(point.y);
+    const tSec = Number(point.tSec);
+    if (
+        !Number.isFinite(x) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(tSec)
+    ) {
+        return null;
+    }
+    return {
+        x: roundToTenThousandth(clamp(x, 0, 1)),
+        y: roundToTenThousandth(clamp(y, 0, 1)),
+        tSec: roundToHundredth(Math.max(tSec, 0)),
+    };
+}
+
+function dedupeSequentialPoints(points: AutoPathPoint[]) {
+    const deduped: AutoPathPoint[] = [];
+    points.forEach(point => {
+        const last = deduped[deduped.length - 1];
+        if (!last) {
+            deduped.push(point);
+            return;
+        }
+        const dx = point.x - last.x;
+        const dy = point.y - last.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (
+            distance < AUTO_PATH_MIN_POINT_DISTANCE &&
+            Math.abs(point.tSec - last.tSec) < 0.08
+        ) {
+            return;
+        }
+        deduped.push(point);
+    });
+    return deduped;
+}
+
+function hashString(input: string) {
+    let hash = 2166136261;
+    for (let index = 0; index < input.length; index++) {
+        hash ^= input.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function buildAutoPathFingerprint(
+    alliance: AllianceColor,
+    startPosition: MatchData['autoStartingPosition'],
+    points: AutoPathPoint[],
+    shotMarkers: AutoPathPoint[]
+) {
+    const pointsKey = points
+        .map(point => `${point.x},${point.y},${point.tSec}`)
+        .join('|');
+    const shotKey = shotMarkers
+        .map(point => `${point.x},${point.y},${point.tSec}`)
+        .join('|');
+    return hashString(
+        `${alliance};${startPosition ?? 'none'};${pointsKey};${shotKey}`
+    );
+}
+
+function normalizeAutoPath(
+    input: MatchData['autoPath'] | undefined,
+    fallbackAlliance: AllianceColor,
+    fallbackStartPosition: MatchData['autoStartingPosition']
+): MatchData['autoPath'] {
+    if (!input) return null;
+
+    const alliance =
+        input.alliance === 'red' || input.alliance === 'blue'
+            ? input.alliance
+            : fallbackAlliance;
+    const startPosition =
+        input.startPosition === 'left' ||
+        input.startPosition === 'center' ||
+        input.startPosition === 'right'
+            ? input.startPosition
+            : fallbackStartPosition ?? null;
+
+    const points = dedupeSequentialPoints(
+        (Array.isArray(input.points) ? input.points : [])
+            .map(normalizeAutoPoint)
+            .filter((point): point is AutoPathPoint => point !== null)
+    );
+    const shotMarkers = dedupeSequentialPoints(
+        (Array.isArray(input.shotMarkers) ? input.shotMarkers : [])
+            .map(normalizeAutoPoint)
+            .filter((point): point is AutoPathPoint => point !== null)
+    );
+
+    if (points.length === 0 && shotMarkers.length === 0) {
+        return null;
+    }
+
+    return {
+        alliance,
+        startPosition,
+        points,
+        shotMarkers,
+        fingerprint: buildAutoPathFingerprint(
+            alliance,
+            startPosition,
+            points,
+            shotMarkers
+        ),
+    };
 }
 
 function getActionTimeBySegment(
@@ -101,6 +240,12 @@ app.post('/data/match', async (req, res) => {
     const body = req.body as MatchData;
     const shootTimeBySegment = getActionTimeBySegment(body.shootTimeBySegment);
     const passTimeBySegment = getActionTimeBySegment(body.passTimeBySegment);
+    const fallbackAlliance = getAllianceFromPosition(body.metadata.robotPosition);
+    const normalizedAutoPath = normalizeAutoPath(
+        body.autoPath,
+        fallbackAlliance,
+        body.autoStartingPosition ?? null
+    );
     const ballsPerSecondUsed = await getBallsPerSecond(
         body.metadata.matchNumber,
         body.metadata.robotTeam
@@ -112,6 +257,8 @@ app.post('/data/match', async (req, res) => {
 
     const normalizedBody: MatchData = {
         ...body,
+        autoStartingPosition: body.autoStartingPosition ?? null,
+        autoPath: normalizedAutoPath,
         shootTimeBySegment,
         passTimeBySegment,
         ballsPerSecondUsed,
