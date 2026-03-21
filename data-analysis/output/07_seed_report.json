@@ -1,9 +1,0 @@
-{
-  "stage": "07_seed_fake_data",
-  "generatedAt": "2026-03-21T02:35:22.591331Z",
-  "matchCount": 432,
-  "pitCount": 36,
-  "seededMongo": false,
-  "fakeMatchPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\fake_match_source.json",
-  "fakePitPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\fake_pit_source.json"
-}
