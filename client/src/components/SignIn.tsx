@@ -11,20 +11,23 @@ function SignIn({
     onChangeRobotPosition,
     pitScouting,
     onSubmit,
+    robotPositionLocked,
 }: {
     scouterName: string;
     onChangeScouterName: Dispatch<string>;
     onSubmit: () => void;
 } & (
-    | {
+      | {
           pitScouting: true;
           robotPosition?: undefined;
           onChangeRobotPosition?: undefined;
+          robotPositionLocked?: undefined;
       }
-    | {
+      | {
           pitScouting?: false;
           robotPosition: RobotPosition | undefined;
           onChangeRobotPosition: Dispatch<RobotPosition>;
+          robotPositionLocked?: boolean;
       }
 )) {
     const [showCheck, setShowCheck] = useState(false);
@@ -43,6 +46,11 @@ function SignIn({
         const [alliance, slot] = position.split('_');
         return `${alliance.charAt(0).toUpperCase()}${alliance.slice(1)} ${slot}`;
     });
+    const formatPositionLabel = (position: RobotPosition | undefined) => {
+        if (!position) return 'Unassigned';
+        const [alliance, slot] = position.split('_');
+        return `${alliance.charAt(0).toUpperCase()}${alliance.slice(1)} ${slot}`;
+    };
     const unSelectedClassName = positions.map(position =>
         position.startsWith('blue')
             ? 'text-blue-500 bg-gray-300'
@@ -75,15 +83,22 @@ function SignIn({
             />
 
             {pitScouting ? undefined : (
-                <MultiButton
-                    onChange={onChangeRobotPosition}
-                    value={robotPosition}
-                    labels={labels}
-                    values={positions}
-                    className='text-xl'
-                    unSelectedClassName={unSelectedClassName}
-                    selectedClassName={selectedClassName}
-                />
+                robotPositionLocked ? (
+                    <div className='col-span-2 rounded-lg border border-[#48c55c]/40 bg-[#48c55c]/10 px-3 py-2 text-center text-sm text-white'>
+                        Assigned Position: {formatPositionLabel(robotPosition)} (Locked By
+                        Admin)
+                    </div>
+                ) : (
+                    <MultiButton
+                        onChange={onChangeRobotPosition}
+                        value={robotPosition}
+                        labels={labels}
+                        values={positions}
+                        className='text-xl'
+                        unSelectedClassName={unSelectedClassName}
+                        selectedClassName={selectedClassName}
+                    />
+                )
             )}
 
             <div

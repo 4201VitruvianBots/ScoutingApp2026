@@ -35,6 +35,9 @@ function ScouterCard({
                 <>
                     <div className=''>{scouter[0].matchNumber}</div>
                     <div>{scouter[0].scouterName}</div>
+                    <div className='mt-1 break-all text-[11px] text-gray-200'>
+                        {scouter[0].tabletId || 'Unknown Tablet'}
+                    </div>
                     <div>
                         {BatteryLevelIcon(
                             Math.floor((scouter[0].battery ?? 0) * 100)
@@ -55,7 +58,7 @@ function ScouterCard({
                     {scouter.map(entry => (
                         <div
                             key={`${entry.scouterName}-${entry.matchNumber ?? 'unknown'}`}>
-                            {entry.scouterName}
+                            {entry.scouterName} ({entry.tabletId || 'unknown'})
                         </div>
                     ))}
                 </>

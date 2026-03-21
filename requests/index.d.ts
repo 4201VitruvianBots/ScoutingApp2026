@@ -326,6 +326,7 @@ export interface matchOutliersAggregation {
 }
 
 export interface StatusReport {
+    tabletId: string;
     robotPosition: RobotPosition | undefined;
     matchNumber: number | undefined;
     scouterName: string;
@@ -351,6 +352,11 @@ export interface BallsPerSecondSetting {
 export interface AutoFieldOrientationSetting {
     side: AllianceColor;
     orientation: FieldOrientation;
+}
+
+export interface TabletAssignmentSetting {
+    tabletId: string;
+    robotPosition: RobotPosition;
 }
 
 export type MatchSchedule = Record<

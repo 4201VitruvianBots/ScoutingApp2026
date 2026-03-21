@@ -8,6 +8,7 @@ import {
     ballsPerSecondApp,
     matchApp,
     pitApp,
+    tabletAssignmentApp,
 } from './Schema.js';
 import {
     averageAndMax,
@@ -26,6 +27,8 @@ import {
     MatchData,
     PitFile,
     PitResult,
+    RobotPosition,
+    TabletAssignmentSetting,
 } from 'requests';
 import { dataUriToBuffer } from 'data-uri-to-buffer';
 import { gameConfig } from './gameConfig.js';
@@ -39,6 +42,17 @@ const defaultAutoFieldOrientation: Record<AllianceColor, FieldOrientation> = {
     red: 'orientation1',
     blue: 'orientation1',
 };
+const assignmentRobotPositions: RobotPosition[] = [
+    'red_1',
+    'red_2',
+    'red_3',
+    'blue_1',
+    'blue_2',
+    'blue_3',
+];
+const assignmentRobotPositionSet = new Set<RobotPosition>(
+    assignmentRobotPositions
+);
 
 const app = express();
 
@@ -582,6 +596,70 @@ app.post('/config/auto-field-orientation', async (req, res) => {
         side,
         orientation,
     } satisfies AutoFieldOrientationSetting);
+});
+
+app.get('/config/tablet-assignments', async (req, res) => {
+    const tabletIdQuery = String(req.query.tabletId ?? '').trim();
+    const entries = (await tabletAssignmentApp
+        .find()
+        .select('-_id -__v')
+        .lean()) as TabletAssignmentSetting[];
+
+    if (tabletIdQuery) {
+        const entry =
+            entries.find(current => current.tabletId === tabletIdQuery) ?? null;
+        res.send(entry);
+        return;
+    }
+
+    res.send(entries);
+});
+
+app.post('/config/tablet-assignments', async (req, res) => {
+    if (!Array.isArray(req.body)) {
+        res.status(400).send('Tablet assignments payload must be an array');
+        return;
+    }
+
+    const normalized: TabletAssignmentSetting[] = [];
+    const tabletIds = new Set<string>();
+    const robotPositions = new Set<RobotPosition>();
+
+    for (const row of req.body as Partial<TabletAssignmentSetting>[]) {
+        const tabletId = String(row.tabletId ?? '').trim();
+        const robotPosition = row.robotPosition;
+
+        if (!tabletId) {
+            res.status(400).send('Tablet assignment tabletId cannot be empty');
+            return;
+        }
+
+        if (!robotPosition || !assignmentRobotPositionSet.has(robotPosition)) {
+            res.status(400).send('Tablet assignment robotPosition is invalid');
+            return;
+        }
+
+        if (tabletIds.has(tabletId)) {
+            res.status(400).send(`Duplicate tabletId: ${tabletId}`);
+            return;
+        }
+
+        if (robotPositions.has(robotPosition)) {
+            res.status(400).send(`Duplicate robotPosition: ${robotPosition}`);
+            return;
+        }
+
+        tabletIds.add(tabletId);
+        robotPositions.add(robotPosition);
+        normalized.push({ tabletId, robotPosition });
+    }
+
+    await tabletAssignmentApp.deleteMany({});
+    if (normalized.length > 0) {
+        await tabletAssignmentApp.insertMany(normalized, { ordered: true });
+    }
+
+    res.send(normalized);
 });
 
 app.post('/data/pit', async (req, res) => {

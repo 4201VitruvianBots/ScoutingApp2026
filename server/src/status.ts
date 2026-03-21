@@ -102,6 +102,7 @@ function setUpSocket(expressApp: Application) {
     app.ws('/status/scouter', (ws, _req) => {
         // Create an object to hold the scouter info
         const scouter: StatusReport = {
+            tabletId: '',
             battery: undefined,
             matchNumber: undefined,
             robotPosition: undefined,

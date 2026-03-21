@@ -18,6 +18,7 @@ import {
     MatchData,
     MatchSchedule,
     RobotPosition,
+    TabletAssignmentSetting,
     TeleTowerResult,
 } from 'requests';
 import LinkButton from '../../components/LinkButton';
@@ -32,6 +33,7 @@ import HoldButton from '../../components/HoldButton';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import { usePreventUnload } from '../../lib/usePreventUnload';
+import { getOrCreateTabletId } from '../../lib/tabletId';
 import scheduleFile from '../../assets/matchSchedule.json';
 import { formatMatchTime, gameConfig } from '../../lib/gameConfig';
 
@@ -90,6 +92,14 @@ const matchTimelineSegments: MatchTimelineSegment[] = gameConfig.segments.map(
 );
 
 const schedule = scheduleFile as MatchSchedule;
+const assignmentRobotPositions = new Set<RobotPosition>([
+    'red_1',
+    'red_2',
+    'red_3',
+    'blue_1',
+    'blue_2',
+    'blue_3',
+]);
 
 const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
     { label: 'Left', value: 'left' },
@@ -403,10 +413,15 @@ function buildActionTimelineFromTicks(ticks: ActionTick[]): MatchData['actionTim
 function MatchApp() {
     usePreventUnload();
     const [sendQueue, sendAll, queue, sending] = useQueue();
+    const [tabletId] = useState(getOrCreateTabletId);
     const [teamNumber, setTeamNumber] = useState<number>();
     const [matchNumber, setMatchNumber] = useState<number>();
     const [scouterName, setScouterName] = useState('');
     const [robotPosition, setRobotPosition] = useState<RobotPosition>();
+    const [assignedRobotPosition, setAssignedRobotPosition] = useState<
+        RobotPosition | undefined
+    >();
+    const [assignmentLoaded, setAssignmentLoaded] = useState(false);
     const [showCheck, setShowCheck] = useState(false);
 
     const [robotAbsent, setRobotAbsent] = useState(false);
@@ -536,6 +551,7 @@ function MatchApp() {
         [actionTicks]
     );
 
+    const robotPositionLocked = assignedRobotPosition != undefined;
     const signInRequired = scouterName.trim() === '' || robotPosition == undefined;
     const canTrackActions = isRunning && !robotAbsent && remainingSec > 0;
     const sectionClass = 'rounded-2xl border border-white/10 bg-[#1d2433]/95 p-4 shadow-lg shadow-black/25';
@@ -553,7 +569,44 @@ function MatchApp() {
         );
     };
 
-    useStatus(robotPosition, matchNumber, scouterName);
+    useStatus(tabletId, robotPosition, matchNumber, scouterName);
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadTabletAssignment = async () => {
+            try {
+                const response = await fetch(
+                    `/config/tablet-assignments?tabletId=${encodeURIComponent(tabletId)}`
+                );
+                if (!response.ok) throw new Error('Failed to load tablet assignment');
+                const payload = (await response.json()) as TabletAssignmentSetting | null;
+                if (cancelled) return;
+
+                if (
+                    payload &&
+                    payload.tabletId === tabletId &&
+                    assignmentRobotPositions.has(payload.robotPosition)
+                ) {
+                    setAssignedRobotPosition(payload.robotPosition);
+                    setRobotPosition(payload.robotPosition);
+                    return;
+                }
+
+                setAssignedRobotPosition(undefined);
+            } catch {
+                // Keep current assignment state on transient fetch errors.
+            } finally {
+                if (!cancelled) setAssignmentLoaded(true);
+            }
+        };
+
+        loadTabletAssignment();
+        const interval = window.setInterval(loadTabletAssignment, 15000);
+        return () => {
+            cancelled = true;
+            window.clearInterval(interval);
+        };
+    }, [tabletId]);
 
     useEffect(() => {
         if (!schedule || !robotPosition || matchNumber == undefined) {
@@ -1040,6 +1093,14 @@ function MatchApp() {
                         <p className='mt-1 text-xs text-gray-400'>
                             {scouterName || 'Scouter not set'} {robotPosition ? `(${robotPosition})` : ''}
                         </p>
+                        <p className='text-[11px] text-gray-500'>
+                            Tablet ID: {tabletId}
+                            {!assignmentLoaded
+                                ? ' (loading assignment...)'
+                                : robotPositionLocked
+                                  ? ' (position locked)'
+                                  : ' (no assignment)'}
+                        </p>
                     </div>
 
                     <div className='flex items-center gap-2'>
@@ -1065,6 +1126,7 @@ function MatchApp() {
                                     onChangeScouterName={setScouterName}
                                     robotPosition={robotPosition}
                                     onChangeRobotPosition={setRobotPosition}
+                                    robotPositionLocked={robotPositionLocked}
                                     onSubmit={close}
                                 />
                             )}

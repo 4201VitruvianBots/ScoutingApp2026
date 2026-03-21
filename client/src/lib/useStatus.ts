@@ -3,6 +3,7 @@ import { RobotPosition, StatusReport, StatusRecieve } from 'requests';
 import { useBattery } from './useBattery';
 
 function useStatus(
+    tabletId: string,
     robotPosition: RobotPosition | undefined,
     matchNumber: number | undefined,
     scouterName: string
@@ -12,7 +13,7 @@ function useStatus(
     // Store the current status
     const battery = useBattery();
     const status = useRef<StatusReport>();
-    status.current = { robotPosition, matchNumber, scouterName, battery };
+    status.current = { tabletId, robotPosition, matchNumber, scouterName, battery };
 
     useEffect(() => {
         try {
@@ -47,7 +48,7 @@ function useStatus(
         if (socketRef.current?.readyState !== WebSocket.OPEN) return;
 
         socketRef.current?.send(JSON.stringify(status.current));
-    }, [matchNumber, robotPosition, scouterName, battery]);
+    }, [tabletId, matchNumber, robotPosition, scouterName, battery]);
 }
 
 function useStatusRecieve() {
