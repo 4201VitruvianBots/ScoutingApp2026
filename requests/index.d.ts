@@ -74,14 +74,12 @@ export interface GameConfig2026 {
 export interface MetaData {
     scouterName: string;
     matchNumber: number;
-    robotTeam?: number;
+    robotTeam: number;
     robotPosition: RobotPosition;
 }
 
 export type AutoStartingPosition = 'left' | 'center' | 'right';
-export type AutoTowerResult = 'None' | 'level1' | 'Failed';
 export type TeleTowerResult = 'None' | 'level1' | 'level2' | 'level3' | 'Failed';
-export type AutoFuelWinner = AllianceColor | 'tie' | 'unknown';
 export type FieldOrientation = 'orientation1' | 'orientation2';
 
 export interface AutoPathPoint {
@@ -149,49 +147,7 @@ export type BreakdownType =
 
 export type DriverQuality = 'great' | 'good' | 'ok' | 'rough';
 
-export interface MatchData {
-    metadata: MetaData;
-    robotAbsent: boolean;
-    autoStartingPosition: AutoStartingPosition | null;
-    autoPath: AutoPathTrace | null;
-    autoMoved: boolean;
-    shootTimeBySegment: ActionTimeBySegment;
-    passTimeBySegment: ActionTimeBySegment;
-    actionTimeline: MatchActionTimeline | null;
-    ballsPerSecondUsed: number;
-    autoFuelScored: number;
-    autoTower: AutoTowerResult;
-    autoFuelWinner: AutoFuelWinner;
-    shift1ActiveHubIfTie: AllianceColor | null;
-    teleFuelBySegment: TeleFuelBySegment;
-    teleTower: TeleTowerResult;
-    climbTimeBucket: 'early' | 'mid' | 'late' | null;
-    breakdown: BreakdownType;
-    driverQuality: DriverQuality;
-    defenseProvided: DefenseProvided;
-    defenseReceived: boolean;
-    fouls: SuperFouls;
-    breaks: SuperBreaks;
-    comments: CommentValues[];
-    freeText: string;
-}
-
 export type DefenseProvided = 'None' | 'some' | 'heavy';
-
-export interface SuperFouls {
-    pinning: number;
-    towerContactInEndgame: number;
-    outOfZoneShooting: number;
-    ejectedFuel: number;
-    other: number;
-}
-
-export interface SuperBreaks {
-    mechanism: number;
-    battery: number;
-    comms: number;
-    bumper: number;
-}
 
 export type CommentValues =
     | 'great_driving'
@@ -209,14 +165,40 @@ export type CommentValues =
     | 'slow_climb'
     | 'no_climb';
 
-export interface SuperData {
+export interface MatchFouls {
+    pinning: number;
+    towerContactInEndgame: number;
+    outOfZoneShooting: number;
+    ejectedFuel: number;
+    other: number;
+}
+
+export interface MatchBreaks {
+    mechanism: number;
+    battery: number;
+    comms: number;
+    bumper: number;
+}
+
+export interface MatchData {
     metadata: MetaData;
+    robotAbsent: boolean;
+    autoStartingPosition: AutoStartingPosition | null;
+    autoPath: AutoPathTrace | null;
+    shootTimeBySegment: ActionTimeBySegment;
+    passTimeBySegment: ActionTimeBySegment;
+    actionTimeline: MatchActionTimeline | null;
+    ballsPerSecondUsed: number;
+    autoFuelScored: number;
+    teleFuelBySegment: TeleFuelBySegment;
+    teleTower: TeleTowerResult;
+    breakdown: BreakdownType;
+    driverQuality: DriverQuality;
     defenseProvided: DefenseProvided;
     defenseReceived: boolean;
-    fouls: SuperFouls;
-    breaks: SuperBreaks;
-    comments: CommentValues[];
-    humanPlayerFuelScored: number;
+    fouls: MatchFouls;
+    breaks: MatchBreaks;
+    freeText: string;
 }
 
 export type Drivebase = 'tank' | 'swerve' | 'other';
@@ -256,14 +238,10 @@ export interface ScouterData {
 export interface MatchDataAggregations {
     _id: { teamNumber: number };
     avgAutoFuel: number;
-    autoMovedRate: number;
     autoStartingPositionLeftRate: number;
     autoStartingPositionCenterRate: number;
     autoStartingPositionRightRate: number;
     autoStartingPositionUnknownRate: number;
-    autoTowerAttemptRate: number;
-    autoTowerLevel1Rate: number;
-    autoTowerFailRate: number;
     avgTeleFuelTransition: number;
     avgTeleFuelShift1: number;
     avgTeleFuelShift2: number;
@@ -280,10 +258,6 @@ export interface MatchDataAggregations {
     climbFailRate: number;
     climbNoAttemptRate: number;
     climbAttemptRate: number;
-    climbTimeEarlyRate: number;
-    climbTimeMidRate: number;
-    climbTimeLateRate: number;
-    climbTimeKnownRate: number;
     driverQualityGreatRate: number;
     driverQualityGoodRate: number;
     driverQualityOkRate: number;
@@ -303,48 +277,12 @@ export interface MatchDataAggregations {
     avgShootIntervalDurationSec: number;
     avgPassIntervalDurationSec: number;
     avgShootCycleGapSec: number;
-    matchCount: number;
-}
-
-export interface MatchIndividualDataAggregations {
-    _id: { teamNumber: number; matchNumber: number; robotPosition: RobotPosition };
-    scouterName: string;
-    robotAbsent: boolean;
-    autoStartingPosition: AutoStartingPosition | null;
-    autoPath: AutoPathTrace | null;
-    autoMoved: boolean;
-    shootTimeBySegment: ActionTimeBySegment;
-    passTimeBySegment: ActionTimeBySegment;
-    actionTimeline: MatchActionTimeline | null;
-    ballsPerSecondUsed: number;
-    autoFuelScored: number;
-    autoFuelWinner: AutoFuelWinner;
-    shift1ActiveHubIfTie: AllianceColor | null;
-    teleFuelBySegment: TeleFuelBySegment;
-    teleFuelActiveComputed: number;
-    teleFuelWastedComputed: number;
-    autoTower: AutoTowerResult;
-    teleTower: TeleTowerResult;
-    climbTimeBucket: 'early' | 'mid' | 'late' | null;
-    breakdown: BreakdownType;
-    driverQuality: DriverQuality;
-    defenseProvided: DefenseProvided;
-    defenseReceived: boolean;
-    fouls: SuperFouls;
-    breaks: SuperBreaks;
-    comments: CommentValues[];
-    freeText: string;
-}
-
-export interface SuperDataAggregations {
-    _id: { teamNumber: number };
     avgFoulsTotal: number;
     foulRatePinning: number;
     foulRateTowerContactInEndgame: number;
     foulRateOutOfZoneShooting: number;
     foulRateEjectedFuel: number;
     foulRateOther: number;
-    avgHumanPlayerFuelScored: number;
     avgBreaksTotal: number;
     avgBreaksMechanism: number;
     avgBreaksBattery: number;
@@ -355,20 +293,32 @@ export interface SuperDataAggregations {
     defenseSomeRate: number;
     defenseNoneRate: number;
     defenseReceivedRate: number;
-    avgCommentTags: number;
     matchCount: number;
-    commentCounts: Partial<Record<CommentValues, number>>;
 }
 
-export interface SuperIndividualDataAggregations {
+export interface MatchIndividualDataAggregations {
     _id: { teamNumber: number; matchNumber: number; robotPosition: RobotPosition };
     scouterName: string;
+    robotAbsent: boolean;
+    autoStartingPosition: AutoStartingPosition | null;
+    autoPath: AutoPathTrace | null;
+    shootTimeBySegment: ActionTimeBySegment;
+    passTimeBySegment: ActionTimeBySegment;
+    actionTimeline: MatchActionTimeline | null;
+    ballsPerSecondUsed: number;
+    autoFuelScored: number;
+    teleFuelBySegment: TeleFuelBySegment;
+    teleFuelTotal: number;
+    teleFuelActiveComputed: number;
+    teleFuelWastedComputed: number;
+    teleTower: TeleTowerResult;
+    breakdown: BreakdownType;
+    driverQuality: DriverQuality;
     defenseProvided: DefenseProvided;
     defenseReceived: boolean;
-    fouls: SuperFouls;
-    breaks: SuperBreaks;
-    comments: CommentValues[];
-    humanPlayerFuelScored: number;
+    fouls: MatchFouls;
+    breaks: MatchBreaks;
+    freeText: string;
 }
 
 export interface matchOutliersAggregation {
@@ -407,6 +357,43 @@ export type MatchSchedule = Record<
     number,
     Partial<Record<RobotPosition, number>>
 >;
+
+export interface TeamTimelineHeatBin {
+    second: number;
+    binEndSec: number;
+    shootRate: number;
+    passRate: number;
+    activityRate: number;
+    [metric: string]: number;
+}
+
+export interface TeamTimelineRow {
+    matchNumber: number;
+    intervals: ActionInterval[];
+}
+
+export interface TeamProfilePayload {
+    teamNumber: number;
+    matchCount: number;
+    score: number;
+    metricContributions: Record<string, number>;
+    metrics: Record<string, number | string>;
+    timeline: {
+        totalSec: number;
+        binSec: number;
+        autoEndSec: number;
+        delayEndSec: number;
+        bins: TeamTimelineHeatBin[];
+        rows: TeamTimelineRow[];
+    };
+    autoPaths: AutoPathTrace[];
+}
+
+export interface PicklistPayload {
+    generatedAt: string;
+    sourceMode: 'mongo' | 'fake';
+    teams: TeamProfilePayload[];
+}
 
 export interface TeamInfo {
     address: null;

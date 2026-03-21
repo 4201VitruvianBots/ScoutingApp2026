@@ -9,7 +9,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import { SuperIndividualDataAggregations } from 'requests';
+import { MatchIndividualDataAggregations } from 'requests';
 
 type ChartRow = {
     match: number;
@@ -24,7 +24,7 @@ function SuperBreaksPerMatchChart({
     teamNumber,
     height = 280,
 }: {
-    data: SuperIndividualDataAggregations[];
+    data: MatchIndividualDataAggregations[];
     teamNumber?: number;
     height?: number;
 }) {

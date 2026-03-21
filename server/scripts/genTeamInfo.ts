@@ -39,10 +39,37 @@ dotenvLoad({ path: '.env' });
 dotenvLoad({ path: '.env.local' });
 const apiKey = process.env.API_KEY!;
 
-// Get every team number in the output_analysis.json file
-const teams = JSON.parse(
-    fs.readFileSync('static/output_analysis.json', 'utf-8')
-).map((e: { teamNumber: number }) => e.teamNumber) as number[];
+function loadTeamNumbers() {
+    const candidateSources = [
+        '../data-analysis/output/06_team_profiles.json',
+        'static/output_analysis.json',
+    ];
+
+    for (const sourcePath of candidateSources) {
+        if (!fs.existsSync(sourcePath)) {
+            continue;
+        }
+
+        const rows = JSON.parse(fs.readFileSync(sourcePath, 'utf-8')) as Array<{
+            teamNumber?: number;
+        }>;
+        const teams = rows
+            .map(row => Number(row.teamNumber))
+            .filter(teamNumber => Number.isFinite(teamNumber) && teamNumber > 0)
+            .sort((a, b) => a - b);
+
+        if (teams.length > 0) {
+            console.log(`Using team source: ${sourcePath}`);
+            return teams;
+        }
+    }
+
+    throw new Error(
+        'No team source file found. Run data-analysis/run_pipeline.py first or provide static/output_analysis.json.'
+    );
+}
+
+const teams = loadTeamNumbers();
 
 // Create a teamColors object to store the color for each team
 const teamInfo: TeamData = {};

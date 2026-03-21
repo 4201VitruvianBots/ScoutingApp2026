@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import chalk from 'chalk';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import {
@@ -10,11 +11,9 @@ import {
 } from './Schema.js';
 import {
     averageAndMax,
-    superAverageAndMax,
     robotImageDisplay,
     scouterRankings,
     maxIndividual,
-    superMaxIndividual,
     matchOutlier,
 } from './aggregate.js';
 import { setUpSocket, updateMatchStatus } from './status.js';
@@ -418,6 +417,16 @@ async function getAutoFieldOrientationMap() {
 
 app.post('/data/match', async (req, res) => {
     const body = req.body as MatchData;
+    if (
+        !body?.metadata ||
+        !Number.isFinite(body.metadata.matchNumber) ||
+        !Number.isFinite(body.metadata.robotTeam) ||
+        !body.metadata.robotPosition
+    ) {
+        res.status(400).send('Invalid match payload metadata');
+        return;
+    }
+
     const normalizedActionTimeline = normalizeActionTimeline(body.actionTimeline);
     const shootTimeBySegment = normalizedActionTimeline
         ? getActionTimeBySegmentFromTimeline(normalizedActionTimeline, 'shoot')
@@ -460,7 +469,6 @@ app.post('/data/match', async (req, res) => {
             ...emptyBreaks,
             ...(body.breaks ?? {}),
         },
-        comments: body.comments ?? [],
         freeText: body.freeText ?? '',
     };
 
@@ -604,20 +612,23 @@ app.get('/data/retrieve', async (req, res) => {
 app.get('/data/retrieve/individualMatch', async (req, res) => {
     res.send(await maxIndividual());
 });
-//:)
-
-app.get('/data/retrieve/super', async (req, res) => {
-    res.send(await superAverageAndMax());
-});
 
 app.get('/data/retrieve/matchOutlier', async (req, res) => {
     res.send(await matchOutlier());
 });
 
-app.get('/data/retrieve/individualSuper', async (req, res) => {
-    res.send(await superMaxIndividual());
+app.get('/data/retrieve/analyzed', async (_req, res) => {
+    const payloadPath = path.resolve('../data-analysis/output/06_picklist_payload.json');
+    try {
+        const payloadRaw = await fs.promises.readFile(payloadPath, 'utf8');
+        res.type('application/json').send(payloadRaw);
+    } catch {
+        res.status(404).send({
+            message: 'Analyzed payload not found. Run data-analysis/run_pipeline.py first.',
+            path: payloadPath,
+        });
+    }
 });
-//:)
 
 app.get('/data/retrieve/scouter', async (req, res) => {
     res.send(await scouterRankings());

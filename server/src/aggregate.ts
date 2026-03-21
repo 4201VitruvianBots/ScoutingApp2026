@@ -1,14 +1,11 @@
 import {
     AllianceColor,
-    CommentValues,
     MatchData,
     MatchDataAggregations,
     MatchIndividualDataAggregations,
+    MatchBreaks,
+    MatchFouls,
     RobotPosition,
-    SuperBreaks,
-    SuperDataAggregations,
-    SuperFouls,
-    SuperIndividualDataAggregations,
     matchOutliersAggregation,
     ScouterData,
 } from 'requests';
@@ -18,64 +15,7 @@ function getAllianceFromPosition(position: RobotPosition): AllianceColor {
     return position.startsWith('red') ? 'red' : 'blue';
 }
 
-function flipAlliance(color: AllianceColor): AllianceColor {
-    return color === 'red' ? 'blue' : 'red';
-}
-
-function getShift1ActiveHub(
-    autoFuelWinner: MatchData['autoFuelWinner'],
-    shift1ActiveHubIfTie: MatchData['shift1ActiveHubIfTie']
-): AllianceColor | null {
-    if (autoFuelWinner === 'red' || autoFuelWinner === 'blue') {
-        return autoFuelWinner;
-    }
-    if (autoFuelWinner === 'tie') {
-        return shift1ActiveHubIfTie ?? null;
-    }
-    return null;
-}
-
-function computeTeleFuelActiveWasted(entry: MatchData) {
-    const shift1Active = getShift1ActiveHub(
-        entry.autoFuelWinner,
-        entry.shift1ActiveHubIfTie
-    );
-    const alliance = getAllianceFromPosition(entry.metadata.robotPosition);
-    const shift2Active = shift1Active ? flipAlliance(shift1Active) : null;
-    const shift3Active = shift1Active ?? null;
-    const shift4Active = shift1Active ? flipAlliance(shift1Active) : null;
-
-    const shiftMap: Record<
-        'shift1' | 'shift2' | 'shift3' | 'shift4',
-        AllianceColor | null
-    > = {
-        shift1: shift1Active,
-        shift2: shift2Active,
-        shift3: shift3Active,
-        shift4: shift4Active,
-    };
-
-    let active = entry.teleFuelBySegment.transition + entry.teleFuelBySegment.endgame;
-    let wasted = 0;
-
-    (Object.keys(shiftMap) as Array<keyof typeof shiftMap>).forEach(
-        shiftKey => {
-            const activeHub = shiftMap[shiftKey];
-            if (!activeHub) {
-                return;
-            }
-            if (activeHub === alliance) {
-                active += entry.teleFuelBySegment[shiftKey];
-            } else {
-                wasted += entry.teleFuelBySegment[shiftKey];
-            }
-        }
-    );
-
-    return { active, wasted };
-}
-
-const emptyFouls: SuperFouls = {
+const emptyFouls: MatchFouls = {
     pinning: 0,
     towerContactInEndgame: 0,
     outOfZoneShooting: 0,
@@ -83,7 +23,7 @@ const emptyFouls: SuperFouls = {
     other: 0,
 };
 
-const emptyBreaks: SuperBreaks = {
+const emptyBreaks: MatchBreaks = {
     mechanism: 0,
     battery: 0,
     comms: 0,
@@ -109,18 +49,29 @@ function getActionTimeBySegment(
     };
 }
 
-function getFouls(entry: MatchData): SuperFouls {
+function getFouls(entry: MatchData): MatchFouls {
     return {
         ...emptyFouls,
         ...(entry.fouls ?? {}),
     };
 }
 
-function getBreaks(entry: MatchData): SuperBreaks {
+function getBreaks(entry: MatchData): MatchBreaks {
     return {
         ...emptyBreaks,
         ...(entry.breaks ?? {}),
     };
+}
+
+function getTeleFuelTotal(entry: MatchData) {
+    return (
+        entry.teleFuelBySegment.transition +
+        entry.teleFuelBySegment.shift1 +
+        entry.teleFuelBySegment.shift2 +
+        entry.teleFuelBySegment.shift3 +
+        entry.teleFuelBySegment.shift4 +
+        entry.teleFuelBySegment.endgame
+    );
 }
 
 function getDefenseProvided(entry: MatchData): MatchData['defenseProvided'] {
@@ -129,10 +80,6 @@ function getDefenseProvided(entry: MatchData): MatchData['defenseProvided'] {
 
 function getDefenseReceived(entry: MatchData): boolean {
     return entry.defenseReceived ?? false;
-}
-
-function getComments(entry: MatchData): CommentValues[] {
-    return entry.comments ?? [];
 }
 
 function getAutoPath(entry: MatchData): MatchData['autoPath'] {
@@ -181,14 +128,10 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             return {
                 _id: { teamNumber },
                 avgAutoFuel: 0,
-                autoMovedRate: 0,
                 autoStartingPositionLeftRate: 0,
                 autoStartingPositionCenterRate: 0,
                 autoStartingPositionRightRate: 0,
                 autoStartingPositionUnknownRate: 0,
-                autoTowerAttemptRate: 0,
-                autoTowerLevel1Rate: 0,
-                autoTowerFailRate: 0,
                 avgTeleFuelTransition: 0,
                 avgTeleFuelShift1: 0,
                 avgTeleFuelShift2: 0,
@@ -205,10 +148,6 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
                 climbFailRate: 0,
                 climbNoAttemptRate: 0,
                 climbAttemptRate: 0,
-                climbTimeEarlyRate: 0,
-                climbTimeMidRate: 0,
-                climbTimeLateRate: 0,
-                climbTimeKnownRate: 0,
                 driverQualityGreatRate: 0,
                 driverQualityGoodRate: 0,
                 driverQualityOkRate: 0,
@@ -228,19 +167,31 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
                 avgShootIntervalDurationSec: 0,
                 avgPassIntervalDurationSec: 0,
                 avgShootCycleGapSec: 0,
+                avgFoulsTotal: 0,
+                foulRatePinning: 0,
+                foulRateTowerContactInEndgame: 0,
+                foulRateOutOfZoneShooting: 0,
+                foulRateEjectedFuel: 0,
+                foulRateOther: 0,
+                avgBreaksTotal: 0,
+                avgBreaksMechanism: 0,
+                avgBreaksBattery: 0,
+                avgBreaksComms: 0,
+                avgBreaksBumper: 0,
+                breakRateAny: 0,
+                defenseHeavyRate: 0,
+                defenseSomeRate: 0,
+                defenseNoneRate: 0,
+                defenseReceivedRate: 0,
                 matchCount: 0,
             };
         }
 
         let autoFuel = 0;
-        let autoMoved = 0;
         let autoStartLeft = 0;
         let autoStartCenter = 0;
         let autoStartRight = 0;
         let autoStartUnknown = 0;
-        let autoTowerAttempt = 0;
-        let autoTowerL1 = 0;
-        let autoTowerFail = 0;
         let teleTransition = 0;
         let teleShift1 = 0;
         let teleShift2 = 0;
@@ -254,9 +205,6 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
         let climbL3 = 0;
         let climbFail = 0;
         let climbNone = 0;
-        let climbTimeEarly = 0;
-        let climbTimeMid = 0;
-        let climbTimeLate = 0;
         let driverGreat = 0;
         let driverGood = 0;
         let driverOk = 0;
@@ -280,17 +228,28 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
         let shootCycleGapMedianSum = 0;
         let shootCycleGapMatchCount = 0;
 
+        let pinning = 0;
+        let towerContact = 0;
+        let outOfZone = 0;
+        let ejectedFuel = 0;
+        let other = 0;
+        let breaksMechanism = 0;
+        let breaksBattery = 0;
+        let breaksComms = 0;
+        let breaksBumper = 0;
+        let breaksAny = 0;
+        let heavyDefense = 0;
+        let someDefense = 0;
+        let noneDefense = 0;
+        let defenseReceived = 0;
+
         validEntries.forEach(entry => {
             autoFuel += entry.autoFuelScored;
-            if (entry.autoMoved) autoMoved += 1;
+
             if (entry.autoStartingPosition === 'left') autoStartLeft += 1;
             if (entry.autoStartingPosition === 'center') autoStartCenter += 1;
             if (entry.autoStartingPosition === 'right') autoStartRight += 1;
             if (entry.autoStartingPosition === null) autoStartUnknown += 1;
-
-            if (entry.autoTower !== 'None') autoTowerAttempt += 1;
-            if (entry.autoTower === 'level1') autoTowerL1 += 1;
-            if (entry.autoTower === 'Failed') autoTowerFail += 1;
 
             teleTransition += entry.teleFuelBySegment.transition;
             teleShift1 += entry.teleFuelBySegment.shift1;
@@ -299,19 +258,15 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             teleShift4 += entry.teleFuelBySegment.shift4;
             teleEndgame += entry.teleFuelBySegment.endgame;
 
-            const computed = computeTeleFuelActiveWasted(entry);
-            teleActive += computed.active;
-            teleWasted += computed.wasted;
+            const teleTotal = getTeleFuelTotal(entry);
+            teleActive += teleTotal;
+            teleWasted += 0;
 
             if (entry.teleTower === 'level1') climbL1 += 1;
             if (entry.teleTower === 'level2') climbL2 += 1;
             if (entry.teleTower === 'level3') climbL3 += 1;
             if (entry.teleTower === 'Failed') climbFail += 1;
             if (entry.teleTower === 'None') climbNone += 1;
-
-            if (entry.climbTimeBucket === 'early') climbTimeEarly += 1;
-            if (entry.climbTimeBucket === 'mid') climbTimeMid += 1;
-            if (entry.climbTimeBucket === 'late') climbTimeLate += 1;
 
             if (entry.driverQuality === 'great') {
                 driverGreat += 1;
@@ -327,7 +282,6 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             }
             if (entry.driverQuality === 'rough') {
                 driverRough += 1;
-                driverQualityScoreSum += 0;
             }
 
             if (entry.breakdown !== 'None') breakdown += 1;
@@ -336,6 +290,34 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             if (entry.breakdown === 'comms') breakdownComms += 1;
             if (entry.breakdown === 'mechanism') breakdownMechanism += 1;
             if (entry.breakdown === 'other') breakdownOther += 1;
+
+            const fouls = getFouls(entry);
+            const breaks = getBreaks(entry);
+            const defenseProvided = getDefenseProvided(entry);
+            const defenseReceivedForEntry = getDefenseReceived(entry);
+
+            pinning += fouls.pinning;
+            towerContact += fouls.towerContactInEndgame;
+            outOfZone += fouls.outOfZoneShooting;
+            ejectedFuel += fouls.ejectedFuel;
+            other += fouls.other;
+
+            breaksMechanism += breaks.mechanism;
+            breaksBattery += breaks.battery;
+            breaksComms += breaks.comms;
+            breaksBumper += breaks.bumper;
+
+            const breakTotal =
+                breaks.mechanism +
+                breaks.battery +
+                breaks.comms +
+                breaks.bumper;
+            if (breakTotal > 0) breaksAny += 1;
+
+            if (defenseProvided === 'heavy') heavyDefense += 1;
+            if (defenseProvided === 'some') someDefense += 1;
+            if (defenseProvided === 'None') noneDefense += 1;
+            if (defenseReceivedForEntry) defenseReceived += 1;
 
             const actionTimeline = getActionTimeline(entry);
             if (!actionTimeline) {
@@ -401,17 +383,17 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             teleShift4 +
             teleEndgame;
 
+        const totalFouls = pinning + towerContact + outOfZone + ejectedFuel + other;
+        const totalBreaks =
+            breaksMechanism + breaksBattery + breaksComms + breaksBumper;
+
         return {
             _id: { teamNumber },
             avgAutoFuel: autoFuel / matchCount,
-            autoMovedRate: autoMoved / matchCount,
             autoStartingPositionLeftRate: autoStartLeft / matchCount,
             autoStartingPositionCenterRate: autoStartCenter / matchCount,
             autoStartingPositionRightRate: autoStartRight / matchCount,
             autoStartingPositionUnknownRate: autoStartUnknown / matchCount,
-            autoTowerAttemptRate: autoTowerAttempt / matchCount,
-            autoTowerLevel1Rate: autoTowerL1 / matchCount,
-            autoTowerFailRate: autoTowerFail / matchCount,
             avgTeleFuelTransition: teleTransition / matchCount,
             avgTeleFuelShift1: teleShift1 / matchCount,
             avgTeleFuelShift2: teleShift2 / matchCount,
@@ -429,11 +411,6 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             climbNoAttemptRate: climbNone / matchCount,
             climbAttemptRate:
                 (climbL1 + climbL2 + climbL3 + climbFail) / matchCount,
-            climbTimeEarlyRate: climbTimeEarly / matchCount,
-            climbTimeMidRate: climbTimeMid / matchCount,
-            climbTimeLateRate: climbTimeLate / matchCount,
-            climbTimeKnownRate:
-                (climbTimeEarly + climbTimeMid + climbTimeLate) / matchCount,
             driverQualityGreatRate: driverGreat / matchCount,
             driverQualityGoodRate: driverGood / matchCount,
             driverQualityOkRate: driverOk / matchCount,
@@ -472,162 +449,12 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
                 shootCycleGapMatchCount === 0
                     ? 0
                     : shootCycleGapMedianSum / shootCycleGapMatchCount,
-            matchCount,
-        };
-    });
-}
-
-async function maxIndividual(): Promise<MatchIndividualDataAggregations[]> {
-    const entries = (await matchApp.find().lean()) as MatchData[];
-    return entries
-        .filter(entry => entry.metadata.robotTeam)
-        .map(entry => {
-            const computed = computeTeleFuelActiveWasted(entry);
-            return {
-                _id: {
-                    teamNumber: entry.metadata.robotTeam!,
-                    matchNumber: entry.metadata.matchNumber,
-                    robotPosition: entry.metadata.robotPosition,
-                },
-                scouterName: entry.metadata.scouterName,
-                robotAbsent: entry.robotAbsent,
-                autoStartingPosition: entry.autoStartingPosition,
-                autoPath: getAutoPath(entry),
-                autoMoved: entry.autoMoved,
-                shootTimeBySegment: getActionTimeBySegment(
-                    entry.shootTimeBySegment
-                ),
-                passTimeBySegment: getActionTimeBySegment(
-                    entry.passTimeBySegment
-                ),
-                actionTimeline: getActionTimeline(entry),
-                ballsPerSecondUsed: entry.ballsPerSecondUsed ?? 0,
-                autoFuelScored: entry.autoFuelScored,
-                autoFuelWinner: entry.autoFuelWinner,
-                shift1ActiveHubIfTie: entry.shift1ActiveHubIfTie,
-                teleFuelBySegment: entry.teleFuelBySegment,
-                teleFuelActiveComputed: computed.active,
-                teleFuelWastedComputed: computed.wasted,
-                autoTower: entry.autoTower,
-                teleTower: entry.teleTower,
-                climbTimeBucket: entry.climbTimeBucket,
-                breakdown: entry.breakdown,
-                driverQuality: entry.driverQuality,
-                defenseProvided: getDefenseProvided(entry),
-                defenseReceived: getDefenseReceived(entry),
-                fouls: getFouls(entry),
-                breaks: getBreaks(entry),
-                comments: getComments(entry),
-                freeText: entry.freeText,
-            };
-        });
-}
-
-async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
-    const entries = (await matchApp.find().lean()) as MatchData[];
-    const byTeam = new Map<number, MatchData[]>();
-
-    entries.forEach(entry => {
-        if (!entry.metadata.robotTeam || entry.robotAbsent) return;
-        const teamEntries = byTeam.get(entry.metadata.robotTeam) ?? [];
-        teamEntries.push(entry);
-        byTeam.set(entry.metadata.robotTeam, teamEntries);
-    });
-
-    return Array.from(byTeam.entries()).map(([teamNumber, teamEntries]) => {
-        const matchCount = teamEntries.length;
-        if (matchCount === 0) {
-            return {
-                _id: { teamNumber },
-                avgFoulsTotal: 0,
-                foulRatePinning: 0,
-                foulRateTowerContactInEndgame: 0,
-                foulRateOutOfZoneShooting: 0,
-                foulRateEjectedFuel: 0,
-                foulRateOther: 0,
-                avgHumanPlayerFuelScored: 0,
-                avgBreaksTotal: 0,
-                avgBreaksMechanism: 0,
-                avgBreaksBattery: 0,
-                avgBreaksComms: 0,
-                avgBreaksBumper: 0,
-                breakRateAny: 0,
-                defenseHeavyRate: 0,
-                defenseSomeRate: 0,
-                defenseNoneRate: 0,
-                defenseReceivedRate: 0,
-                avgCommentTags: 0,
-                matchCount: 0,
-                commentCounts: {},
-            };
-        }
-
-        let pinning = 0;
-        let towerContact = 0;
-        let outOfZone = 0;
-        let ejectedFuel = 0;
-        let other = 0;
-        let humanFuel = 0;
-        let breaksMechanism = 0;
-        let breaksBattery = 0;
-        let breaksComms = 0;
-        let breaksBumper = 0;
-        let breaksAny = 0;
-        let heavyDefense = 0;
-        let someDefense = 0;
-        let noneDefense = 0;
-        let defenseReceived = 0;
-        let totalCommentTags = 0;
-        const commentCounts: Partial<Record<CommentValues, number>> = {};
-
-        teamEntries.forEach(entry => {
-            const fouls = getFouls(entry);
-            const breaks = getBreaks(entry);
-            const defenseProvided = getDefenseProvided(entry);
-            const defenseReceivedForEntry = getDefenseReceived(entry);
-            const comments = getComments(entry);
-
-            pinning += fouls.pinning;
-            towerContact += fouls.towerContactInEndgame;
-            outOfZone += fouls.outOfZoneShooting;
-            ejectedFuel += fouls.ejectedFuel;
-            other += fouls.other;
-            humanFuel += 0;
-
-            breaksMechanism += breaks.mechanism;
-            breaksBattery += breaks.battery;
-            breaksComms += breaks.comms;
-            breaksBumper += breaks.bumper;
-            const breakTotal =
-                breaks.mechanism +
-                breaks.battery +
-                breaks.comms +
-                breaks.bumper;
-            if (breakTotal > 0) breaksAny += 1;
-
-            if (defenseProvided === 'heavy') heavyDefense += 1;
-            if (defenseProvided === 'some') someDefense += 1;
-            if (defenseProvided === 'None') noneDefense += 1;
-            if (defenseReceivedForEntry) defenseReceived += 1;
-            totalCommentTags += comments.length;
-            comments.forEach(comment => {
-                commentCounts[comment] = (commentCounts[comment] ?? 0) + 1;
-            });
-        });
-
-        const totalFouls = pinning + towerContact + outOfZone + ejectedFuel + other;
-        const totalBreaks =
-            breaksMechanism + breaksBattery + breaksComms + breaksBumper;
-
-        return {
-            _id: { teamNumber },
             avgFoulsTotal: totalFouls / matchCount,
             foulRatePinning: pinning / matchCount,
             foulRateTowerContactInEndgame: towerContact / matchCount,
             foulRateOutOfZoneShooting: outOfZone / matchCount,
             foulRateEjectedFuel: ejectedFuel / matchCount,
             foulRateOther: other / matchCount,
-            avgHumanPlayerFuelScored: humanFuel / matchCount,
             avgBreaksTotal: totalBreaks / matchCount,
             avgBreaksMechanism: breaksMechanism / matchCount,
             avgBreaksBattery: breaksBattery / matchCount,
@@ -638,31 +465,50 @@ async function superAverageAndMax(): Promise<SuperDataAggregations[]> {
             defenseSomeRate: someDefense / matchCount,
             defenseNoneRate: noneDefense / matchCount,
             defenseReceivedRate: defenseReceived / matchCount,
-            avgCommentTags: totalCommentTags / matchCount,
             matchCount,
-            commentCounts,
         };
     });
 }
 
-async function superMaxIndividual(): Promise<SuperIndividualDataAggregations[]> {
+async function maxIndividual(): Promise<MatchIndividualDataAggregations[]> {
     const entries = (await matchApp.find().lean()) as MatchData[];
     return entries
-        .filter(entry => entry.metadata.robotTeam && !entry.robotAbsent)
-        .map(entry => ({
-            _id: {
-                teamNumber: entry.metadata.robotTeam!,
-                matchNumber: entry.metadata.matchNumber,
-                robotPosition: entry.metadata.robotPosition,
-            },
-            scouterName: entry.metadata.scouterName,
-            defenseProvided: getDefenseProvided(entry),
-            defenseReceived: getDefenseReceived(entry),
-            fouls: getFouls(entry),
-            breaks: getBreaks(entry),
-            comments: getComments(entry),
-            humanPlayerFuelScored: 0,
-        }));
+        .filter(entry => entry.metadata.robotTeam)
+        .map(entry => {
+            const teleFuelTotal = getTeleFuelTotal(entry);
+            return {
+                _id: {
+                    teamNumber: entry.metadata.robotTeam,
+                    matchNumber: entry.metadata.matchNumber,
+                    robotPosition: entry.metadata.robotPosition,
+                },
+                scouterName: entry.metadata.scouterName,
+                robotAbsent: entry.robotAbsent,
+                autoStartingPosition: entry.autoStartingPosition,
+                autoPath: getAutoPath(entry),
+                shootTimeBySegment: getActionTimeBySegment(
+                    entry.shootTimeBySegment
+                ),
+                passTimeBySegment: getActionTimeBySegment(
+                    entry.passTimeBySegment
+                ),
+                actionTimeline: getActionTimeline(entry),
+                ballsPerSecondUsed: entry.ballsPerSecondUsed ?? 0,
+                autoFuelScored: entry.autoFuelScored,
+                teleFuelBySegment: entry.teleFuelBySegment,
+                teleFuelTotal,
+                teleFuelActiveComputed: teleFuelTotal,
+                teleFuelWastedComputed: 0,
+                teleTower: entry.teleTower,
+                breakdown: entry.breakdown,
+                driverQuality: entry.driverQuality,
+                defenseProvided: getDefenseProvided(entry),
+                defenseReceived: getDefenseReceived(entry),
+                fouls: getFouls(entry),
+                breaks: getBreaks(entry),
+                freeText: entry.freeText,
+            };
+        });
 }
 
 async function matchOutlier(): Promise<matchOutliersAggregation[]> {
@@ -684,10 +530,8 @@ async function robotImageDisplay(
 
 export {
     averageAndMax,
-    superAverageAndMax,
     robotImageDisplay,
     scouterRankings,
-    superMaxIndividual,
     maxIndividual,
     matchOutlier,
 };

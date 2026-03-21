@@ -1,0 +1,9 @@
+{
+  "stage": "01_extract_source",
+  "sourceMode": "fake",
+  "counts": {
+    "match": 432,
+    "pit": 36
+  },
+  "configPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\pipeline_effective_x_wcpral.json"
+}

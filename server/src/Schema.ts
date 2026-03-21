@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 import {
     AutoFieldOrientationSetting,
     BallsPerSecondSetting,
-    CommentValues,
     MatchData,
     PitFile,
     ScouterData,
@@ -20,12 +19,13 @@ const robotPositions = [
 ] as const;
 
 const matchappsMetaDataSchema = {
-    scouterName: String,
-    matchNumber: Number,
-    robotTeam: Number,
+    scouterName: { type: String, required: true, default: '' },
+    matchNumber: { type: Number, required: true, min: 1 },
+    robotTeam: { type: Number, required: true, min: 1 },
     robotPosition: {
         type: String,
         enum: robotPositions,
+        required: true,
     },
 };
 
@@ -99,7 +99,6 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
         type: autoPathTraceSchema,
         default: null,
     },
-    autoMoved: { type: Boolean, default: false },
     shootTimeBySegment: actionTimeBySegmentSchema,
     passTimeBySegment: actionTimeBySegmentSchema,
     actionTimeline: {
@@ -108,31 +107,11 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
     },
     ballsPerSecondUsed: { type: Number, default: 5 },
     autoFuelScored: { type: Number, default: 0 },
-    autoTower: {
-        type: String,
-        enum: ['None', 'level1', 'Failed'],
-        default: 'None',
-    },
-    autoFuelWinner: {
-        type: String,
-        enum: ['red', 'blue', 'tie', 'unknown'],
-        default: 'unknown',
-    },
-    shift1ActiveHubIfTie: {
-        type: String,
-        enum: ['red', 'blue', null],
-        default: null,
-    },
     teleFuelBySegment: teleFuelBySegmentSchema,
     teleTower: {
         type: String,
         enum: ['None', 'level1', 'level2', 'level3', 'Failed'],
         default: 'None',
-    },
-    climbTimeBucket: {
-        type: String,
-        enum: ['early', 'mid', 'late', null],
-        default: null,
     },
     breakdown: {
         type: String,
@@ -163,29 +142,14 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
         comms: { type: Number, default: 0 },
         bumper: { type: Number, default: 0 },
     },
-    comments: [
-        {
-            type: String,
-            enum: [
-                'great_driving',
-                'good_driving',
-                'ok_driving',
-                'rough_driving',
-                'fast_cycles',
-                'drops_fuel',
-                'accurate_shots',
-                'inaccurate_shots',
-                'aggressive_defense',
-                'smart_defense',
-                'defense_liability',
-                'fast_climb',
-                'slow_climb',
-                'no_climb',
-            ] satisfies CommentValues[],
-        },
-    ],
     freeText: { type: String, default: '' },
 });
+
+matchDataSchema.index(
+    { 'metadata.robotTeam': 1, 'metadata.matchNumber': 1 },
+    { unique: true }
+);
+matchDataSchema.index({ 'metadata.matchNumber': 1, 'metadata.robotPosition': 1 });
 
 const leaderboardDataSchema = new mongoose.Schema<ScouterData>({
     scouterName: String,

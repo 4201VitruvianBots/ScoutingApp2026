@@ -7,7 +7,7 @@ dotenv.load({ path: '.env' });
 dotenv.load({ path: '.env.local' });
 
 await startDockerContainer(process.env.CONTAINER_NAME);
-await mongoose.connect('mongodb://0.0.0.0:27107/');
+await mongoose.connect('mongodb://0.0.0.0:27017/');
 
 console.log('Sending to remote server...');
 

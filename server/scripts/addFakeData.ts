@@ -5,7 +5,6 @@ import mongoose from 'mongoose';
 import { ballsPerSecondApp, leaderboardApp, matchApp, pitApp } from '../src/Schema.js';
 import {
     ActionKind,
-    AutoFuelWinner,
     Drivebase,
     MatchData,
     PitFile,
@@ -424,15 +423,6 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
         const profile = profiles.get(team) ?? createProfile();
 
         const robotAbsent = chance(0.03 + (1 - profile.reliability) * 0.08);
-        const autoFuelWinner = weightedChoice<AutoFuelWinner>([
-            ['red', 0.44],
-            ['blue', 0.44],
-            ['tie', 0.08],
-            ['unknown', 0.04],
-        ]);
-        const shift1ActiveHubIfTie =
-            autoFuelWinner === 'tie' ? choose(['red', 'blue'] as const) : null;
-
         const ballsPerSecondUsed = roundToHundredth(
             clamp(4.6 + profile.tele * 1.9 + randfloat(0.7, -0.6), 3, 8)
         );
@@ -494,7 +484,6 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
             robotAbsent,
             autoStartingPosition,
             autoPath: buildAutoPath(robotPosition, autoStartingPosition, matchNumber),
-            autoMoved: robotAbsent ? false : chance(0.86),
             shootTimeBySegment: robotAbsent ? emptyActionTimeBySegment : shootTimeBySegment,
             passTimeBySegment: robotAbsent ? emptyActionTimeBySegment : passTimeBySegment,
             actionTimeline: robotAbsent
@@ -507,15 +496,6 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
                 : actionTimeline,
             ballsPerSecondUsed,
             autoFuelScored: robotAbsent ? 0 : fuel.autoFuelScored,
-            autoTower: robotAbsent
-                ? 'None'
-                : chance(0.28)
-                  ? chance(0.2)
-                      ? 'Failed'
-                      : 'level1'
-                  : 'None',
-            autoFuelWinner,
-            shift1ActiveHubIfTie,
             teleFuelBySegment: robotAbsent
                 ? {
                       transition: 0,
@@ -527,8 +507,6 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
                   }
                 : fuel.teleFuelBySegment,
             teleTower,
-            climbTimeBucket:
-                teleTower === 'None' ? null : choose(['early', 'mid', 'late']),
             breakdown: robotAbsent
                 ? 'None'
                 : chance(0.03 + (1 - profile.reliability) * 0.09)
@@ -561,7 +539,6 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
                 comms: randint(2 - Math.floor(profile.reliability * 2)),
                 bumper: randint(2 - Math.floor(profile.reliability * 2)),
             },
-            comments: [],
             freeText: chance(0.2) ? 'Fake match note' : '',
         };
 

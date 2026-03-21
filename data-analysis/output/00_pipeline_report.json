@@ -1,0 +1,16 @@
+{
+  "startedAt": "2026-03-21T02:35:21.370851Z",
+  "finishedAt": "2026-03-21T02:35:28.803357Z",
+  "configPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\pipeline_config.json",
+  "sourceMode": "fake",
+  "runStage07": true,
+  "executedStages": [
+    "07_seed_fake_data.py",
+    "01_extract_source.py",
+    "02_clean_normalize.py",
+    "03_feature_engineering.py",
+    "04_team_aggregation.py",
+    "05_picklist_scores.py",
+    "06_export_app_payloads.py"
+  ]
+}

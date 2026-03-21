@@ -1,0 +1,43 @@
+{
+  "source": {
+    "mode": "mongo",
+    "mongo_url": "mongodb://localhost:27017/",
+    "db": "test",
+    "fake_match_json": "data-analysis/output/fake_match_source.json",
+    "fake_pit_json": "data-analysis/output/fake_pit_source.json"
+  },
+  "paths": {
+    "output_dir": "data-analysis/output"
+  },
+  "analysis": {
+    "timeline_bin_sec": 1,
+    "normalization": "zscore",
+    "score_scale": {
+      "center": 50,
+      "spread": 18,
+      "min": 0,
+      "max": 100
+    },
+    "metrics": {
+      "avgFuelPerMatch": { "weight": 1.4, "direction": "high", "enabled": true },
+      "avgAutoFuel": { "weight": 0.6, "direction": "high", "enabled": true },
+      "avgShootHeldSec": { "weight": 0.8, "direction": "high", "enabled": true },
+      "avgPassHeldSec": { "weight": 0.5, "direction": "high", "enabled": true },
+      "estimatedFuelPoints": { "weight": 1.2, "direction": "high", "enabled": true },
+      "consistencyIndex": { "weight": 0.9, "direction": "high", "enabled": true },
+      "reliabilityIndex": { "weight": 1.0, "direction": "high", "enabled": true },
+      "disciplineIndex": { "weight": 0.7, "direction": "high", "enabled": true },
+      "defenseHeavyRate": { "weight": 0.4, "direction": "high", "enabled": true },
+      "timelineCoverageRate": { "weight": 0.5, "direction": "high", "enabled": true }
+    }
+  },
+  "fake_data": {
+    "run_stage_07": false,
+    "seed_mongo": false,
+    "match_count": 72,
+    "team_count": 36,
+    "team_start": 1000,
+    "scouter_count": 12,
+    "include_pit": true
+  }
+}

@@ -12,6 +12,7 @@
     "dev:remote": "cross-env NODE_ENV=dev LOCATION=remote tsx watch src/index.ts",
     "gen-fake-data": "tsx scripts/addFakeData.ts",
     "gen-fake-json": "tsx scripts/genFakeJson.ts",
+    "migrate-match-schema": "tsx scripts/migrateMatchSchema.ts",
     "gen-team-info": "tsx scripts/genTeamInfo.ts",
     "download-schedule": "tsx scripts/downloadSchedule.ts",
     "backup": "tsx scripts/saveBackup.ts",

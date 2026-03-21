@@ -4,8 +4,6 @@ import { ballsPerSecondApp, matchApp } from './Schema.js';
 async function exportAllData() {
     return {
         matchApp: (await matchApp.find({})) satisfies MatchData[],
-        // Keep this key for backwards-compatibility with older backups.
-        superApp: [],
         ballsPerSecondApp: (await ballsPerSecondApp.find({})) satisfies BallsPerSecondSetting[],
     };
 }
@@ -33,7 +31,6 @@ function scheduleExport() {
 
 async function importAllData(data: {
     matchApp: MatchData[];
-    superApp?: unknown[];
     ballsPerSecondApp?: BallsPerSecondSetting[];
 }) {
     await Promise.all([matchApp.deleteMany(), ballsPerSecondApp.deleteMany()]);
