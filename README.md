@@ -169,3 +169,7 @@ Core stage order:
 5. `05_picklist_scores.py`
 6. `06_export_app_payloads.py`
 7. `07_seed_fake_data.py` (optional)
+
+mongosh "mongodb://localhost:27017/test" --eval "db.matchapps.deleteMany({}); db.pitapps.deleteMany({}); db.ballspersecondapps.deleteMany({}); db.leaderboardapps.deleteMany({});"
+
+mongosh "mongodb://localhost:27017/test" --eval "print('match',db.matchapps.countDocuments()); print('pit',db.pitapps.countDocuments()); print('bps',db.ballspersecondapps.countDocuments()); print('leaderboard',db.leaderboardapps.countDocuments());"
