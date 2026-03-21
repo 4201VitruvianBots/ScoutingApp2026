@@ -134,6 +134,7 @@ def main() -> None:
     delay_end = next((segment.get('endSec', 23) for segment in segments if segment.get('id') == 'transition'), 23)
 
     fake_matches: List[Dict[str, Any]] = []
+    fake_balls_per_second_settings: List[Dict[str, Any]] = []
 
     for match_number in range(1, match_count + 1):
         random.shuffle(teams)
@@ -236,6 +237,13 @@ def main() -> None:
                     'freeText': '' if random.random() < 0.7 else f'Fake note for match {match_number}',
                 }
             )
+            fake_balls_per_second_settings.append(
+                {
+                    'matchNumber': match_number,
+                    'robotTeam': team_number,
+                    'ballsPerSecond': balls_per_second,
+                }
+            )
 
     fake_pit: List[Dict[str, Any]] = []
     if include_pit:
@@ -270,10 +278,13 @@ def main() -> None:
         db = client[source_cfg.get('db', 'test')]
         db.matchapps.delete_many({})
         db.pitapps.delete_many({})
+        db.ballspersecondapps.delete_many({})
         if fake_matches:
             db.matchapps.insert_many(fake_matches)
         if fake_pit:
             db.pitapps.insert_many(fake_pit)
+        if fake_balls_per_second_settings:
+            db.ballspersecondapps.insert_many(fake_balls_per_second_settings)
         client.close()
         seeded = True
 
@@ -282,6 +293,7 @@ def main() -> None:
         'generatedAt': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         'matchCount': len(fake_matches),
         'pitCount': len(fake_pit),
+        'ballsPerSecondCount': len(fake_balls_per_second_settings),
         'seededMongo': seeded,
         'fakeMatchPath': str(fake_match_path),
         'fakePitPath': str(fake_pit_path),

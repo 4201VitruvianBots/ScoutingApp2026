@@ -14,6 +14,7 @@
     "gen-fake-json": "tsx scripts/genFakeJson.ts",
     "migrate-match-schema": "tsx scripts/migrateMatchSchema.ts",
     "gen-team-info": "tsx scripts/genTeamInfo.ts",
+    "import:logs": "tsx scripts/importLogs.ts",
     "download-schedule": "tsx scripts/downloadSchedule.ts",
     "backup": "tsx scripts/saveBackup.ts",
     "download-teams": "tsx scripts/downloadTeams.ts"
