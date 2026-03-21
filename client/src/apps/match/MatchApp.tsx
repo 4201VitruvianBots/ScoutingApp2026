@@ -22,21 +22,14 @@ import {
 } from 'requests';
 import LinkButton from '../../components/LinkButton';
 import NumberInput from '../../components/NumberInput';
-import TeamDropdown from '../../components/TeamDropdown';
 import MultiButton from '../../components/MultiButton';
 import Checkbox from '../../components/Checkbox';
 import TextInput from '../../components/TextInput';
 import HoldButton from '../../components/HoldButton';
+import SignIn from '../../components/SignIn';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import { usePreventUnload } from '../../lib/usePreventUnload';
-import { useLocalStorage } from '../../lib/useLocalStorage';
-import {
-    getOrCreateTabletId,
-    TABLET_SLOT_STORAGE_KEY,
-    formatTabletSlotLabel,
-    isAssignableRobotPosition,
-} from '../../lib/tabletId';
 import scheduleFile from '../../assets/matchSchedule.json';
 import { formatMatchTime, gameConfig } from '../../lib/gameConfig';
 
@@ -95,6 +88,16 @@ const matchTimelineSegments: MatchTimelineSegment[] = gameConfig.segments.map(
 );
 
 const schedule = scheduleFile as MatchSchedule;
+const scheduleMatchNumbers = Object.keys(schedule)
+    .map(value => Number.parseInt(value, 10))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+const firstScheduledMatchNumber = scheduleMatchNumbers[0];
+
+function nextScheduledMatchNumber(matchNumber: number | undefined) {
+    if (matchNumber == undefined) return firstScheduledMatchNumber;
+    return scheduleMatchNumbers.find(value => value > matchNumber) ?? matchNumber + 1;
+}
 
 const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
     { label: 'Left', value: 'left' },
@@ -408,15 +411,13 @@ function buildActionTimelineFromTicks(ticks: ActionTick[]): MatchData['actionTim
 function MatchApp() {
     usePreventUnload();
     const [sendQueue, sendAll, queue, sending] = useQueue();
-    const [tabletId] = useState(getOrCreateTabletId);
-    const [tabletSlot] = useLocalStorage<RobotPosition | null>(
-        null,
-        TABLET_SLOT_STORAGE_KEY
-    );
     const [teamNumber, setTeamNumber] = useState<number>();
-    const [matchNumber, setMatchNumber] = useState<number>();
+    const [matchNumber, setMatchNumber] = useState<number | undefined>(
+        firstScheduledMatchNumber
+    );
     const [scouterName, setScouterName] = useState('');
     const [robotPosition, setRobotPosition] = useState<RobotPosition>();
+    const [signedIn, setSignedIn] = useState(false);
     const [showCheck, setShowCheck] = useState(false);
 
     const [robotAbsent, setRobotAbsent] = useState(false);
@@ -546,12 +547,8 @@ function MatchApp() {
         [actionTicks]
     );
 
-    const assignedRobotPosition = isAssignableRobotPosition(tabletSlot)
-        ? tabletSlot
-        : undefined;
-    const hasTabletAssignment = assignedRobotPosition != undefined;
     const canTrackActions =
-        hasTabletAssignment && isRunning && !robotAbsent && remainingSec > 0;
+        isRunning && !robotAbsent && remainingSec > 0;
     const sectionClass = 'rounded-2xl border border-white/10 bg-[#1d2433]/95 p-4 shadow-lg shadow-black/25';
     const inputClass =
         'mt-1 w-full rounded-lg border border-white/15 bg-[#0f1522] px-3 py-2 text-sm text-white outline-none focus:border-[#48c55c]/60 focus:ring-2 focus:ring-[#48c55c]/30';
@@ -567,17 +564,7 @@ function MatchApp() {
         );
     };
 
-    useStatus(tabletId, robotPosition, matchNumber, scouterName);
-
-    useEffect(() => {
-        if (!assignedRobotPosition) {
-            setRobotPosition(undefined);
-            setScouterName('');
-            return;
-        }
-        setRobotPosition(assignedRobotPosition);
-        setScouterName(formatTabletSlotLabel(assignedRobotPosition));
-    }, [assignedRobotPosition]);
+    useStatus('', robotPosition, matchNumber, scouterName);
 
     useEffect(() => {
         if (!schedule || !robotPosition || matchNumber == undefined) {
@@ -977,11 +964,25 @@ function MatchApp() {
         setScrubbingTimeline(false);
     };
 
-    const handleStartNewMatch = () => {
-        if (!hasTabletAssignment) {
-            alert('This tablet is unassigned. Open Admin and set a tablet slot first.');
+    const handleSignIn = () => {
+        const trimmedName = scouterName.trim();
+        if (!trimmedName) {
+            alert('Enter your name before signing in.');
             return;
         }
+        if (!robotPosition) {
+            alert('Pick your scout position before signing in.');
+            return;
+        }
+
+        setScouterName(trimmedName);
+        setSignedIn(true);
+        if (matchNumber == undefined) {
+            setMatchNumber(firstScheduledMatchNumber);
+        }
+    };
+
+    const handleStartNewMatch = () => {
         resetScoutingFields();
         setIsRunning(true);
     };
@@ -992,10 +993,6 @@ function MatchApp() {
     };
 
     const handlePauseResume = () => {
-        if (!hasTabletAssignment) {
-            alert('This tablet is unassigned. Open Admin and set a tablet slot first.');
-            return;
-        }
         if (isRunning) {
             endActionHold('shoot');
             endActionHold('pass');
@@ -1006,8 +1003,14 @@ function MatchApp() {
     };
 
     const handleSubmit = () => {
-        if (robotPosition == undefined || matchNumber == undefined || teamNumber == undefined) {
-            alert('Check tablet slot assignment, match number, and team number');
+        if (
+            !signedIn ||
+            !scouterName.trim() ||
+            robotPosition == undefined ||
+            matchNumber == undefined ||
+            teamNumber == undefined
+        ) {
+            alert('Check sign-in, match number, and scheduled team number.');
             return;
         }
         if (activeHoldsRef.current.shoot || activeHoldsRef.current.pass) {
@@ -1048,9 +1051,37 @@ function MatchApp() {
         sendQueue('/data/match', data);
         setShowCheck(true);
         setTimeout(() => setShowCheck(false), 1800);
-        setMatchNumber(prev => (prev == undefined ? prev : prev + 1));
+        setMatchNumber(prev => nextScheduledMatchNumber(prev));
         handleResetMatch();
     };
+
+    if (!signedIn) {
+        return (
+            <div className='min-h-screen bg-gradient-to-b from-[#151a25] via-[#111722] to-[#0b111a] pb-8 text-sm text-white'>
+                <main className='mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center gap-4 px-4 pb-10 pt-5 md:px-6'>
+                    <section className={`${sectionClass} w-full max-w-2xl text-center`}>
+                        <h1 className='text-xl font-semibold text-[#48c55c]'>Match Scouting Sign-In</h1>
+                        <p className='mt-2 text-xs text-gray-300'>
+                            Choose your scout position once, then this app auto-fills team
+                            numbers from the hardcoded schedule using match number + position.
+                        </p>
+                    </section>
+
+                    <SignIn
+                        scouterName={scouterName}
+                        onChangeScouterName={setScouterName}
+                        robotPosition={robotPosition}
+                        onChangeRobotPosition={setRobotPosition}
+                        onSubmit={handleSignIn}
+                    />
+
+                    <LinkButton link='/' className='snap-none'>
+                        <MaterialSymbol icon='home' size={38} fill grade={200} color='green' />
+                    </LinkButton>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div className='min-h-screen bg-gradient-to-b from-[#151a25] via-[#111722] to-[#0b111a] pb-8 text-sm text-white'>
@@ -1070,39 +1101,23 @@ function MatchApp() {
                     <div>
                         <h1 className='text-xl font-semibold text-[#48c55c]'>Match Scouting</h1>
                         <p className='mt-1 text-xs text-gray-400'>
-                            {scouterName || 'Unassigned Tablet'}{' '}
+                            {scouterName || 'Scout Not Signed In'}{' '}
                             {robotPosition ? `(${robotPosition})` : ''}
-                        </p>
-                        <p className='text-[11px] text-gray-500'>
-                            Tablet ID: {tabletId}
-                            {hasTabletAssignment ? ' (assigned)' : ' (no assignment)'}
                         </p>
                     </div>
 
                     <div className='flex items-center gap-2'>
+                        <button
+                            type='button'
+                            onClick={() => setSignedIn(false)}
+                            className='rounded-lg bg-[#3a4254] px-3 py-2 text-xs font-semibold text-white'>
+                            Switch Scout
+                        </button>
                         <LinkButton link='/' className='snap-none'>
                             <MaterialSymbol icon='home' size={38} fill grade={200} color='green' />
                         </LinkButton>
-                        <LinkButton link='/admin' className='snap-none'>
-                            <MaterialSymbol
-                                icon='admin_panel_settings'
-                                size={36}
-                                fill
-                                grade={200}
-                                color='orange'
-                            />
-                        </LinkButton>
                     </div>
                 </header>
-
-                {!hasTabletAssignment && (
-                    <section className='rounded-2xl border border-yellow-400/50 bg-yellow-900/30 p-4'>
-                        <p className='text-sm text-yellow-100'>
-                            This tablet has no slot assignment. Open Admin on this tablet and set
-                            `This Tablet Slot` before scouting matches.
-                        </p>
-                    </section>
-                )}
 
                 <section className={sectionClass}>
                     <h2 className='text-base font-semibold text-[#48c55c]'>Overview</h2>
@@ -1120,8 +1135,8 @@ function MatchApp() {
                         </div>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Team Number</p>
-                            <div className='mt-1 rounded-lg border border-white/10 bg-[#0f1522] px-2 py-2'>
-                                <TeamDropdown value={teamNumber} onChange={setTeamNumber} />
+                            <div className='mt-1 rounded-lg border border-white/10 bg-[#0f1522] px-3 py-2 text-sm font-semibold text-white'>
+                                {teamNumber ?? 'No scheduled team for selected match/position'}
                             </div>
                         </div>
                     </div>
@@ -1149,7 +1164,8 @@ function MatchApp() {
                             <span className='ml-1.5'>Robot Absent</span>
                         </Checkbox>
                         <p className='text-gray-400'>
-                            Team auto-fills from schedule using match number + tablet slot.
+                            Team auto-fills from hardcoded schedule using match number + scout
+                            position.
                         </p>
                     </div>
                 </section>
