@@ -354,11 +354,6 @@ export interface AutoFieldOrientationSetting {
     orientation: FieldOrientation;
 }
 
-export interface TabletAssignmentSetting {
-    tabletId: string;
-    robotPosition: RobotPosition;
-}
-
 export type MatchSchedule = Record<
     number,
     Partial<Record<RobotPosition, number>>

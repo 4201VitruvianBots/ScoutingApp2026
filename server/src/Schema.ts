@@ -5,7 +5,6 @@ import {
     MatchData,
     PitFile,
     ScouterData,
-    TabletAssignmentSetting,
 } from 'requests';
 
 const robotPositions = [
@@ -184,22 +183,6 @@ const autoFieldOrientationSchema = new mongoose.Schema<AutoFieldOrientationSetti
 
 autoFieldOrientationSchema.index({ side: 1 }, { unique: true });
 
-const tabletAssignmentSchema = new mongoose.Schema<TabletAssignmentSetting>({
-    tabletId: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    robotPosition: {
-        type: String,
-        enum: ['red_1', 'red_2', 'red_3', 'blue_1', 'blue_2', 'blue_3'],
-        required: true,
-    },
-});
-
-tabletAssignmentSchema.index({ tabletId: 1 }, { unique: true });
-tabletAssignmentSchema.index({ robotPosition: 1 }, { unique: true });
-
 type PitDataSchemaType = {
     [K in keyof PitFile]: K extends 'photo' ? Buffer : PitFile[K];
 };
@@ -248,10 +231,6 @@ const autoFieldOrientationApp = mongoose.model<AutoFieldOrientationSetting>(
     'autoFieldOrientationApp',
     autoFieldOrientationSchema
 );
-const tabletAssignmentApp = mongoose.model<TabletAssignmentSetting>(
-    'tabletAssignmentApp',
-    tabletAssignmentSchema
-);
 
 export {
     matchApp,
@@ -264,6 +243,4 @@ export {
     ballsPerSecondDataSchema,
     autoFieldOrientationApp,
     autoFieldOrientationSchema,
-    tabletAssignmentApp,
-    tabletAssignmentSchema,
 };

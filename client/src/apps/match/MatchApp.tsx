@@ -18,12 +18,9 @@ import {
     MatchData,
     MatchSchedule,
     RobotPosition,
-    TabletAssignmentSetting,
     TeleTowerResult,
 } from 'requests';
 import LinkButton from '../../components/LinkButton';
-import SignIn from '../../components/SignIn';
-import Dialog from '../../components/Dialog';
 import NumberInput from '../../components/NumberInput';
 import TeamDropdown from '../../components/TeamDropdown';
 import MultiButton from '../../components/MultiButton';
@@ -33,7 +30,13 @@ import HoldButton from '../../components/HoldButton';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import { usePreventUnload } from '../../lib/usePreventUnload';
-import { getOrCreateTabletId } from '../../lib/tabletId';
+import { useLocalStorage } from '../../lib/useLocalStorage';
+import {
+    getOrCreateTabletId,
+    TABLET_SLOT_STORAGE_KEY,
+    formatTabletSlotLabel,
+    isAssignableRobotPosition,
+} from '../../lib/tabletId';
 import scheduleFile from '../../assets/matchSchedule.json';
 import { formatMatchTime, gameConfig } from '../../lib/gameConfig';
 
@@ -92,14 +95,6 @@ const matchTimelineSegments: MatchTimelineSegment[] = gameConfig.segments.map(
 );
 
 const schedule = scheduleFile as MatchSchedule;
-const assignmentRobotPositions = new Set<RobotPosition>([
-    'red_1',
-    'red_2',
-    'red_3',
-    'blue_1',
-    'blue_2',
-    'blue_3',
-]);
 
 const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
     { label: 'Left', value: 'left' },
@@ -414,14 +409,14 @@ function MatchApp() {
     usePreventUnload();
     const [sendQueue, sendAll, queue, sending] = useQueue();
     const [tabletId] = useState(getOrCreateTabletId);
+    const [tabletSlot] = useLocalStorage<RobotPosition | null>(
+        null,
+        TABLET_SLOT_STORAGE_KEY
+    );
     const [teamNumber, setTeamNumber] = useState<number>();
     const [matchNumber, setMatchNumber] = useState<number>();
     const [scouterName, setScouterName] = useState('');
     const [robotPosition, setRobotPosition] = useState<RobotPosition>();
-    const [assignedRobotPosition, setAssignedRobotPosition] = useState<
-        RobotPosition | undefined
-    >();
-    const [assignmentLoaded, setAssignmentLoaded] = useState(false);
     const [showCheck, setShowCheck] = useState(false);
 
     const [robotAbsent, setRobotAbsent] = useState(false);
@@ -551,9 +546,12 @@ function MatchApp() {
         [actionTicks]
     );
 
-    const robotPositionLocked = assignedRobotPosition != undefined;
-    const signInRequired = scouterName.trim() === '' || robotPosition == undefined;
-    const canTrackActions = isRunning && !robotAbsent && remainingSec > 0;
+    const assignedRobotPosition = isAssignableRobotPosition(tabletSlot)
+        ? tabletSlot
+        : undefined;
+    const hasTabletAssignment = assignedRobotPosition != undefined;
+    const canTrackActions =
+        hasTabletAssignment && isRunning && !robotAbsent && remainingSec > 0;
     const sectionClass = 'rounded-2xl border border-white/10 bg-[#1d2433]/95 p-4 shadow-lg shadow-black/25';
     const inputClass =
         'mt-1 w-full rounded-lg border border-white/15 bg-[#0f1522] px-3 py-2 text-sm text-white outline-none focus:border-[#48c55c]/60 focus:ring-2 focus:ring-[#48c55c]/30';
@@ -572,41 +570,14 @@ function MatchApp() {
     useStatus(tabletId, robotPosition, matchNumber, scouterName);
 
     useEffect(() => {
-        let cancelled = false;
-        const loadTabletAssignment = async () => {
-            try {
-                const response = await fetch(
-                    `/config/tablet-assignments?tabletId=${encodeURIComponent(tabletId)}`
-                );
-                if (!response.ok) throw new Error('Failed to load tablet assignment');
-                const payload = (await response.json()) as TabletAssignmentSetting | null;
-                if (cancelled) return;
-
-                if (
-                    payload &&
-                    payload.tabletId === tabletId &&
-                    assignmentRobotPositions.has(payload.robotPosition)
-                ) {
-                    setAssignedRobotPosition(payload.robotPosition);
-                    setRobotPosition(payload.robotPosition);
-                    return;
-                }
-
-                setAssignedRobotPosition(undefined);
-            } catch {
-                // Keep current assignment state on transient fetch errors.
-            } finally {
-                if (!cancelled) setAssignmentLoaded(true);
-            }
-        };
-
-        loadTabletAssignment();
-        const interval = window.setInterval(loadTabletAssignment, 15000);
-        return () => {
-            cancelled = true;
-            window.clearInterval(interval);
-        };
-    }, [tabletId]);
+        if (!assignedRobotPosition) {
+            setRobotPosition(undefined);
+            setScouterName('');
+            return;
+        }
+        setRobotPosition(assignedRobotPosition);
+        setScouterName(formatTabletSlotLabel(assignedRobotPosition));
+    }, [assignedRobotPosition]);
 
     useEffect(() => {
         if (!schedule || !robotPosition || matchNumber == undefined) {
@@ -1007,6 +978,10 @@ function MatchApp() {
     };
 
     const handleStartNewMatch = () => {
+        if (!hasTabletAssignment) {
+            alert('This tablet is unassigned. Open Admin and set a tablet slot first.');
+            return;
+        }
         resetScoutingFields();
         setIsRunning(true);
     };
@@ -1017,6 +992,10 @@ function MatchApp() {
     };
 
     const handlePauseResume = () => {
+        if (!hasTabletAssignment) {
+            alert('This tablet is unassigned. Open Admin and set a tablet slot first.');
+            return;
+        }
         if (isRunning) {
             endActionHold('shoot');
             endActionHold('pass');
@@ -1028,7 +1007,7 @@ function MatchApp() {
 
     const handleSubmit = () => {
         if (robotPosition == undefined || matchNumber == undefined || teamNumber == undefined) {
-            alert('Check sign-in, match number, and team number');
+            alert('Check tablet slot assignment, match number, and team number');
             return;
         }
         if (activeHoldsRef.current.shoot || activeHoldsRef.current.pass) {
@@ -1091,15 +1070,12 @@ function MatchApp() {
                     <div>
                         <h1 className='text-xl font-semibold text-[#48c55c]'>Match Scouting</h1>
                         <p className='mt-1 text-xs text-gray-400'>
-                            {scouterName || 'Scouter not set'} {robotPosition ? `(${robotPosition})` : ''}
+                            {scouterName || 'Unassigned Tablet'}{' '}
+                            {robotPosition ? `(${robotPosition})` : ''}
                         </p>
                         <p className='text-[11px] text-gray-500'>
                             Tablet ID: {tabletId}
-                            {!assignmentLoaded
-                                ? ' (loading assignment...)'
-                                : robotPositionLocked
-                                  ? ' (position locked)'
-                                  : ' (no assignment)'}
+                            {hasTabletAssignment ? ' (assigned)' : ' (no assignment)'}
                         </p>
                     </div>
 
@@ -1107,32 +1083,26 @@ function MatchApp() {
                         <LinkButton link='/' className='snap-none'>
                             <MaterialSymbol icon='home' size={38} fill grade={200} color='green' />
                         </LinkButton>
-                        <Dialog
-                            open={signInRequired}
-                            trigger={open => (
-                                <button onClick={open} aria-label='Scout sign-in'>
-                                    <MaterialSymbol
-                                        icon='account_circle'
-                                        size={38}
-                                        fill
-                                        grade={200}
-                                        className={signInRequired ? 'text-gray-400' : 'text-green-400'}
-                                    />
-                                </button>
-                            )}>
-                            {close => (
-                                <SignIn
-                                    scouterName={scouterName}
-                                    onChangeScouterName={setScouterName}
-                                    robotPosition={robotPosition}
-                                    onChangeRobotPosition={setRobotPosition}
-                                    robotPositionLocked={robotPositionLocked}
-                                    onSubmit={close}
-                                />
-                            )}
-                        </Dialog>
+                        <LinkButton link='/admin' className='snap-none'>
+                            <MaterialSymbol
+                                icon='admin_panel_settings'
+                                size={36}
+                                fill
+                                grade={200}
+                                color='orange'
+                            />
+                        </LinkButton>
                     </div>
                 </header>
+
+                {!hasTabletAssignment && (
+                    <section className='rounded-2xl border border-yellow-400/50 bg-yellow-900/30 p-4'>
+                        <p className='text-sm text-yellow-100'>
+                            This tablet has no slot assignment. Open Admin on this tablet and set
+                            `This Tablet Slot` before scouting matches.
+                        </p>
+                    </section>
+                )}
 
                 <section className={sectionClass}>
                     <h2 className='text-base font-semibold text-[#48c55c]'>Overview</h2>
@@ -1178,7 +1148,9 @@ function MatchApp() {
                             boxClassName='size-4'>
                             <span className='ml-1.5'>Robot Absent</span>
                         </Checkbox>
-                        <p className='text-gray-400'>Team auto-fills from schedule when match/position are set.</p>
+                        <p className='text-gray-400'>
+                            Team auto-fills from schedule using match number + tablet slot.
+                        </p>
                     </div>
                 </section>
 
