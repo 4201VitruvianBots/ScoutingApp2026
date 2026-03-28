@@ -209,6 +209,7 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
         let driverGood = 0;
         let driverOk = 0;
         let driverRough = 0;
+        let driverPoor = 0;
         let driverQualityScoreSum = 0;
         let breakdown = 0;
         let breakdownStuck = 0;
@@ -268,20 +269,23 @@ async function averageAndMax(): Promise<MatchDataAggregations[]> {
             if (entry.teleTower === 'Failed') climbFail += 1;
             if (entry.teleTower === 'None') climbNone += 1;
 
-            if (entry.driverQuality === 'great') {
+            if (entry.driverQuality === 'Great') {
                 driverGreat += 1;
                 driverQualityScoreSum += 3;
             }
-            if (entry.driverQuality === 'good') {
+            if (entry.driverQuality === 'Good') {
                 driverGood += 1;
                 driverQualityScoreSum += 2;
             }
-            if (entry.driverQuality === 'ok') {
+            if (entry.driverQuality === 'Ok') {
                 driverOk += 1;
                 driverQualityScoreSum += 1;
             }
-            if (entry.driverQuality === 'rough') {
+            if (entry.driverQuality === 'Rough') {
                 driverRough += 1;
+            }
+            if (entry.driverQuality === 'Poor') {
+                driverPoor += 1;
             }
 
             if (entry.breakdown !== 'None') breakdown += 1;

@@ -120,8 +120,8 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
     },
     driverQuality: {
         type: String,
-        enum: ['great', 'good', 'ok', 'rough'],
-        default: 'ok',
+        enum: ['Poor', 'Rough', 'Ok', 'Good', 'Great'],
+        default: 'Poor',
     },
     defenseProvided: {
         type: String,
