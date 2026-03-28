@@ -1,0 +1,39 @@
+{
+  "startedAt": "2026-03-25T03:40:22.237Z",
+  "finishedAt": "2026-03-25T03:40:22.238Z",
+  "sourceFile": "C:\\GitKrakenStuff\\ScoutingApp2026\\bundle.json",
+  "serverUrl": "http://localhost:8080",
+  "dryRun": true,
+  "failFast": false,
+  "counts": {
+    "ballsPerSecondSettings": {
+      "input": 0,
+      "valid": 0,
+      "sent": 0,
+      "success": 0,
+      "failed": 0
+    },
+    "matchLogs": {
+      "input": 0,
+      "valid": 0,
+      "sent": 0,
+      "success": 0,
+      "failed": 0
+    },
+    "pitLogs": {
+      "input": 0,
+      "valid": 0,
+      "sent": 0,
+      "success": 0,
+      "failed": 0
+    }
+  },
+  "errors": [
+    {
+      "section": "bundle",
+      "type": "validation",
+      "message": "File not found: C:\\GitKrakenStuff\\ScoutingApp2026\\bundle.json"
+    }
+  ],
+  "success": false
+}
