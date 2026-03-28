@@ -2,3 +2,4 @@ node_modules/
 dist/
 venv/
 data-analysis/__pycache__/
+import_report.json
