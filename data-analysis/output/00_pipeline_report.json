@@ -1,0 +1,15 @@
+{
+  "startedAt": "2026-03-25T03:42:24.475532Z",
+  "finishedAt": "2026-03-25T03:42:26.426745Z",
+  "configPath": "C:\\GitKrakenStuff\\ScoutingApp2026\\data-analysis\\pipeline_config.json",
+  "sourceMode": "mongo",
+  "runStage07": false,
+  "executedStages": [
+    "01_extract_source.py",
+    "02_clean_normalize.py",
+    "03_feature_engineering.py",
+    "04_team_aggregation.py",
+    "05_picklist_scores.py",
+    "06_export_app_payloads.py"
+  ]
+}
