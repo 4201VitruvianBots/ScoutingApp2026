@@ -62,6 +62,7 @@ def flatten_pit_row(entry: Dict[str, Any]) -> Dict[str, Any]:
         'intakeFloorNeutral': coerce_bool(intake.get('floorNeutral', False)),
         'scoringMethod': entry.get('scoringMethod', ''),
         'preferredScoringSpot': entry.get('preferredScoringSpot', ''),
+        'robotMaintain': entry.get('robotMaintain', ''),
         'towerCapabilityClaimed': entry.get('towerCapabilityClaimed', ''),
         'batteryCount': coerce_int(entry.get('batteryCount', 0)),
         'notes': entry.get('notes', ''),

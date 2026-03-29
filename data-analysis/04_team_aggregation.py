@@ -134,6 +134,7 @@ def main() -> None:
                 'pitMaxFuelStorageEstimate': coerce_float(pit.get('maxFuelStorageEstimate', 0)),
                 'pitScoringMethod': pit.get('scoringMethod', ''),
                 'pitPreferredScoringSpot': pit.get('preferredScoringSpot', ''),
+                'pitRobotMaintain': pit.get('robotMaintain', ''),
                 'pitTowerCapabilityClaimed': pit.get('towerCapabilityClaimed', ''),
             }
         )

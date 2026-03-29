@@ -261,6 +261,7 @@ def main() -> None:
                     },
                     'scoringMethod': random.choice(['dump', 'low-shot', 'high-shot', 'other']),
                     'preferredScoringSpot': random.choice(['nearHub', 'backOfZone', 'varies']),
+                    'robotMaintain': random.choice(['easyMaintain', 'hardMaintain']),
                     'towerCapabilityClaimed': random.choice(['level1', 'level2', 'level3', 'unknown']),
                     'batteryCount': random.randint(2, 7),
                     'notes': '',

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
     Drivebase,
+    OtherSwerveModuleType,
     PitFile,
     PreferredScoringSpot,
+    RobotMaintain,
     ScoringMethod,
+    SDSSwerveModuleType,
     TowerCapabilityClaimed,
+    WPCSwerveModuleType,
 } from 'requests';
 import LinkButton from '../../components/LinkButton';
 import { MaterialSymbol } from 'react-material-symbols';
@@ -32,11 +36,15 @@ function PitApp() {
     const [teamNumber, setTeamNumber] = useState<number>();
     const [batteryCount, setBatteryCount] = useState(0);
     const [drivebase, setDrivebase] = useState<Drivebase>('tank');
+    const [sdsSwerveType, setSDSSwerveType] = useState<SDSSwerveModuleType>();
+    const [wpcSwerveType, setWPCSwerveType] = useState<WPCSwerveModuleType>();
+    const [otherSwerveType, setOtherSwerveType] = useState<OtherSwerveModuleType>();
+    const [swerveGearRatio, setSwerveGearRatio] = useState<number | null>(null);
     const [maxFuelStorageEstimate, setMaxFuelStorageEstimate] = useState<
         number | null
     >(null);
     const [intakeSources, setIntakeSources] = useState({
-        depot: false,
+        depot: false,   
         outpostCorral: false,
         floorNeutral: false,
     });
@@ -44,6 +52,7 @@ function PitApp() {
         useState<ScoringMethod>('dump');
     const [preferredScoringSpot, setPreferredScoringSpot] =
         useState<PreferredScoringSpot>('nearHub');
+    const [robotMaintain, setRobotMaintain] = useState<RobotMaintain>('easyMaintain');
     const [towerCapabilityClaimed, setTowerCapabilityClaimed] =
         useState<TowerCapabilityClaimed>('unknown');
     const [robotImage, setRobotImage] = useState('');
@@ -67,10 +76,14 @@ function PitApp() {
             scouterName,
             teamNumber,
             drivebase,
+            sdsSwerveType,
+            wpcSwerveType,
+            otherSwerveType,
             maxFuelStorageEstimate,
             intakeSources,
             scoringMethod,
             preferredScoringSpot,
+            robotMaintain,
             towerCapabilityClaimed,
             batteryCount,
             photo: robotImage,
@@ -83,6 +96,9 @@ function PitApp() {
         setNotes('');
         setTeamNumber(undefined);
         setDrivebase('tank');
+        setSDSSwerveType(undefined);
+        setWPCSwerveType(undefined);
+        setOtherSwerveType(undefined);
         setMaxFuelStorageEstimate(null);
         setIntakeSources({
             depot: false,
@@ -91,6 +107,7 @@ function PitApp() {
         });
         setScoringMethod('dump');
         setPreferredScoringSpot('nearHub');
+        setRobotMaintain('easyMaintain');
         setTowerCapabilityClaimed('unknown');
         setRobotImage('');
     };
@@ -167,23 +184,23 @@ function PitApp() {
 
                 <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
-                        Drivebase
+                        Battery Count
                     </h2>
-                    <div className='mt-3 flex flex-wrap gap-2'>
-                        <MultiButton
-                            onChange={setDrivebase}
-                            value={drivebase}
-                            labels={['Tank', 'Swerve', 'Other']}
-                            values={['tank', 'swerve', 'other']}
-                            selectedClassName='bg-[#48c55c] text-black'
-                            unSelectedClassName='bg-gray-700 text-white'
-                        />
-                    </div>
+                    <input
+                        min={0}
+                        onChange={event =>
+                            setBatteryCount(parseInt(event.target.value, 10) || 0)
+                        }
+                        value={batteryCount}
+                        className='mt-3 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
+                        type='number'
+                        placeholder='0'
+                    />
                 </section>
 
                 <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
-                        Fuel Storage Estimate
+                        Fuel Storage (Estimate)
                     </h2>
                     <input
                         min={0}
@@ -199,6 +216,88 @@ function PitApp() {
                         placeholder='0'
                     />
                 </section>
+
+                <section className={`${sectionClass} mb-6`}>
+                    <h2 className='text-lg font-semibold text-[#48c55c]'>
+                        Drivebase
+                    </h2>
+                    <div className='mt-3 flex flex-wr   ap gap-2'>
+                        <MultiButton
+                            onChange={setDrivebase}
+                            value={drivebase}
+                            labels={['Tank', 'Swerve', 'Other']}
+                            values={['tank', 'swerve', 'other']}
+                            selectedClassName='bg-[#48c55c] text-black'
+                            unSelectedClassName='bg-gray-700 text-white'
+                        />
+                    </div>
+                </section>
+
+                {drivebase === 'swerve' && (
+                    <section className={`${sectionClass} mb-6`}>
+                        <h2 className='text-lg font-semibold text-[#48c55c]'>
+                            Swerve Differences
+                        </h2>
+                        <details className='mb-5'>
+                            <summary className='text-lg font-semibold text-[#48c55c]'>
+                                SDS
+                            </summary>
+                            <MultiButton
+                                className='mr-5'
+                                onChange={setSDSSwerveType}
+                                value={sdsSwerveType}
+                                labels={['MK4', 'MK4i', 'MK4n', 'MK4c','MK5n','MK5i']}
+                                values={['mk4','mk4i','mk4n','mk4c','mk5n','mk5i']}
+                                selectedClassName='bg-[#48c55c] text-black'
+                                unSelectedClassName='bg-gray-700 text-white'
+                                />
+                        </details>
+                        <details>
+                            <summary className='text-lg font-semibold text-[#48c55c]'>
+                                WCP
+                            </summary>
+                            <p className='text-sm text-gray-200'>
+                                L. = Legacy ; F. = Flipped
+                            </p>
+                            <MultiButton
+                                className='mr-5'
+                                onChange={setWPCSwerveType}
+                                value={wpcSwerveType}
+                                labels={['L. Nonflipped', 'L. Flippedbelt', 'L. Flippedgear', 'SwerveX','SwerveX F.','X2/X2', 'X2S/X2S']}
+                                values={['lNonFlipped','lFlippedBelt','lFlippedGear','swerveX','swerveXF','x2x2', 'x2Sx2S']}
+                                selectedClassName='bg-[#48c55c] text-black'
+                                unSelectedClassName='bg-gray-700 text-white'
+                                />
+                        </details>
+                        <MultiButton
+                            className='mt-5'
+                            onChange={setOtherSwerveType}
+                            value={otherSwerveType}
+                            labels={['Other']}
+                            values={['other']}
+                            selectedClassName='bg-[#48c55c] text-black'
+                            unSelectedClassName='bg-gray-700 text-white'/>
+                        
+                        <div className='mt-3 space-y-4'>
+                            <div>
+                                <p className='text-lg font-semibold text-[#48c5bb] mb-2'>
+                                    Drive Ratio
+                                </p>
+                                <input
+                                    type='number'
+                                    step='0.1'
+                                    value={swerveGearRatio ?? ''}
+                                    onChange={event => {
+                                        const value = event.target.value;
+                                        setSwerveGearRatio(value === '' ? null : parseFloat(value));
+                                    }}
+                                    className='mt-1 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus-ring-2 focus:ring-[#48c55c]/10'
+                                    placeholder='8.14'
+                                />
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 <section className={`${sectionClass} mb-6`}>
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
@@ -265,10 +364,27 @@ function PitApp() {
                         <MultiButton
                             onChange={setPreferredScoringSpot}
                             value={preferredScoringSpot}
-                            labels={['Near Hub', 'Back of Zone', 'Varies']}
-                            values={['nearHub', 'backOfZone', 'varies']}
+                            labels={['Near Hub', 'Back of Zone', 'Score on the Run', 'Varies']}
+                            values={['nearHub', 'backOfZone', 'scoreOnTheRun', 'varies']}
                             selectedClassName='bg-[#48c55c] text-black'
                             unSelectedClassName='bg-gray-700 text-white'
+                        />
+                    </div>
+                </section>
+                
+                <section className={`${sectionClass} mb-6`}>
+                    <h2 className='text-lg font-semibold text-[#48c55c]'>
+                        Reliability
+                    </h2>
+                    <p className='text-sm text-gray-200'>How easy is it to maintain the robot?</p>
+                    <div className='mt-3 flex flex-wrap gap-2'>
+                    <MultiButton
+                        onChange={setRobotMaintain}
+                        value={robotMaintain}
+                        labels={['Easy to Maintain', 'Hard to Maintain']}
+                        values={['easyMaintain', 'hardMaintain']}
+                        selectedClassName='bg-[#48c55c] text-black'
+                        unSelectedClassName={'bg-gray-700 text-white'}
                         />
                     </div>
                 </section>
@@ -287,22 +403,6 @@ function PitApp() {
                             unSelectedClassName='bg-gray-700 text-white'
                         />
                     </div>
-                </section>
-
-                <section className={`${sectionClass} mb-6`}>
-                    <h2 className='text-lg font-semibold text-[#48c55c]'>
-                        Battery Count
-                    </h2>
-                    <input
-                        min={0}
-                        onChange={event =>
-                            setBatteryCount(parseInt(event.target.value, 10) || 0)
-                        }
-                        value={batteryCount}
-                        className='mt-3 w-40 rounded-lg border border-gray-700 bg-white px-3 py-2 text-black focus:border-[#48c55c] focus:outline-none focus:ring-2 focus:ring-[#48c55c]/30'
-                        type='number'
-                        placeholder='0'
-                    />
                 </section>
 
                 <section className={`${sectionClass} mb-6`}>

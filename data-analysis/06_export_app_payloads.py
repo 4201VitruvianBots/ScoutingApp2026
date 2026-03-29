@@ -248,6 +248,7 @@ def main() -> None:
                     'pitDrivebase',
                     'pitScoringMethod',
                     'pitPreferredScoringSpot',
+                    'pitRobotMaintain',
                     'pitTowerCapabilityClaimed',
                 }
                 else value
