@@ -145,7 +145,7 @@ export type BreakdownType =
     | 'mechanism'
     | 'other';
 
-export type DriverQuality = 'great' | 'good' | 'ok' | 'rough';
+export type DriverQuality = 'Poor' | 'Rough' | 'Ok' | 'Good' | 'Great';
 
 export type DefenseProvided = 'None' | 'some' | 'heavy';
 
