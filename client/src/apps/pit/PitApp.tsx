@@ -221,7 +221,7 @@ function PitApp() {
                     <h2 className='text-lg font-semibold text-[#48c55c]'>
                         Drivebase
                     </h2>
-                    <div className='mt-3 flex flex-wr   ap gap-2'>
+                    <div className='mt-3 flex flex-wrap gap-2'>
                         <MultiButton
                             onChange={setDrivebase}
                             value={drivebase}
@@ -243,8 +243,12 @@ function PitApp() {
                                 SDS
                             </summary>
                             <MultiButton
-                                className='mr-5'
-                                onChange={setSDSSwerveType}
+                                className='mr-2'
+                                onChange={(value: SDSSwerveModuleType) => {
+                                    setSDSSwerveType(value);
+                                    setWPCSwerveType(undefined);
+                                    setOtherSwerveType(undefined);
+                                }}
                                 value={sdsSwerveType}
                                 labels={['MK4', 'MK4i', 'MK4n', 'MK4c','MK5n','MK5i']}
                                 values={['mk4','mk4i','mk4n','mk4c','mk5n','mk5i']}
@@ -260,8 +264,12 @@ function PitApp() {
                                 L. = Legacy ; F. = Flipped
                             </p>
                             <MultiButton
-                                className='mr-5'
-                                onChange={setWPCSwerveType}
+                                className='mr-2'
+                                onChange={(value: WPCSwerveModuleType) => {
+                                    setWPCSwerveType(value);
+                                    setSDSSwerveType(undefined);
+                                    setOtherSwerveType(undefined);
+                                }}
                                 value={wpcSwerveType}
                                 labels={['L. Nonflipped', 'L. Flippedbelt', 'L. Flippedgear', 'SwerveX','SwerveX F.','X2/X2', 'X2S/X2S']}
                                 values={['lNonFlipped','lFlippedBelt','lFlippedGear','swerveX','swerveXF','x2x2', 'x2Sx2S']}
@@ -271,7 +279,11 @@ function PitApp() {
                         </details>
                         <MultiButton
                             className='mt-5'
-                            onChange={setOtherSwerveType}
+                            onChange={(value: OtherSwerveModuleType) => {
+                                setOtherSwerveType(value);
+                                setSDSSwerveType(undefined);
+                                setWPCSwerveType(undefined);
+                            }}
                             value={otherSwerveType}
                             labels={['Other']}
                             values={['other']}

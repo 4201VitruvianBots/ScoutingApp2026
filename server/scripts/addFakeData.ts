@@ -524,10 +524,11 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
                   ? choose(['stuck', 'tipped', 'comms', 'mechanism', 'other'])
                   : 'None',
             driverQuality: weightedChoice([
-                ['great', 0.2 + profile.tele * 0.35],
-                ['good', 0.35],
-                ['ok', 0.3],
-                ['rough', 0.15 + (1 - profile.tele) * 0.2],
+                ['Poor', 0.2 + profile.tele * 0.35],
+                ['Rough', 0.35],
+                ['Ok', 0.3],
+                ['Good', 0.15 + (1 - profile.tele) * 0.2],
+                ['Great', 0.1],
             ]),
             defenseProvided: weightedChoice([
                 ['None', 0.45],

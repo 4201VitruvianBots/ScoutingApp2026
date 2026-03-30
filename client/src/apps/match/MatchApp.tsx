@@ -1101,8 +1101,8 @@ function MatchApp() {
             <main className='mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pb-10 pt-5 md:px-6'>
                 <header className={`${sectionClass} flex flex-wrap items-center justify-between gap-3`}>
                     <div>
-                        <h1 className='text-xl font-semibold text-[#48c55c]'>Match Scouting</h1>
-                        <p className='mt-1 text-xs text-gray-400'>
+                        <h1 className='select-none text-xl font-semibold text-[#48c55c]'>Match Scouting</h1>
+                        <p className='select-none mt-1 text-xs text-gray-400'>
                             {scouterName || 'Scout Not Signed In'}{' '}
                             {robotPosition ? `(${robotPosition})` : ''}
                         </p>
@@ -1122,8 +1122,8 @@ function MatchApp() {
                 </header>
 
                 <section className={sectionClass}>
-                    <h2 className='text-base font-semibold text-[#48c55c]'>Overview</h2>
-                    <div className='mt-3 grid gap-3 md:grid-cols-2'>
+                    <h2 className='select-none text-base font-semibold text-[#48c55c]'>Overview</h2>
+                    <div className='select-none mt-3 grid gap-3 md:grid-cols-2'>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Match Number</p>
                             <NumberInput
@@ -1143,7 +1143,7 @@ function MatchApp() {
                         </div>
                     </div>
 
-                    <div className='mt-3'>
+                    <div className='select-none mt-3'>
                         <p className='text-xs uppercase tracking-wide text-gray-300'>Starting Position</p>
                         <div className='select-none mt-1 flex flex-wrap gap-2'>
                             <MultiButton
@@ -1165,7 +1165,7 @@ function MatchApp() {
                             boxClassName='size-4'>
                             <span className='ml-1.5'>Robot Absent</span>
                         </Checkbox>
-                        <p className='text-gray-400'>
+                        <p className='select-none text-gray-400'>
                             Team auto-fills from hardcoded schedule using match number + scout
                             position.
                         </p>
@@ -1173,7 +1173,7 @@ function MatchApp() {
                 </section>
 
                 <section className={sectionClass}>
-                    <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <div className='select-none flex flex-wrap items-center justify-between gap-3'>
                         <div>
                             <h2 className='text-base font-semibold text-[#48c55c]'>Auto Path</h2>
                             <p className='text-xs text-gray-300'>
@@ -1201,7 +1201,7 @@ function MatchApp() {
                     </div>
 
                     {autoPanelOpen && (
-                        <div className='mt-3 space-y-3'>
+                        <div className='select-none mt-3 space-y-3'>
                             <div className='flex flex-wrap items-center gap-2 text-xs text-gray-300'>
                                 <span className='rounded border border-white/15 bg-[#111827] px-2 py-1'>
                                     Alliance: {allianceColor.toUpperCase()}
@@ -1335,7 +1335,7 @@ function MatchApp() {
                 </section>
 
                 <section className={sectionClass}>
-                    <div className='flex items-end justify-between gap-3'>
+                    <div className='select-none flex items-end justify-between gap-3'>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Match Timer</p>
                             <p className='font-mono text-4xl font-semibold text-[#48c55c]'>
@@ -1426,7 +1426,7 @@ function MatchApp() {
                 </section>
 
                 <section className={sectionClass}>
-                    <div className='flex flex-wrap items-center justify-between gap-2'>
+                    <div className='select-none flex flex-wrap items-center justify-between gap-2'>
                         <h2 className='text-base font-semibold text-[#48c55c]'>Timeline</h2>
                         <p className='text-xs text-gray-300'>
                             Elapsed {elapsedSec.toFixed(1)}s / {MATCH_TOTAL_SEC}s
@@ -1439,7 +1439,7 @@ function MatchApp() {
                         onPointerMove={handleTimelinePointerMove}
                         onPointerUp={stopTimelineScrub}
                         onPointerCancel={stopTimelineScrub}
-                        className={`relative mt-2 h-24 cursor-ew-resize overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
+                        className={`select-none relative mt-2 h-24 cursor-ew-resize overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
                             scrubbingTimeline ? 'ring-2 ring-[#48c55c]/60' : ''
                         }`}>
                         <div className='absolute inset-0 bg-gradient-to-r from-[#141b2a] via-[#101826] to-[#0c1320]' />
@@ -1500,7 +1500,7 @@ function MatchApp() {
                         />
                     </div>
 
-                    <div className='mt-2 flex flex-wrap items-center gap-4 text-[11px] text-gray-300'>
+                    <div className='select-none mt-2 flex flex-wrap items-center gap-4 text-[11px] text-gray-300'>
                         <p>Drag timeline to jump to any time.</p>
                         <p className='flex items-center gap-1.5'>
                             <span className='inline-block size-2 rounded-sm bg-emerald-400/90' />
@@ -1513,8 +1513,8 @@ function MatchApp() {
                     </div>
                 </section>
                 <section className={sectionClass}>
-                    <h2 className='text-base font-semibold text-[#48c55c]'>Endgame</h2>
-                    <p className='mt-1 text-xs text-gray-300'>Climbing Result</p>
+                    <h2 className='select-none text-base font-semibold text-[#48c55c]'>Endgame</h2>
+                    <p className='select-none mt-1 text-xs text-gray-300'>Climbing Result</p>
                     <div className='select-none mt-2 flex flex-wrap gap-2'>
                         <MultiButton
                             onChange={setTeleTower}
@@ -1531,7 +1531,7 @@ function MatchApp() {
                         Expanded Match Content
                     </summary>
 
-                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                    <div className='select-none mt-4 grid gap-4 md:grid-cols-2'>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Driver Quality</p>
                             <div className='select-none mt-1 flex flex-wrap gap-2'>
@@ -1589,7 +1589,7 @@ function MatchApp() {
                         </div>
                     </div>
 
-                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                    <div className='select-none mt-4 grid gap-4 md:grid-cols-2'>
                         <div>
                             <p className='text-xs font-semibold uppercase tracking-wide text-gray-300'>
                                 Fouls
@@ -1734,7 +1734,7 @@ function MatchApp() {
                         className='select-none rounded-lg bg-[#48c55c] px-4 py-3 text-sm font-semibold text-black'>
                         Submit Match
                     </button>
-                    <p className='text-xs text-gray-300'>
+                    <p className='select-none text-xs text-gray-300'>
                         Queue: <span className='font-semibold text-white'>{queue.length}</span>
                     </p>
                     <button
