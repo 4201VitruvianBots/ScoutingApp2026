@@ -1,0 +1,16 @@
+{
+  "stage": "07_seed_fake_data",
+  "generatedAt": "2026-03-29T21:43:57.983984Z",
+  "matchCount": 462,
+  "uniqueMatches": 77,
+  "usedMatchSchedule": true,
+  "matchSchedulePath": "C:\\Users\\benja\\code\\ScoutingApp2026\\client\\src\\assets\\matchSchedule.json",
+  "pitCount": 42,
+  "ballsPerSecondCount": 462,
+  "seededMongo": false,
+  "fakeMatchPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\fake_match_source.json",
+  "fakePitPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\fake_pit_source.json",
+  "fakeMatchCsvPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\fake_match_source.csv",
+  "fakePitCsvPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\fake_pit_source.csv",
+  "fakeTeamProfileCsvPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\07_fake_team_profiles.csv"
+}
