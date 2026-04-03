@@ -1,9 +1,18 @@
 {
   "stage": "01_extract_source",
+<<<<<<< HEAD
   "sourceMode": "csv",
   "counts": {
     "match": 462,
     "pit": 42
   },
   "configPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\pipeline_effective_w6k0xt_m.json"
+=======
+  "sourceMode": "mongo",
+  "counts": {
+    "match": 210,
+    "pit": 1
+  },
+  "configPath": "C:\\GitKrakenStuff\\ScoutingApp2026\\data-analysis\\pipeline_config.json"
+>>>>>>> c533c9d0a0f2d0c0b1df521e5832b775cc1f65b0
 }

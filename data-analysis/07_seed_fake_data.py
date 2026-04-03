@@ -746,6 +746,7 @@ def main() -> None:
 
     fake_pit: List[Dict[str, Any]] = []
     if include_pit:
+<<<<<<< HEAD
         fake_pit = [build_pit_entry(team, team_profiles[team], scouters) for team in teams]
 
     fake_match_path = to_output_path(
@@ -760,6 +761,28 @@ def main() -> None:
     fake_pit_csv_path = to_output_path(
         source_cfg.get('fake_pit_csv', 'data-analysis/output/fake_pit_source.csv')
     )
+=======
+        for team in teams:
+            fake_pit.append(
+                {
+                    'scouterName': random.choice(scouters),
+                    'teamNumber': team,
+                    'drivebase': random.choice(['tank', 'swerve', 'other']),
+                    'maxFuelStorageEstimate': random.randint(8, 50),
+                    'intakeSources': {
+                        'depot': random.random() < 0.75,
+                        'outpostCorral': random.random() < 0.45,
+                        'floorNeutral': random.random() < 0.65,
+                    },
+                    'scoringMethod': random.choice(['dump', 'low-shot', 'high-shot', 'other']),
+                    'preferredScoringSpot': random.choice(['nearHub', 'backOfZone', 'varies']),
+                    'robotMaintain': random.choice(['easyMaintain', 'hardMaintain']),
+                    'towerCapabilityClaimed': random.choice(['level1', 'level2', 'level3', 'unknown']),
+                    'batteryCount': random.randint(2, 7),
+                    'notes': '',
+                }
+            )
+>>>>>>> c533c9d0a0f2d0c0b1df521e5832b775cc1f65b0
 
     write_json(fake_match_path, fake_matches)
     write_json(fake_pit_path, fake_pit)

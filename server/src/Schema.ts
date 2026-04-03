@@ -120,8 +120,8 @@ const matchDataSchema = new mongoose.Schema<MatchData>({
     },
     driverQuality: {
         type: String,
-        enum: ['great', 'good', 'ok', 'rough'],
-        default: 'ok',
+        enum: ['Poor', 'Rough', 'Ok', 'Good', 'Great'],
+        default: 'Poor',
     },
     defenseProvided: {
         type: String,
@@ -194,6 +194,14 @@ const pitDataSchema = new mongoose.Schema<PitDataSchemaType>({
         type: String,
         enum: ['tank', 'swerve', 'other'],
     },
+    sdsSwerveType: {
+        type: String,
+        enum: ['mk4' , 'mk4i' , 'mk4n' , 'mk4c' , 'mk5n' , 'mk5i'],
+    },
+    wpcSwerveType: {
+        type: String,
+        enum: ['lNonFlipped', 'lFlippedBelt', 'lFlippedGear', 'swerveX' , 'swerveXF' , 'x2x2' , 'x2Sx2S'],
+    },
     maxFuelStorageEstimate: { type: Number, default: null },
     intakeSources: {
         depot: Boolean,
@@ -207,6 +215,10 @@ const pitDataSchema = new mongoose.Schema<PitDataSchemaType>({
     preferredScoringSpot: {
         type: String,
         enum: ['nearHub', 'backOfZone', 'varies'],
+    },
+    robotMaintain: {
+        type: String,
+        enum: ['easyMaintain','hardMaintain'],
     },
     towerCapabilityClaimed: {
         type: String,

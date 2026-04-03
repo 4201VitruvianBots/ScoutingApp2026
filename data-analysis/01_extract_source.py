@@ -2,18 +2,21 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from common import (
-    ROOT,
-    coerce_bool,
-    coerce_float,
-    coerce_int,
-    load_config,
-    parse_args,
-    parse_json_field,
-    read_csv,
-    write_csv,
-    write_json,
-)
+from pymongo import MongoClient
+
+from common import ROOT, coerce_bool, coerce_float, coerce_int, load_config, parse_args, parse_json_field, write_csv, write_json
+
+
+def convert_objectid_to_str(obj: Any) -> Any:
+    """Recursively convert MongoDB ObjectId objects to strings."""
+    if isinstance(obj, ObjectId):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_objectid_to_str(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_objectid_to_str(item) for item in obj]
+    else:
+        return obj
 
 
 def flatten_match_row(entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -25,26 +28,26 @@ def flatten_match_row(entry: Dict[str, Any]) -> Dict[str, Any]:
         'robotPosition': metadata.get('robotPosition', ''),
         'robotAbsent': coerce_bool(entry.get('robotAbsent', False)),
         'autoStartingPosition': entry.get('autoStartingPosition'),
-        'autoPathJson': json.dumps(entry.get('autoPath') or {}, separators=(',', ':')),
-        'shootTimeBySegmentJson': json.dumps(entry.get('shootTimeBySegment') or {}, separators=(',', ':')),
-        'passTimeBySegmentJson': json.dumps(entry.get('passTimeBySegment') or {}, separators=(',', ':')),
-        'actionTimelineJson': json.dumps(entry.get('actionTimeline') or {}, separators=(',', ':')),
+        'autoPathJson': json.dumps(convert_objectid_to_str(entry.get('autoPath') or {}), separators=(',', ':')),
+        'shootTimeBySegmentJson': json.dumps(convert_objectid_to_str(entry.get('shootTimeBySegment') or {}), separators=(',', ':')),
+        'passTimeBySegmentJson': json.dumps(convert_objectid_to_str(entry.get('passTimeBySegment') or {}), separators=(',', ':')),
+        'actionTimelineJson': json.dumps(convert_objectid_to_str(entry.get('actionTimeline') or {}), separators=(',', ':')),
         'ballsPerSecondUsed': coerce_float(entry.get('ballsPerSecondUsed', 0)),
         'autoFuelScored': coerce_float(entry.get('autoFuelScored', 0)),
-        'teleFuelBySegmentJson': json.dumps(entry.get('teleFuelBySegment') or {}, separators=(',', ':')),
+        'teleFuelBySegmentJson': json.dumps(convert_objectid_to_str(entry.get('teleFuelBySegment') or {}), separators=(',', ':')),
         'teleTower': entry.get('teleTower', 'None'),
         'breakdown': entry.get('breakdown', 'None'),
         'driverQuality': entry.get('driverQuality', 'ok'),
         'defenseProvided': entry.get('defenseProvided', 'None'),
         'defenseReceived': coerce_bool(entry.get('defenseReceived', False)),
-        'foulsJson': json.dumps(entry.get('fouls') or {}, separators=(',', ':')),
-        'breaksJson': json.dumps(entry.get('breaks') or {}, separators=(',', ':')),
+        'foulsJson': json.dumps(convert_objectid_to_str(entry.get('fouls') or {}), separators=(',', ':')),
+        'breaksJson': json.dumps(convert_objectid_to_str(entry.get('breaks') or {}), separators=(',', ':')),
         'freeText': entry.get('freeText', ''),
     }
 
 
 def flatten_pit_row(entry: Dict[str, Any]) -> Dict[str, Any]:
-    intake = parse_json_field(entry.get('intakeSources'), {})
+    intake = parse_json_field(convert_objectid_to_str(entry.get('intakeSources')), {})
     if not isinstance(intake, dict):
         intake = {}
 
@@ -58,6 +61,7 @@ def flatten_pit_row(entry: Dict[str, Any]) -> Dict[str, Any]:
         'intakeFloorNeutral': coerce_bool(intake.get('floorNeutral', False)),
         'scoringMethod': entry.get('scoringMethod', ''),
         'preferredScoringSpot': entry.get('preferredScoringSpot', ''),
+        'robotMaintain': entry.get('robotMaintain', ''),
         'towerCapabilityClaimed': entry.get('towerCapabilityClaimed', ''),
         'batteryCount': coerce_int(entry.get('batteryCount', 0)),
         'notes': entry.get('notes', ''),

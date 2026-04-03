@@ -1,4 +1,5 @@
 batteryCount,drivebase,intakeDepot,intakeFloorNeutral,intakeOutpostCorral,maxFuelStorageEstimate,notes,preferredScoringSpot,scoringMethod,scouterName,teamNumber,towerCapabilityClaimed
+<<<<<<< HEAD
 5,swerve,True,True,False,38,Strong auto consistency in center lane.,backOfZone,low-shot,Scout 12,4,level2
 8,other,False,True,False,43,Strong auto consistency in center lane.,varies,high-shot,Scout 2,294,level3
 5,tank,True,False,True,14,Needs occasional reset after defense contact.,varies,dump,Scout 4,597,level3
@@ -41,3 +42,6 @@ batteryCount,drivebase,intakeDepot,intakeFloorNeutral,intakeOutpostCorral,maxFue
 3,other,True,True,False,14,Strong auto consistency in center lane.,varies,high-shot,Scout 4,9505,level1
 6,tank,True,True,True,33,,nearHub,low-shot,Scout 2,9696,level1
 4,tank,False,True,True,30,Prefers fast cycle rhythm.,nearHub,dump,Scout 12,11096,unknown
+=======
+1,tank,True,False,False,1,Worst robot at event fr fr,nearHub,other,Phong,4201,level3
+>>>>>>> c533c9d0a0f2d0c0b1df521e5832b775cc1f65b0

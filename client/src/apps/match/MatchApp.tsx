@@ -107,7 +107,7 @@ const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | 
 ];
 
 const teleTowerOptions: TeleTowerResult[] = ['None', 'Failed', 'level1', 'level2', 'level3'];
-const driverQualityOptions: DriverQuality[] = ['great', 'good', 'ok', 'rough'];
+const driverQualityOptions: DriverQuality[] = ['Poor', 'Rough', 'Ok', 'Good', 'Great'];
 const breakdownOptions: BreakdownType[] = ['None', 'stuck', 'tipped', 'comms', 'mechanism', 'other'];
 
 const foulLabels: Array<{
@@ -423,7 +423,7 @@ function MatchApp() {
     const [robotAbsent, setRobotAbsent] = useState(false);
     const [autoStartingPosition, setAutoStartingPosition] = useState<AutoStartingPosition | null>(null);
     const [teleTower, setTeleTower] = useState<TeleTowerResult>('None');
-    const [driverQuality, setDriverQuality] = useState<DriverQuality>('ok');
+    const [driverQuality, setDriverQuality] = useState<DriverQuality>('Poor');
     const [breakdown, setBreakdown] = useState<BreakdownType>('None');
     const [defenseProvided, setDefenseProvided] = useState<MatchData['defenseProvided']>('None');
     const [defenseReceived, setDefenseReceived] = useState(false);
@@ -948,7 +948,7 @@ function MatchApp() {
         }
         autoDrawingPointerIdRef.current = null;
         setTeleTower('None');
-        setDriverQuality('ok');
+        setDriverQuality('Ok');
         setBreakdown('None');
         setDefenseProvided('None');
         setDefenseReceived(false);
@@ -1055,6 +1055,8 @@ function MatchApp() {
         handleResetMatch();
     };
 
+    const [shooterAccuracy, setAccuracy] = useState(0);
+
     if (!signedIn) {
         return (
             <div className='min-h-screen bg-gradient-to-b from-[#151a25] via-[#111722] to-[#0b111a] pb-8 text-sm text-white'>
@@ -1099,8 +1101,8 @@ function MatchApp() {
             <main className='mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pb-10 pt-5 md:px-6'>
                 <header className={`${sectionClass} flex flex-wrap items-center justify-between gap-3`}>
                     <div>
-                        <h1 className='text-xl font-semibold text-[#48c55c]'>Match Scouting</h1>
-                        <p className='mt-1 text-xs text-gray-400'>
+                        <h1 className='select-none text-xl font-semibold text-[#48c55c]'>Match Scouting</h1>
+                        <p className='select-none mt-1 text-xs text-gray-400'>
                             {scouterName || 'Scout Not Signed In'}{' '}
                             {robotPosition ? `(${robotPosition})` : ''}
                         </p>
@@ -1110,7 +1112,7 @@ function MatchApp() {
                         <button
                             type='button'
                             onClick={() => setSignedIn(false)}
-                            className='rounded-lg bg-[#3a4254] px-3 py-2 text-xs font-semibold text-white'>
+                            className='select-none rounded-lg bg-[#3a4254] px-3 py-2 text-xs font-semibold text-white'>
                             Switch Scout
                         </button>
                         <LinkButton link='/' className='snap-none'>
@@ -1120,8 +1122,8 @@ function MatchApp() {
                 </header>
 
                 <section className={sectionClass}>
-                    <h2 className='text-base font-semibold text-[#48c55c]'>Overview</h2>
-                    <div className='mt-3 grid gap-3 md:grid-cols-2'>
+                    <h2 className='select-none text-base font-semibold text-[#48c55c]'>Overview</h2>
+                    <div className='select-none mt-3 grid gap-3 md:grid-cols-2'>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Match Number</p>
                             <NumberInput
@@ -1141,9 +1143,9 @@ function MatchApp() {
                         </div>
                     </div>
 
-                    <div className='mt-3'>
+                    <div className='select-none mt-3'>
                         <p className='text-xs uppercase tracking-wide text-gray-300'>Starting Position</p>
-                        <div className='mt-1 flex flex-wrap gap-2'>
+                        <div className='select-none mt-1 flex flex-wrap gap-2'>
                             <MultiButton
                                 onChange={setAutoStartingPosition}
                                 value={autoStartingPosition}
@@ -1163,7 +1165,7 @@ function MatchApp() {
                             boxClassName='size-4'>
                             <span className='ml-1.5'>Robot Absent</span>
                         </Checkbox>
-                        <p className='text-gray-400'>
+                        <p className='select-none text-gray-400'>
                             Team auto-fills from hardcoded schedule using match number + scout
                             position.
                         </p>
@@ -1171,7 +1173,7 @@ function MatchApp() {
                 </section>
 
                 <section className={sectionClass}>
-                    <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <div className='select-none flex flex-wrap items-center justify-between gap-3'>
                         <div>
                             <h2 className='text-base font-semibold text-[#48c55c]'>Auto Path</h2>
                             <p className='text-xs text-gray-300'>
@@ -1192,14 +1194,14 @@ function MatchApp() {
                             <button
                                 type='button'
                                 onClick={() => setAutoPanelManualOverride(!autoPanelOpen)}
-                                className='rounded bg-[#48c55c] px-3 py-1 text-xs font-semibold text-black'>
+                                className='select-none rounded bg-[#48c55c] px-3 py-1 text-xs font-semibold text-black'>
                                 {autoPanelOpen ? 'Collapse' : 'Expand'}
                             </button>
                         </div>
                     </div>
 
                     {autoPanelOpen && (
-                        <div className='mt-3 space-y-3'>
+                        <div className='select-none mt-3 space-y-3'>
                             <div className='flex flex-wrap items-center gap-2 text-xs text-gray-300'>
                                 <span className='rounded border border-white/15 bg-[#111827] px-2 py-1'>
                                     Alliance: {allianceColor.toUpperCase()}
@@ -1316,14 +1318,14 @@ function MatchApp() {
                                 <button
                                     type='button'
                                     onClick={handleMarkShot}
-                                    className='rounded-lg bg-amber-400 px-3 py-2 text-xs font-semibold text-black'
+                                    className='select-none rounded-lg bg-amber-400 px-3 py-2 text-xs font-semibold text-black'
                                     disabled={!autoDrawingTip && !autoResumePoint}>
                                     Mark Shot Position
                                 </button>
                                 <button
                                     type='button'
                                     onClick={clearAutoPath}
-                                    className='rounded-lg bg-[#4b5568] px-3 py-2 text-xs font-semibold text-white'
+                                    className='select-none rounded-lg bg-[#4b5568] px-3 py-2 text-xs font-semibold text-white'
                                     disabled={autoPathPoints.length === 0 && autoShotMarkers.length === 0}>
                                     Clear Auto Path
                                 </button>
@@ -1333,7 +1335,7 @@ function MatchApp() {
                 </section>
 
                 <section className={sectionClass}>
-                    <div className='flex items-end justify-between gap-3'>
+                    <div className='select-none flex items-end justify-between gap-3'>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Match Timer</p>
                             <p className='font-mono text-4xl font-semibold text-[#48c55c]'>
@@ -1363,14 +1365,14 @@ function MatchApp() {
                         <button
                             type='button'
                             onClick={handleStartNewMatch}
-                            className='rounded-lg bg-[#48c55c] px-3 py-2 text-sm font-semibold text-black'>
+                            className='select-none rounded-lg bg-[#48c55c] px-3 py-2 text-sm font-semibold text-black'>
                             Start Match
                         </button>
                         <button
                             type='button'
                             onClick={handlePauseResume}
                             disabled={remainingSec <= 0}
-                            className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                            className={`select-none rounded-lg px-3 py-2 text-sm font-semibold ${
                                 remainingSec <= 0
                                     ? 'cursor-not-allowed bg-[#324056] text-gray-400'
                                     : 'bg-sky-500 text-black'
@@ -1380,12 +1382,12 @@ function MatchApp() {
                         <button
                             type='button'
                             onClick={handleResetMatch}
-                            className='rounded-lg bg-[#d15858] px-3 py-2 text-sm font-semibold text-white'>
+                            className='select-none rounded-lg bg-[#d15858] px-3 py-2 text-sm font-semibold text-white'>
                             Reset Match
                         </button>
                     </div>
 
-                    <div className='mt-4 grid gap-3 md:grid-cols-2'>
+                    <div className='select-none mt-4 grid gap-3 md:grid-cols-2'>
                         {(
                             [
                                 { action: 'shoot', label: 'HOLD TO TRACK SHOOTING', color: 'bg-emerald-400', ticks: shootTickCount },
@@ -1424,7 +1426,7 @@ function MatchApp() {
                 </section>
 
                 <section className={sectionClass}>
-                    <div className='flex flex-wrap items-center justify-between gap-2'>
+                    <div className='select-none flex flex-wrap items-center justify-between gap-2'>
                         <h2 className='text-base font-semibold text-[#48c55c]'>Timeline</h2>
                         <p className='text-xs text-gray-300'>
                             Elapsed {elapsedSec.toFixed(1)}s / {MATCH_TOTAL_SEC}s
@@ -1437,7 +1439,7 @@ function MatchApp() {
                         onPointerMove={handleTimelinePointerMove}
                         onPointerUp={stopTimelineScrub}
                         onPointerCancel={stopTimelineScrub}
-                        className={`relative mt-2 h-24 cursor-ew-resize overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
+                        className={`select-none relative mt-2 h-24 cursor-ew-resize overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
                             scrubbingTimeline ? 'ring-2 ring-[#48c55c]/60' : ''
                         }`}>
                         <div className='absolute inset-0 bg-gradient-to-r from-[#141b2a] via-[#101826] to-[#0c1320]' />
@@ -1498,7 +1500,7 @@ function MatchApp() {
                         />
                     </div>
 
-                    <div className='mt-2 flex flex-wrap items-center gap-4 text-[11px] text-gray-300'>
+                    <div className='select-none mt-2 flex flex-wrap items-center gap-4 text-[11px] text-gray-300'>
                         <p>Drag timeline to jump to any time.</p>
                         <p className='flex items-center gap-1.5'>
                             <span className='inline-block size-2 rounded-sm bg-emerald-400/90' />
@@ -1511,9 +1513,9 @@ function MatchApp() {
                     </div>
                 </section>
                 <section className={sectionClass}>
-                    <h2 className='text-base font-semibold text-[#48c55c]'>Endgame</h2>
-                    <p className='mt-1 text-xs text-gray-300'>Climbing Result</p>
-                    <div className='mt-2 flex flex-wrap gap-2'>
+                    <h2 className='select-none text-base font-semibold text-[#48c55c]'>Endgame</h2>
+                    <p className='select-none mt-1 text-xs text-gray-300'>Climbing Result</p>
+                    <div className='select-none mt-2 flex flex-wrap gap-2'>
                         <MultiButton
                             onChange={setTeleTower}
                             value={teleTower}
@@ -1529,14 +1531,14 @@ function MatchApp() {
                         Expanded Match Content
                     </summary>
 
-                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                    <div className='select-none mt-4 grid gap-4 md:grid-cols-2'>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Driver Quality</p>
-                            <div className='mt-1 flex flex-wrap gap-2'>
+                            <div className='select-none mt-1 flex flex-wrap gap-2'>
                                 <MultiButton
                                     onChange={setDriverQuality}
                                     value={driverQuality}
-                                    labels={driverQualityOptions.map(option => option.toUpperCase())}
+                                    labels={driverQualityOptions}
                                     values={driverQualityOptions}
                                     selectedClassName='bg-[#48c55c] text-black'
                                     unSelectedClassName='bg-[#3a4254] text-white'
@@ -1545,7 +1547,7 @@ function MatchApp() {
                         </div>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Breakdown</p>
-                            <div className='mt-1 flex flex-wrap gap-2'>
+                            <div className='select-none mt-1 flex flex-wrap gap-2'>
                                 <MultiButton
                                     onChange={setBreakdown}
                                     value={breakdown}
@@ -1558,7 +1560,7 @@ function MatchApp() {
                         </div>
                         <div>
                             <p className='text-xs uppercase tracking-wide text-gray-300'>Defense Provided</p>
-                            <div className='mt-1 flex flex-wrap gap-2'>
+                            <div className='select-none mt-1 mb-1 flex flex-wrap gap-2'>
                                 <MultiButton
                                     onChange={setDefenseProvided}
                                     value={defenseProvided}
@@ -1573,7 +1575,7 @@ function MatchApp() {
                                 onChange={setDefenseReceived}
                                 className='mt-2 text-xs text-white'
                                 boxClassName='size-4'>
-                                <span className='ml-1.5'>Was Defended</span>
+                                <span className='ml-1.5 text-center mb-5'>Was Defended</span>
                             </Checkbox>
                         </div>
                         <div>
@@ -1587,7 +1589,7 @@ function MatchApp() {
                         </div>
                     </div>
 
-                    <div className='mt-4 grid gap-4 md:grid-cols-2'>
+                    <div className='select-none mt-4 grid gap-4 md:grid-cols-2'>
                         <div>
                             <p className='text-xs font-semibold uppercase tracking-wide text-gray-300'>
                                 Fouls
@@ -1602,7 +1604,7 @@ function MatchApp() {
                                                 onHold={() => adjustFoul(entry.key, -1)}
                                                 repeatDelay={120}
                                                 repeatInterval={90}
-                                                className='rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
+                                                className='select-none rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
                                                 -
                                             </HoldButton>
                                             <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
@@ -1614,7 +1616,7 @@ function MatchApp() {
                                                     )
                                                 }
                                                 aria-expanded={activeFoulInfo === entry.key}
-                                                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                                                className={`select-none rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
                                                     activeFoulInfo === entry.key
                                                         ? 'border-sky-300/70 bg-sky-300/15 text-sky-100'
                                                         : 'border-white/25 bg-white/5 text-gray-300 hover:bg-white/10'
@@ -1628,7 +1630,7 @@ function MatchApp() {
                                                 onHold={() => adjustFoul(entry.key, 1)}
                                                 repeatDelay={120}
                                                 repeatInterval={90}
-                                                className='rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
+                                                className='select-none rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
                                                 +
                                             </HoldButton>
                                         </div>
@@ -1657,7 +1659,7 @@ function MatchApp() {
                                                 onHold={() => adjustBreak(entry.key, -1)}
                                                 repeatDelay={120}
                                                 repeatInterval={90}
-                                                className='rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
+                                                className='select-none rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
                                                 -
                                             </HoldButton>
                                             <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
@@ -1669,7 +1671,7 @@ function MatchApp() {
                                                     )
                                                 }
                                                 aria-expanded={activeBreakInfo === entry.key}
-                                                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
+                                                className={`select-none rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition ${
                                                     activeBreakInfo === entry.key
                                                         ? 'border-sky-300/70 bg-sky-300/15 text-sky-100'
                                                         : 'border-white/25 bg-white/5 text-gray-300 hover:bg-white/10'
@@ -1683,7 +1685,7 @@ function MatchApp() {
                                                 onHold={() => adjustBreak(entry.key, 1)}
                                                 repeatDelay={120}
                                                 repeatInterval={90}
-                                                className='rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
+                                                className='select-none rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
                                                 +
                                             </HoldButton>
                                         </div>
@@ -1697,22 +1699,48 @@ function MatchApp() {
                                 ))}
                             </div>
                         </div>
+
+                        <div className='col-span-2'>
+                            <p className='text-xs font-semibold uppercase tracking-wide text-gray-300'> 
+                                Shooter Accuracy 
+                            </p>
+                            <div>
+                                <input
+                                    type='range'
+                                    value={shooterAccuracy}
+                                    onChange={e => setAccuracy(Number(e.target.value))}
+                                    min={0}
+                                    max={100}
+                                    className='w-full mt-3'
+                                    step="5"
+                                />
+                                <div className='mt-1 text-sm'>Accuracy: {shooterAccuracy}%</div>
+                                <div className='mt-2 flex items-center justify-between text-xs text-gray-400'>
+                                    <span>0</span>
+                                    <span>25</span>
+                                    <span>50</span>
+                                    <span>75</span>
+                                    <span>100</span>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </details>
                 <section className={`${sectionClass} flex flex-col gap-2`}>
                     <button
                         type='button'
                         onClick={handleSubmit}
-                        className='rounded-lg bg-[#48c55c] px-4 py-3 text-sm font-semibold text-black'>
+                        className='select-none rounded-lg bg-[#48c55c] px-4 py-3 text-sm font-semibold text-black'>
                         Submit Match
                     </button>
-                    <p className='text-xs text-gray-300'>
+                    <p className='select-none text-xs text-gray-300'>
                         Queue: <span className='font-semibold text-white'>{queue.length}</span>
                     </p>
                     <button
                         type='button'
                         onClick={sendAll}
-                        className='rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-black'>
+                        className='select-none rounded-lg bg-amber-500 px-4 py-2 text-xs font-semibold text-black'>
                         {sending ? 'Sending...' : 'Resend All'}
                     </button>
                 </section>

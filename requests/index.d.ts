@@ -145,7 +145,7 @@ export type BreakdownType =
     | 'mechanism'
     | 'other';
 
-export type DriverQuality = 'great' | 'good' | 'ok' | 'rough';
+export type DriverQuality = 'Poor' | 'Rough' | 'Ok' | 'Good' | 'Great';
 
 export type DefenseProvided = 'None' | 'some' | 'heavy';
 
@@ -202,8 +202,12 @@ export interface MatchData {
 }
 
 export type Drivebase = 'tank' | 'swerve' | 'other';
+export type SDSSwerveModuleType = 'mk4' | 'mk4i' | 'mk4n' | 'mk4c' | 'mk5n' | 'mk5i';
+export type WPCSwerveModuleType = 'lNonFlipped' | 'lFlippedBelt' | 'lFlippedGear' | 'swerveX' | 'swerveXF' | 'x2x2' | 'x2Sx2S';
+export type OtherSwerveModuleType = 'other';
 export type ScoringMethod = 'dump' | 'low-shot' | 'high-shot' | 'other';
-export type PreferredScoringSpot = 'nearHub' | 'backOfZone' | 'varies';
+export type PreferredScoringSpot = 'nearHub' | 'backOfZone' | 'scoreOnTheRun' |'varies';
+export type RobotMaintain = 'easyMaintain' | 'hardMaintain';
 export type TowerCapabilityClaimed =
     | 'level1'
     | 'level2'
@@ -214,6 +218,9 @@ export interface PitFile {
     scouterName: string;
     teamNumber: number;
     drivebase: Drivebase;
+    sdsSwerveType: SDSSwerveModuleType  | undefined;
+    wpcSwerveType: WPCSwerveModuleType  | undefined;
+    otherSwerveType: OtherSwerveModuleType | undefined;
     maxFuelStorageEstimate: number | null;
     intakeSources: {
         depot: boolean;
@@ -222,6 +229,7 @@ export interface PitFile {
     };
     scoringMethod: ScoringMethod;
     preferredScoringSpot: PreferredScoringSpot;
+    robotMaintain: RobotMaintain;
     towerCapabilityClaimed: TowerCapabilityClaimed;
     batteryCount: number;
     photo: string;

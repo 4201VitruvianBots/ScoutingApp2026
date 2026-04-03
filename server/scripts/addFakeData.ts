@@ -7,11 +7,15 @@ import {
     ActionKind,
     Drivebase,
     MatchData,
+    OtherSwerveModuleType,
     PitFile,
     PreferredScoringSpot,
+    RobotMaintain,
     ScoringMethod,
     ScouterData,
+    SDSSwerveModuleType,
     TowerCapabilityClaimed,
+    WPCSwerveModuleType,
 } from 'requests';
 import { dotenvLoad } from 'dotenv-mono';
 
@@ -162,11 +166,18 @@ const scouterNamesBase = [
 ];
 
 const drivebases: Drivebase[] = ['tank', 'swerve', 'other'];
+const sdsSwerveTypes: SDSSwerveModuleType[] = ['mk4' , 'mk4i' , 'mk4n' , 'mk4c' , 'mk5n' , 'mk5i'];
+const wpcSwerveTypes: WPCSwerveModuleType[] = ['lNonFlipped', 'lFlippedBelt', 'lFlippedGear', 'swerveX' , 'swerveXF' , 'x2x2' , 'x2Sx2S'];
+const otherSwerveType: OtherSwerveModuleType[] = ['other'];
 const scoringMethods: ScoringMethod[] = ['dump', 'low-shot', 'high-shot', 'other'];
 const preferredScoringSpots: PreferredScoringSpot[] = [
     'nearHub',
     'backOfZone',
     'varies',
+];
+const robotMaintain: RobotMaintain[] = [
+    'easyMaintain',
+    'hardMaintain',
 ];
 const towerCapabilities: TowerCapabilityClaimed[] = [
     'level1',
@@ -513,10 +524,11 @@ for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
                   ? choose(['stuck', 'tipped', 'comms', 'mechanism', 'other'])
                   : 'None',
             driverQuality: weightedChoice([
-                ['great', 0.2 + profile.tele * 0.35],
-                ['good', 0.35],
-                ['ok', 0.3],
-                ['rough', 0.15 + (1 - profile.tele) * 0.2],
+                ['Poor', 0.2 + profile.tele * 0.35],
+                ['Rough', 0.35],
+                ['Ok', 0.3],
+                ['Good', 0.15 + (1 - profile.tele) * 0.2],
+                ['Great', 0.1],
             ]),
             defenseProvided: weightedChoice([
                 ['None', 0.45],
@@ -568,6 +580,9 @@ if (includePit) {
             scouterName: choose(scouterNames),
             teamNumber: team,
             drivebase: choose(drivebases),
+            sdsSwerveType: choose(sdsSwerveTypes),
+            wpcSwerveType: choose(wpcSwerveTypes),
+            otherSwerveType: choose(otherSwerveType),
             maxFuelStorageEstimate: chance(0.15)
                 ? null
                 : clamp(Math.round(profile.tele * 40 + randfloat(12, 4)), 0, 60),
@@ -578,6 +593,7 @@ if (includePit) {
             },
             scoringMethod: choose(scoringMethods),
             preferredScoringSpot: choose(preferredScoringSpots),
+            robotMaintain: choose(robotMaintain),
             towerCapabilityClaimed: choose(towerCapabilities),
             batteryCount: clamp(randint(7), 0, 6),
             photo: Buffer.from([]),
