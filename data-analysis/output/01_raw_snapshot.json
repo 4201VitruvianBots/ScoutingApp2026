@@ -1,0 +1,9 @@
+{
+  "stage": "01_extract_source",
+  "sourceMode": "csv",
+  "counts": {
+    "match": 462,
+    "pit": 42
+  },
+  "configPath": "C:\\Users\\benja\\code\\ScoutingApp2026\\data-analysis\\output\\pipeline_effective_w6k0xt_m.json"
+}

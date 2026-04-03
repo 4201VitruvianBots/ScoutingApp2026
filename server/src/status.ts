@@ -8,6 +8,8 @@ import {
 } from 'requests';
 import { matchApp } from './Schema.js';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { gameConfig } from './gameConfig.js';
 
 const bluePositionsAll: RobotPosition[] = [
@@ -31,13 +33,21 @@ const redPositions = redPositionsAll.slice(
     gameConfig.allianceSizeRobots.default
 );
 
-const scheduleFile = '../client/src/assets/matchSchedule.json';
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const scheduleFile = path.resolve(
+    currentDir,
+    '../../client/src/assets/matchSchedule.json'
+);
 
 const schedule = fs.existsSync(scheduleFile)
     ? (JSON.parse(
           fs.readFileSync(scheduleFile, { encoding: 'utf8' })
       ) as MatchSchedule)
     : undefined;
+const DEV_USE_DOCKER = ['1', 'true', 'yes', 'on'].includes(
+    String(process.env.DEV_USE_DOCKER ?? '').toLowerCase()
+);
+const DB_ENABLED = process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER;
 
 const status: StatusRecieve = { matches: {}, scouters: [] };
 
@@ -50,11 +60,14 @@ function notifyWatchers() {
 }
 
 async function updateMatchStatus() {
-    const matchEntries = await matchApp
-        .find()
-        .select(
-            'metadata.matchNumber metadata.robotTeam metadata.robotPosition'
-        );
+    const matchEntries = DB_ENABLED
+        ? await matchApp
+              .find()
+              .select(
+                  'metadata.matchNumber metadata.robotTeam metadata.robotPosition'
+              )
+              .catch(() => [])
+        : [];
 
     const matchNumbers = [
         ...[...Object.keys(schedule ?? {})].map(number => parseInt(number)),
@@ -94,7 +107,7 @@ async function updateMatchStatus() {
     notifyWatchers();
 }
 
-updateMatchStatus();
+updateMatchStatus().catch(() => undefined);
 
 function setUpSocket(expressApp: Application) {
     const { app } = expressWs(expressApp);

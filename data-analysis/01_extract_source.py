@@ -2,9 +2,18 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
-from pymongo import MongoClient
-
-from common import ROOT, coerce_bool, coerce_float, coerce_int, load_config, parse_args, parse_json_field, write_csv, write_json
+from common import (
+    ROOT,
+    coerce_bool,
+    coerce_float,
+    coerce_int,
+    load_config,
+    parse_args,
+    parse_json_field,
+    read_csv,
+    write_csv,
+    write_json,
+)
 
 
 def flatten_match_row(entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -56,6 +65,8 @@ def flatten_pit_row(entry: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def load_from_mongo(config: Dict[str, Any]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    from pymongo import MongoClient
+
     source = config['source']
     client = MongoClient(source['mongo_url'])
     db = client[source['db']]
@@ -77,21 +88,46 @@ def load_from_fake(config: Dict[str, Any]) -> tuple[List[Dict[str, Any]], List[D
     return match_rows, pit_rows
 
 
+def resolve_repo_path(path_like: str) -> Path:
+    path = Path(path_like)
+    return path if path.is_absolute() else ROOT / path
+
+
+def load_from_csv(config: Dict[str, Any]) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+    source = config['source']
+    match_path = resolve_repo_path(
+        source.get('fake_match_csv', 'data-analysis/output/fake_match_source.csv')
+    )
+    pit_path = resolve_repo_path(
+        source.get('fake_pit_csv', 'data-analysis/output/fake_pit_source.csv')
+    )
+
+    if not match_path.exists():
+        raise FileNotFoundError(f'CSV source match file does not exist: {match_path}')
+    if not pit_path.exists():
+        raise FileNotFoundError(f'CSV source pit file does not exist: {pit_path}')
+
+    return read_csv(match_path), read_csv(pit_path)
+
+
 def main() -> None:
-    args = parse_args('Stage 01: extract source data from MongoDB or fake JSON source')
+    args = parse_args('Stage 01: extract source data from MongoDB, fake JSON source, or local CSV source')
     config = load_config(args.config)
     output_dir = Path(config['_output_dir'])
 
     mode = config['source'].get('mode', 'mongo').lower()
     if mode == 'mongo':
         match_entries, pit_entries = load_from_mongo(config)
+        match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
+        pit_rows = [flatten_pit_row(entry) for entry in pit_entries if isinstance(entry, dict)]
     elif mode == 'fake':
         match_entries, pit_entries = load_from_fake(config)
+        match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
+        pit_rows = [flatten_pit_row(entry) for entry in pit_entries if isinstance(entry, dict)]
+    elif mode == 'csv':
+        match_rows, pit_rows = load_from_csv(config)
     else:
         raise ValueError(f'Unsupported source mode: {mode}')
-
-    match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
-    pit_rows = [flatten_pit_row(entry) for entry in pit_entries if isinstance(entry, dict)]
 
     write_csv(output_dir / '01_match_raw.csv', match_rows)
     write_csv(output_dir / '01_pit_raw.csv', pit_rows)

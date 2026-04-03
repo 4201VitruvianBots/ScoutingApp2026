@@ -12,12 +12,26 @@ dotenv.load({ path: '.env' });
 dotenv.load({ path: '.env.local' });
 
 const REMOTE = process.env.LOCATION === 'remote';
+const isDev = process.env.NODE_ENV === 'dev';
+const devUseDocker = ['1', 'true', 'yes', 'on'].includes(
+    String(process.env.DEV_USE_DOCKER ?? '').toLowerCase()
+);
+const dbEnabled = !isDev || devUseDocker;
+process.env.DB_ENABLED = dbEnabled ? 'true' : 'false';
 
-process.env.CONTAINER_NAME ??= 'cala-quals';
+let container: Awaited<ReturnType<typeof startDockerContainer>> | null = null;
 
-const container = await startDockerContainer(process.env.CONTAINER_NAME);
-
-mongoose.connect('mongodb://0.0.0.0:27017/');
+if (dbEnabled) {
+    process.env.CONTAINER_NAME ??= 'cala-quals';
+    container = await startDockerContainer(process.env.CONTAINER_NAME);
+    await mongoose.connect('mongodb://0.0.0.0:27017/');
+} else {
+    console.log(
+        chalk.yellow(
+            'Dev mode running without Docker/Mongo (set DEV_USE_DOCKER=1 to enable DB).'
+        )
+    );
+}
 
 const server = app.listen(BACKEND_PORT, () => {
     console.log(chalk.green('Server running at http://localhost:' + BACKEND_PORT));
@@ -41,7 +55,14 @@ const handleExit = async () => {
 
     server.close();
 
-    await stopDockerContainer(container);
+    if (dbEnabled) {
+        if (mongoose.connection.readyState !== 0) {
+            await mongoose.disconnect();
+        }
+        if (container) {
+            await stopDockerContainer(container);
+        }
+    }
 
     console.log(chalk.green('Done'));
 

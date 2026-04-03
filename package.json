@@ -5,7 +5,10 @@
   "scripts": {
     "build": "npm run build --workspaces",
     "start": "npm run start --workspace server",
-    "dev": "concurrently \"npm run dev --workspace client\" \"npm run dev --workspace server\"",
+    "dev:data": "python data-analysis/run_fake_mode.py --no-seed-mongo --use-match-schedule --verify-picklist-artifacts",
+    "dev:data:db": "python data-analysis/run_fake_mode.py --seed-mongo --use-match-schedule --verify-picklist-artifacts",
+    "dev": "npm run dev:data && concurrently \"npm run dev --workspace client\" \"npm run dev --workspace server\"",
+    "dev:db": "npm run dev:data:db && concurrently \"npm run dev --workspace client\" \"cross-env DEV_USE_DOCKER=1 npm run dev --workspace server\"",
     "start:remote": "npm run start:remote --workspace server",
     "dev:remote": "concurrently \"npm run dev --workspace client\" \"npm run dev:remote --workspace server\"",
     "analysis:real": "python data-analysis/run_real_mode.py",

@@ -85,7 +85,7 @@ for (const team of teams) {
             primaryHex: '#7f7f7f',
             secondaryHex: '#7f7f7f',
             verified: false,
-        };
+        }; 
     } else {
         teamInfo[team] = {
             primaryHex: colorJson.primaryHex,

@@ -30,12 +30,14 @@ def parse_args() -> argparse.Namespace:
         default=str(DEFAULT_CONFIG_PATH),
         help='Path to pipeline JSON config.',
     )
-    parser.add_argument('--source-mode', choices=['mongo', 'fake'])
+    parser.add_argument('--source-mode', choices=['mongo', 'fake', 'csv'])
     parser.add_argument('--mongo-url')
     parser.add_argument('--db')
     parser.add_argument('--output-dir')
     parser.add_argument('--fake-match-json')
     parser.add_argument('--fake-pit-json')
+    parser.add_argument('--fake-match-csv')
+    parser.add_argument('--fake-pit-csv')
     parser.add_argument('--run-stage-07', action='store_true')
     parser.add_argument('--skip-stage-07', action='store_true')
     parser.add_argument('--seed-mongo', action='store_true')
@@ -78,6 +80,12 @@ def apply_overrides(config: Dict[str, Any], args: argparse.Namespace) -> bool:
         changed = True
     if args.fake_pit_json:
         source['fake_pit_json'] = args.fake_pit_json
+        changed = True
+    if args.fake_match_csv:
+        source['fake_match_csv'] = args.fake_match_csv
+        changed = True
+    if args.fake_pit_csv:
+        source['fake_pit_csv'] = args.fake_pit_csv
         changed = True
     if args.seed_mongo:
         fake_data['seed_mongo'] = True

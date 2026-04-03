@@ -18,12 +18,14 @@ def parse_args() -> argparse.Namespace:
         default=str(DEFAULT_CONFIG_PATH),
         help='Path to pipeline JSON config.',
     )
-    parser.add_argument('--source-mode', choices=['mongo', 'fake'])
+    parser.add_argument('--source-mode', choices=['mongo', 'fake', 'csv'])
     parser.add_argument('--mongo-url')
     parser.add_argument('--db')
     parser.add_argument('--output-dir')
     parser.add_argument('--fake-match-json')
     parser.add_argument('--fake-pit-json')
+    parser.add_argument('--fake-match-csv')
+    parser.add_argument('--fake-pit-csv')
     parser.add_argument('--run-stage-07', action='store_true')
     parser.add_argument('--skip-stage-07', action='store_true')
     parser.add_argument('--seed-mongo', action='store_true')
@@ -50,6 +52,8 @@ def main() -> None:
         ('--output-dir', args.output_dir),
         ('--fake-match-json', args.fake_match_json),
         ('--fake-pit-json', args.fake_pit_json),
+        ('--fake-match-csv', args.fake_match_csv),
+        ('--fake-pit-csv', args.fake_pit_csv),
     ):
         if option_value:
             command.extend([option_name, str(option_value)])

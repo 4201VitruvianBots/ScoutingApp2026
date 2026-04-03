@@ -4,7 +4,9 @@
     "mongo_url": "mongodb://localhost:27017/",
     "db": "test",
     "fake_match_json": "data-analysis/output/fake_match_source.json",
-    "fake_pit_json": "data-analysis/output/fake_pit_source.json"
+    "fake_pit_json": "data-analysis/output/fake_pit_source.json",
+    "fake_match_csv": "data-analysis/output/fake_match_source.csv",
+    "fake_pit_csv": "data-analysis/output/fake_pit_source.csv"
   },
   "paths": {
     "output_dir": "data-analysis/output"
@@ -38,6 +40,8 @@
     "team_count": 36,
     "team_start": 1000,
     "scouter_count": 12,
-    "include_pit": true
+    "include_pit": true,
+    "use_match_schedule": true,
+    "match_schedule_json": "client/src/assets/matchSchedule.json"
   }
 }

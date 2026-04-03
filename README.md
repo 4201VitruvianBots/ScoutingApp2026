@@ -44,6 +44,22 @@ Expected:
 
 - `Server running at http://localhost:8080`
 
+## One Command Dev Picklist (No Docker Required)
+
+`npm run dev` now does this automatically before starting client/server watchers:
+
+1. Runs fake analysis pipeline in local CSV mode (`--no-seed-mongo`)
+2. Generates picklist payload from `client/src/assets/matchSchedule.json`
+3. Starts dev client/server
+
+Then open Picklist and click **Refresh**. It should show analyzed payload data immediately.
+
+If you want Docker/Mongo in dev, use:
+
+```powershell
+npm run dev:db
+```
+
 ## Option A: Real Mode
 
 Use this when data comes from real scouting submissions (tablets) or imported real logs.
@@ -67,8 +83,9 @@ Outputs:
 Use this for testing. This mode:
 
 1. Generates fake logs.
-2. Clears and reseeds Mongo (`match`, `pit`, and `balls-per-second` collections).
-3. Runs the same analysis flow from Mongo as Real Mode.
+2. Writes local fake sources as JSON and CSV.
+3. Runs the full analysis flow from the generated local CSV source (`01` -> `06`, including picklist scoring and payload export).
+4. Optionally reseeds Mongo (`match`, `pit`, and `balls-per-second` collections) with `--seed-mongo`.
 
 ```powershell
 npm run analysis:fake
@@ -78,6 +95,12 @@ Optional fake-size overrides:
 
 ```powershell
 python data-analysis/run_fake_mode.py --match-count 90 --team-count 45 --scouter-count 16
+```
+
+Optional fake source overrides:
+
+```powershell
+python data-analysis/run_fake_mode.py --fake-match-csv data-analysis/output/my_fake_match.csv --fake-pit-csv data-analysis/output/my_fake_pit.csv --seed-mongo
 ```
 
 ## Import Real Logs Without Tablets

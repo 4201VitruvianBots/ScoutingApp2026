@@ -1,6 +1,8 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import {
@@ -34,17 +36,51 @@ import { gameConfig } from './gameConfig.js';
 
 // If DEV is true then the app should forward requests to localhost:5173 instead of serving from /static
 const DEV = process.env.NODE_ENV === 'dev';
+const DEV_USE_DOCKER = ['1', 'true', 'yes', 'on'].includes(
+    String(process.env.DEV_USE_DOCKER ?? '').toLowerCase()
+);
+const DB_ENABLED = process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER;
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(currentDir, '../..');
+const staticDir = path.resolve(currentDir, '../static');
+const analyzedPayloadPath = path.resolve(
+    repoRoot,
+    'data-analysis/output/06_picklist_payload.json'
+);
+const pipelineConfigPath = path.resolve(repoRoot, 'data-analysis/pipeline_config.json');
+const exportPayloadScriptPath = path.resolve(repoRoot, 'data-analysis/06_export_app_payloads.py');
+const analyzedInputCsvPaths = [
+    path.resolve(repoRoot, 'data-analysis/output/03_match_features.csv'),
+    path.resolve(repoRoot, 'data-analysis/output/03_timeseries_long.csv'),
+    path.resolve(repoRoot, 'data-analysis/output/03_auto_path_points.csv'),
+    path.resolve(repoRoot, 'data-analysis/output/04_team_aggregates.csv'),
+    path.resolve(repoRoot, 'data-analysis/output/05_picklist_scores.csv'),
+    path.resolve(repoRoot, 'data-analysis/output/05_metric_contributions.csv'),
+];
+const clientDistDir = path.resolve(repoRoot, 'client/dist');
 const DEFAULT_BALLS_PER_SECOND = 5;
 const defaultAutoFieldOrientation: Record<AllianceColor, FieldOrientation> = {
     red: 'orientation1',
     blue: 'orientation1',
 };
+const pythonCommand =
+    process.env.PYTHON_CMD ??
+    process.env.PYTHON ??
+    (process.platform === 'win32' ? 'python' : 'python3');
+let analyzedCsvBuildInFlight: Promise<void> | null = null;
 
 const app = express();
 
 app.use(express.json({ limit: '200mb' }));
 
 setUpSocket(app);
+
+function sendDbDisabled(res: express.Response) {
+    res.status(503).send({
+        message:
+            'Database-disabled dev mode: set DEV_USE_DOCKER=1 (or DB_ENABLED=true) to enable Mongo-backed routes.',
+    });
+}
 
 const emptyActionTimeBySegment: MatchData['shootTimeBySegment'] = {
     auto: 0,
@@ -82,6 +118,79 @@ const matchTimelineSegments = gameConfig.segments.map(segment => ({
     startSec: segment.startSec,
     endSec: segment.endSec,
 }));
+
+function shouldServeAnalyzedFromLocalCsv() {
+    const mode = String(process.env.PICKLIST_ANALYZED_SOURCE ?? '').toLowerCase();
+    if (mode === 'mongo') return false;
+    if (mode === 'csv' || mode === 'local' || mode === 'output') return true;
+    return DEV;
+}
+
+function runLocalCsvExport() {
+    return new Promise<void>((resolve, reject) => {
+        const child = spawn(
+            pythonCommand,
+            [
+                exportPayloadScriptPath,
+                '--config',
+                pipelineConfigPath,
+            ],
+            { cwd: repoRoot }
+        );
+
+        let stderr = '';
+        child.stderr.on('data', chunk => {
+            stderr += chunk.toString();
+        });
+
+        child.on('error', error => {
+            reject(error);
+        });
+
+        child.on('close', code => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+            reject(
+                new Error(
+                    `Local CSV analysis pipeline failed with code ${code}. ${stderr.trim()}`
+                )
+            );
+        });
+    });
+}
+
+async function shouldRebuildAnalyzedPayloadFromLocalCsv() {
+    let payloadMtimeMs = 0;
+    try {
+        payloadMtimeMs = (await fs.promises.stat(analyzedPayloadPath)).mtimeMs;
+    } catch {
+        return true;
+    }
+
+    const inputStats = await Promise.all(
+        analyzedInputCsvPaths.map(csvPath => fs.promises.stat(csvPath))
+    );
+    const newestInputMtimeMs = Math.max(
+        ...inputStats.map(entry => entry.mtimeMs)
+    );
+    return newestInputMtimeMs > payloadMtimeMs;
+}
+
+async function ensureAnalyzedPayloadFromLocalCsv() {
+    if (!shouldServeAnalyzedFromLocalCsv()) return;
+    if (analyzedCsvBuildInFlight) {
+        await analyzedCsvBuildInFlight;
+        return;
+    }
+    if (!(await shouldRebuildAnalyzedPayloadFromLocalCsv())) return;
+
+    analyzedCsvBuildInFlight = runLocalCsvExport().finally(() => {
+        analyzedCsvBuildInFlight = null;
+    });
+    await analyzedCsvBuildInFlight;
+}
 
 type AutoPathTrace = NonNullable<MatchData['autoPath']>;
 type AutoPathPoint = AutoPathTrace['points'][number];
@@ -416,6 +525,11 @@ async function getAutoFieldOrientationMap() {
 }
 
 app.post('/data/match', async (req, res) => {
+    if (!DB_ENABLED) {
+        sendDbDisabled(res);
+        return;
+    }
+
     const body = req.body as MatchData;
     if (
         !body?.metadata ||
@@ -493,6 +607,22 @@ app.post('/data/match', async (req, res) => {
 });
 
 app.get('/config/balls-per-second', async (req, res) => {
+    if (!DB_ENABLED) {
+        const matchNumber = Number.parseInt(String(req.query.matchNumber), 10);
+        const teamRaw = req.query.teamNumber ?? req.query.robotTeam;
+        const robotTeam = Number.parseInt(String(teamRaw), 10);
+        if (Number.isFinite(matchNumber) && Number.isFinite(robotTeam)) {
+            res.send({
+                matchNumber,
+                robotTeam,
+                ballsPerSecond: DEFAULT_BALLS_PER_SECOND,
+            } satisfies BallsPerSecondSetting);
+        } else {
+            res.send([]);
+        }
+        return;
+    }
+
     const matchNumber = Number.parseInt(String(req.query.matchNumber), 10);
     const teamRaw = req.query.teamNumber ?? req.query.robotTeam;
     const robotTeam = Number.parseInt(String(teamRaw), 10);
@@ -512,6 +642,11 @@ app.get('/config/balls-per-second', async (req, res) => {
 });
 
 app.post('/config/balls-per-second', async (req, res) => {
+    if (!DB_ENABLED) {
+        sendDbDisabled(res);
+        return;
+    }
+
     const body = req.body as Partial<BallsPerSecondSetting>;
     const matchNumber = Number(body.matchNumber);
     const robotTeam = Number(body.robotTeam);
@@ -542,6 +677,24 @@ app.post('/config/balls-per-second', async (req, res) => {
 });
 
 app.get('/config/auto-field-orientation', async (req, res) => {
+    if (!DB_ENABLED) {
+        const side = String(req.query.side ?? '');
+        if (side === 'red' || side === 'blue') {
+            res.send({
+                side,
+                orientation: defaultAutoFieldOrientation[side],
+            } satisfies AutoFieldOrientationSetting);
+        } else {
+            res.send(
+                (['red', 'blue'] as const).map(currentSide => ({
+                    side: currentSide,
+                    orientation: defaultAutoFieldOrientation[currentSide],
+                } satisfies AutoFieldOrientationSetting))
+            );
+        }
+        return;
+    }
+
     const side = String(req.query.side ?? '');
     const map = await getAutoFieldOrientationMap();
 
@@ -562,6 +715,11 @@ app.get('/config/auto-field-orientation', async (req, res) => {
 });
 
 app.post('/config/auto-field-orientation', async (req, res) => {
+    if (!DB_ENABLED) {
+        sendDbDisabled(res);
+        return;
+    }
+
     const body = req.body as Partial<AutoFieldOrientationSetting>;
     const side = body.side;
     const orientation = body.orientation;
@@ -585,6 +743,11 @@ app.post('/config/auto-field-orientation', async (req, res) => {
 });
 
 app.post('/data/pit', async (req, res) => {
+    if (!DB_ENABLED) {
+        sendDbDisabled(res);
+        return;
+    }
+
     const body = req.body as PitFile;
     try {
         const photo =
@@ -606,39 +769,73 @@ app.post('/data/pit', async (req, res) => {
 });
 
 app.get('/data/retrieve', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.send([]);
+        return;
+    }
     res.send(await averageAndMax());
 });
 
 app.get('/data/retrieve/individualMatch', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.send([]);
+        return;
+    }
     res.send(await maxIndividual());
 });
 
 app.get('/data/retrieve/matchOutlier', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.send([]);
+        return;
+    }
     res.send(await matchOutlier());
 });
 
 app.get('/data/retrieve/analyzed', async (_req, res) => {
-    const payloadPath = path.resolve('../data-analysis/output/06_picklist_payload.json');
     try {
-        const payloadRaw = await fs.promises.readFile(payloadPath, 'utf8');
+        await ensureAnalyzedPayloadFromLocalCsv();
+        const payloadRaw = await fs.promises.readFile(analyzedPayloadPath, 'utf8');
+        if (shouldServeAnalyzedFromLocalCsv()) {
+            const payload = JSON.parse(payloadRaw) as Record<string, unknown>;
+            payload.sourceMode = 'csv';
+            res.json(payload);
+            return;
+        }
         res.type('application/json').send(payloadRaw);
-    } catch {
-        res.status(404).send({
-            message: 'Analyzed payload not found. Run data-analysis/run_pipeline.py first.',
-            path: payloadPath,
+    } catch (error) {
+        res.status(500).send({
+            message:
+                'Unable to build analyzed payload from local CSV outputs in data-analysis/output.',
+            path: analyzedPayloadPath,
+            error: error instanceof Error ? error.message : String(error),
         });
     }
 });
 
 app.get('/data/retrieve/scouter', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.send([]);
+        return;
+    }
     res.send(await scouterRankings());
 });
 
 app.get('/data/pit/scouted-teams', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.send([]);
+        return;
+    }
     res.send((await pitApp.find({}, { teamNumber: 1 })).map(e => e.teamNumber));
 });
 
 app.get('/image/:teamId.jpeg', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.status(404);
+        res.sendFile(path.resolve(staticDir, 'fallback.png'));
+        return;
+    }
+
     const { teamId } = req.params;
 
     //Search the pit scouting database for info on this teamId
@@ -656,7 +853,7 @@ app.get('/image/:teamId.jpeg', async (req, res) => {
     if (!imageData) {
         //  Return a 404 response
         res.status(404);
-        res.sendFile(path.resolve('static/fallback.png'));
+        res.sendFile(path.resolve(staticDir, 'fallback.png'));
         return;
     }
 
@@ -666,6 +863,11 @@ app.get('/image/:teamId.jpeg', async (req, res) => {
 });
 
 app.get('/data/pit', async (req, res) => {
+    if (!DB_ENABLED) {
+        res.send({});
+        return;
+    }
+
     const entries = await pitApp.find({}, { photo: 0 });
 
     const result: PitResult = {};
@@ -675,16 +877,16 @@ app.get('/data/pit', async (req, res) => {
     res.send(result);
 });
 
-app.use(express.static('static'));
+app.use(express.static(staticDir));
 
 // Since this is the fallback is must go after all other routes
 if (DEV) {
     app.use('/', createProxyMiddleware('http://localhost:5173', { ws: true }));
 } else {
-    app.use(express.static('../client/dist'));
+    app.use(express.static(clientDistDir));
 
     app.get('*', (_, res) => {
-        res.sendFile(path.resolve('../client/dist/index.html'));
+        res.sendFile(path.resolve(clientDistDir, 'index.html'));
     });
 }
 

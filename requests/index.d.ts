@@ -392,7 +392,7 @@ export interface TeamProfilePayload {
 
 export interface PicklistPayload {
     generatedAt: string;
-    sourceMode: 'mongo' | 'fake';
+    sourceMode: 'mongo' | 'fake' | 'csv';
     teams: TeamProfilePayload[];
 }
 

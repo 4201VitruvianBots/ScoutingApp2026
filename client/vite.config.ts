@@ -55,4 +55,13 @@ export default defineConfig({
             },
         },
     },
+    server: {
+        proxy: {
+            '/data': 'http://localhost:8081',
+            '/config': 'http://localhost:8081',
+            '/status': 'http://localhost:8081',
+            '/image': 'http://localhost:8081',
+            '/team_info.json': 'http://localhost:8081',
+        },
+    },
 });
