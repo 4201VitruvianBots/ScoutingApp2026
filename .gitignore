@@ -5,4 +5,4 @@ data-analysis/__pycache__/
 import_report.json
 data-analysis/raw_runs/
 data-analysis/analysis_runs/
-# data-analysis/output/
+data-analysis/output/
