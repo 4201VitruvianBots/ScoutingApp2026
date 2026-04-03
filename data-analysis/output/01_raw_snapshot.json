@@ -1,9 +1,0 @@
-{
-  "stage": "01_extract_source",
-  "sourceMode": "mongo",
-  "counts": {
-    "match": 210,
-    "pit": 1
-  },
-  "configPath": "C:\\GitKrakenStuff\\ScoutingApp2026\\data-analysis\\pipeline_config.json"
-}

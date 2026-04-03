@@ -1,18 +1,6 @@
-import { Dispatch } from 'react';
-import teamsString from '../assets/teams.txt?raw';
+﻿import { Dispatch, useMemo } from 'react';
 import SelectSearch, { SelectSearchOption } from 'react-select-search';
-
-('select-search-container');
-
-const teamOptions: SelectSearchOption[] = teamsString
-    .split(/\r?\n/g)
-    .filter(e => e !== '')
-    .map(e => ({ name: e, value: e }));
-
-const teamOptionsWithAbsent: SelectSearchOption[] = [
-    { value: '0', name: 'Absent' },
-    ...teamOptions,
-];
+import { useFetchJson } from '../lib/useFetch';
 
 function TeamDropdown({
     value,
@@ -25,20 +13,44 @@ function TeamDropdown({
     disabledOptions?: number[];
     allowAbsent?: boolean;
 }) {
-    const options = allowAbsent ? teamOptionsWithAbsent : teamOptions;
-    const optionsWithDisabled = disabledOptions
-        ? options.map(e => ({
-              ...e,
-              disabled: disabledOptions.includes(parseInt(e.value as string)),
-          }))
-        : options;
+    const [teams] = useFetchJson<number[]>('/config/teams-list', []);
+
+    const options = useMemo(() => {
+        const teamOptions: SelectSearchOption[] = teams
+            .map(team => Number(team))
+            .filter(team => Number.isFinite(team) && team > 0)
+            .sort((a, b) => a - b)
+            .map(team => ({ name: `${team}`, value: `${team}` }));
+
+        if (!allowAbsent) {
+            return teamOptions;
+        }
+
+        return [{ value: '0', name: 'Absent' }, ...teamOptions];
+    }, [allowAbsent, teams]);
+
+    const optionsWithDisabled = useMemo(
+        () =>
+            disabledOptions
+                ? options.map(option => {
+                      const teamNumber = Number.parseInt(String(option.value), 10);
+                      return {
+                          ...option,
+                          disabled: Number.isFinite(teamNumber)
+                              ? disabledOptions.includes(teamNumber)
+                              : false,
+                      };
+                  })
+                : options,
+        [disabledOptions, options]
+    );
 
     return (
         <div className='team-search mx-auto contents'>
             <SelectSearch
                 options={optionsWithDisabled}
                 value={value?.toString()}
-                onChange={value => onChange?.(parseInt(value as string))}
+                onChange={nextValue => onChange?.(Number.parseInt(nextValue as string, 10))}
                 search
                 placeholder='Select Team Number...'
             />

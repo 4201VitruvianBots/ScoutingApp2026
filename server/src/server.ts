@@ -29,6 +29,11 @@ import {
 } from 'requests';
 import { dataUriToBuffer } from 'data-uri-to-buffer';
 import { gameConfig } from './gameConfig.js';
+import {
+    getLatestAnalysisRunDir,
+    readMatchSchedule,
+    readTeamsList,
+} from './appSettings.js';
 
 // import { MatchData } from 'requests';
 
@@ -561,6 +566,28 @@ app.get('/config/auto-field-orientation', async (req, res) => {
     );
 });
 
+app.get('/config/match-schedule', (_req, res) => {
+    try {
+        res.send(readMatchSchedule());
+    } catch (error) {
+        res.status(500).send({
+            message: 'Failed to load match schedule from app_settings.',
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+});
+
+app.get('/config/teams-list', (_req, res) => {
+    try {
+        res.send(readTeamsList());
+    } catch (error) {
+        res.status(500).send({
+            message: 'Failed to load teams list from app_settings.',
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+});
+
 app.post('/config/auto-field-orientation', async (req, res) => {
     const body = req.body as Partial<AutoFieldOrientationSetting>;
     const side = body.side;
@@ -618,14 +645,25 @@ app.get('/data/retrieve/matchOutlier', async (req, res) => {
 });
 
 app.get('/data/retrieve/analyzed', async (_req, res) => {
-    const payloadPath = path.resolve('../data-analysis/output/06_picklist_payload.json');
+    const latestRunDir = getLatestAnalysisRunDir();
+    if (!latestRunDir) {
+        res.status(404).send({
+            message:
+                'No analysis run pointer found. Run 02 -> 06 in data-analysis first.',
+        });
+        return;
+    }
+
+    const payloadPath = path.resolve(latestRunDir, '06_picklist_payload.json');
     try {
         const payloadRaw = await fs.promises.readFile(payloadPath, 'utf8');
         res.type('application/json').send(payloadRaw);
-    } catch {
+    } catch (error) {
         res.status(404).send({
-            message: 'Analyzed payload not found. Run data-analysis/run_pipeline.py first.',
+            message:
+                'Analyzed payload not found in latest analysis run. Run stage 06_export_app_payloads.py.',
             path: payloadPath,
+            error: error instanceof Error ? error.message : String(error),
         });
     }
 });

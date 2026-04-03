@@ -19,7 +19,9 @@ import {
     PicklistPayload,
     PitResult,
     TeamData,
+    TeamMatchHistoryRow,
     TeamProfilePayload,
+    TeamTimelineRow,
 } from 'requests';
 
 type PicklistTab =
@@ -30,6 +32,12 @@ type PicklistTab =
     | 'pick_builder';
 
 type TimelineMetric = string;
+type AllianceFilter = 'all' | 'red' | 'blue';
+type HeatmapRow = {
+    matchNumber: number;
+    alliance: TeamTimelineRow['alliance'];
+    values: number[];
+};
 
 const tabs: Array<{ id: PicklistTab; label: string }> = [
     { id: 'overview', label: 'Overview' },
@@ -66,60 +74,169 @@ function formatMetricLabel(metric: string) {
         .replace(/^./, char => char.toUpperCase());
 }
 
-function normalizeAutoPath(path: TeamProfilePayload['autoPaths'][number]) {
-    if (path.alliance !== 'blue') return path;
+function getMetricNumber(value: unknown, fallback = 0) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    return fallback;
+}
+
+function formatAllianceLabel(value: TeamTimelineRow['alliance']) {
+    if (value === 'red') return 'Red';
+    if (value === 'blue') return 'Blue';
+    return 'N/A';
+}
+
+function getAllianceFromRobotPosition(position: string): 'red' | 'blue' {
+    return position.startsWith('red') ? 'red' : 'blue';
+}
+
+function isAllianceIncluded(
+    row: TeamTimelineRow,
+    allianceFilter: AllianceFilter
+) {
+    if (allianceFilter === 'all') return true;
+    return row.alliance === allianceFilter;
+}
+
+function normalizeLiveAutoPath(
+    path: NonNullable<MatchIndividualDataAggregations['autoPath']>
+) {
+    const shouldFlip = path.alliance === 'blue';
     return {
         ...path,
-        alliance: 'red' as const,
         points: path.points.map(point => ({
             ...point,
-            x: 1 - point.x,
+            x: shouldFlip ? 1 - point.x : point.x,
         })),
         shotMarkers: path.shotMarkers.map(point => ({
             ...point,
-            x: 1 - point.x,
+            x: shouldFlip ? 1 - point.x : point.x,
         })),
     };
 }
 
 function buildTimelineBins(
-    rows: MatchIndividualDataAggregations[]
+    rows: TeamTimelineRow[],
+    totalSec: number,
+    binSec: number
 ): TeamProfilePayload['timeline']['bins'] {
-    const totalSec = gameConfig.matchDurationSec;
-    const shootBins = Array.from({ length: totalSec }, () => 0);
-    const passBins = Array.from({ length: totalSec }, () => 0);
+    const safeTotalSec = Math.max(1, totalSec);
+    const safeBinSec = Math.max(1, binSec);
+    const binCount = Math.ceil(safeTotalSec / safeBinSec);
+    const shootBins = Array.from({ length: binCount }, () => 0);
+    const passBins = Array.from({ length: binCount }, () => 0);
 
-    const withTimeline = rows.filter(row => row.actionTimeline != null);
-    withTimeline.forEach(row => {
-        row.actionTimeline?.intervals.forEach(interval => {
-            const startBin = Math.max(0, Math.floor(interval.startSec));
-            const endBin = Math.min(totalSec, Math.ceil(interval.endSec));
-            for (let second = startBin; second < endBin; second++) {
-                const bucketStart = second;
-                const bucketEnd = second + 1;
-                if (
-                    interval.endSec <= bucketStart ||
-                    interval.startSec >= bucketEnd
-                ) {
-                    continue;
-                }
+    rows.forEach(row => {
+        row.intervals.forEach(interval => {
+            const startSec = clamp(interval.startSec, 0, safeTotalSec);
+            const endSec = clamp(interval.endSec, 0, safeTotalSec);
+            if (endSec <= startSec) return;
+
+            const startBin = Math.max(0, Math.floor(startSec / safeBinSec));
+            const endBin = Math.min(binCount, Math.ceil(endSec / safeBinSec));
+            for (let binIndex = startBin; binIndex < endBin; binIndex++) {
+                const bucketStart = binIndex * safeBinSec;
+                const bucketEnd = Math.min(safeTotalSec, bucketStart + safeBinSec);
+                const overlap =
+                    Math.min(endSec, bucketEnd) - Math.max(startSec, bucketStart);
+                if (overlap <= 0) continue;
+                const normalizedOverlap = overlap / Math.max(1, bucketEnd - bucketStart);
                 if (interval.action === 'shoot') {
-                    shootBins[second] += 1;
-                } else {
-                    passBins[second] += 1;
+                    shootBins[binIndex] += normalizedOverlap;
+                } else if (interval.action === 'pass') {
+                    passBins[binIndex] += normalizedOverlap;
                 }
             }
         });
     });
 
-    const divisor = withTimeline.length || 1;
-    return Array.from({ length: totalSec }, (_, second) => ({
-        second,
-        binEndSec: second + 1,
-        shootRate: shootBins[second]! / divisor,
-        passRate: passBins[second]! / divisor,
-        activityRate: (shootBins[second]! + passBins[second]!) / divisor,
-    }));
+    const divisor = Math.max(1, rows.length);
+    return Array.from({ length: binCount }, (_, index) => {
+        const second = index * safeBinSec;
+        const binEndSec = Math.min(safeTotalSec, second + safeBinSec);
+        const shootRate = shootBins[index] / divisor;
+        const passRate = passBins[index] / divisor;
+        return {
+            second,
+            binEndSec,
+            shootRate,
+            passRate,
+            activityRate: shootRate + passRate,
+        };
+    });
+}
+
+function buildTimelineRowsFromLiveRows(
+    rows: MatchIndividualDataAggregations[]
+): TeamTimelineRow[] {
+    return rows
+        .filter(row => row.actionTimeline != null)
+        .map(row => ({
+            matchNumber: row._id.matchNumber,
+            alliance: getAllianceFromRobotPosition(row._id.robotPosition),
+            robotPosition: row._id.robotPosition,
+            intervals: row.actionTimeline?.intervals ?? [],
+        }))
+        .sort((a, b) => a.matchNumber - b.matchNumber);
+}
+
+function buildTimelineHeatmapRows(
+    rows: TeamTimelineRow[],
+    metric: TimelineMetric,
+    totalSec: number,
+    binSec: number
+): HeatmapRow[] {
+    const safeTotalSec = Math.max(1, totalSec);
+    const safeBinSec = Math.max(1, binSec);
+    const binCount = Math.ceil(safeTotalSec / safeBinSec);
+
+    return rows
+        .map(row => {
+            const shootValues = Array.from({ length: binCount }, () => 0);
+            const passValues = Array.from({ length: binCount }, () => 0);
+
+            row.intervals.forEach(interval => {
+                const startSec = clamp(interval.startSec, 0, safeTotalSec);
+                const endSec = clamp(interval.endSec, 0, safeTotalSec);
+                if (endSec <= startSec) return;
+
+                const startBin = Math.max(0, Math.floor(startSec / safeBinSec));
+                const endBin = Math.min(binCount, Math.ceil(endSec / safeBinSec));
+                for (let binIndex = startBin; binIndex < endBin; binIndex++) {
+                    const bucketStart = binIndex * safeBinSec;
+                    const bucketEnd = Math.min(safeTotalSec, bucketStart + safeBinSec);
+                    const overlap =
+                        Math.min(endSec, bucketEnd) - Math.max(startSec, bucketStart);
+                    if (overlap <= 0) continue;
+                    const normalizedOverlap = overlap / Math.max(1, bucketEnd - bucketStart);
+                    if (interval.action === 'shoot') {
+                        shootValues[binIndex] += normalizedOverlap;
+                    } else if (interval.action === 'pass') {
+                        passValues[binIndex] += normalizedOverlap;
+                    }
+                }
+            });
+
+            const values = Array.from({ length: binCount }, (_, index) => {
+                const shoot = clamp(shootValues[index], 0, 1);
+                const pass = clamp(passValues[index], 0, 1);
+                if (metric === 'shootRate') return shoot;
+                if (metric === 'passRate') return pass;
+                return clamp(shoot + pass, 0, 1);
+            });
+
+            return {
+                matchNumber: row.matchNumber,
+                alliance: row.alliance,
+                values,
+            };
+        })
+        .sort((a, b) => a.matchNumber - b.matchNumber);
 }
 
 function toPayloadFromLive(
@@ -184,7 +301,105 @@ function toPayloadFromLive(
             const normalizedPaths = rows
                 .map(row => row.autoPath)
                 .filter((path): path is NonNullable<typeof path> => path != null)
-                .map(normalizeAutoPath);
+                .map(normalizeLiveAutoPath);
+
+            const timelineRows = buildTimelineRowsFromLiveRows(rows);
+            const timelineRowsRed = timelineRows.filter(
+                row => row.alliance === 'red'
+            );
+            const timelineRowsBlue = timelineRows.filter(
+                row => row.alliance === 'blue'
+            );
+            const timelineBins = buildTimelineBins(
+                timelineRows,
+                gameConfig.matchDurationSec,
+                1
+            );
+            const timelineBinsRed = buildTimelineBins(
+                timelineRowsRed,
+                gameConfig.matchDurationSec,
+                1
+            );
+            const timelineBinsBlue = buildTimelineBins(
+                timelineRowsBlue,
+                gameConfig.matchDurationSec,
+                1
+            );
+
+            const matchHistory: TeamMatchHistoryRow[] = rows
+                .map(row => {
+                    const shootSec = Object.values(row.shootTimeBySegment).reduce(
+                        (sum, value) => sum + value,
+                        0
+                    );
+                    const passSec = Object.values(row.passTimeBySegment).reduce(
+                        (sum, value) => sum + value,
+                        0
+                    );
+                    const rowEstimatedShotBalls = shootSec * row.ballsPerSecondUsed;
+                    const rowEstimatedPassBalls = passSec * row.ballsPerSecondUsed;
+                    return {
+                        matchNumber: row._id.matchNumber,
+                        alliance: getAllianceFromRobotPosition(row._id.robotPosition),
+                        robotPosition: row._id.robotPosition,
+                        roleEstimate:
+                            row.defenseProvided === 'heavy' ||
+                            (row.defenseProvided === 'some' &&
+                                rowEstimatedShotBalls < 22)
+                                ? ('defense' as const)
+                                : rowEstimatedShotBalls >=
+                                      rowEstimatedPassBalls * 1.35
+                                  ? ('primary_scorer' as const)
+                                  : ('support' as const),
+                        autoFuelScored: row.autoFuelScored,
+                        teleFuelTotal: row.teleFuelTotal,
+                        actualFuelTotal: row.autoFuelScored + row.teleFuelTotal,
+                        estimatedFuelPoints:
+                            rowEstimatedShotBalls *
+                            gameConfig.scoring.fuelPointsActive,
+                        defenseProvided: row.defenseProvided,
+                        defenseReceived: row.defenseReceived,
+                        foulsTotal: Object.values(row.fouls).reduce(
+                            (sum, value) => sum + value,
+                            0
+                        ),
+                        breaksTotal: Object.values(row.breaks).reduce(
+                            (sum, value) => sum + value,
+                            0
+                        ),
+                        breakdown: row.breakdown,
+                        driverQuality: row.driverQuality,
+                        timelineIntervalCount:
+                            row.actionTimeline?.intervals.length ?? 0,
+                    };
+                })
+                .sort((a, b) => a.matchNumber - b.matchNumber);
+
+            const matchHistoryCount = Math.max(1, matchHistory.length);
+            const rolePrimaryCount = matchHistory.filter(
+                row => row.roleEstimate === 'primary_scorer'
+            ).length;
+            const roleSupportCount = matchHistory.filter(
+                row => row.roleEstimate === 'support'
+            ).length;
+            const roleDefenseCount = matchHistory.filter(
+                row => row.roleEstimate === 'defense'
+            ).length;
+            const defenseHeavyCount = matchHistory.filter(
+                row => row.defenseProvided === 'heavy'
+            ).length;
+            const defenseSomeCount = matchHistory.filter(
+                row => row.defenseProvided === 'some'
+            ).length;
+            const defensiveSampleCount = defenseHeavyCount + defenseSomeCount;
+            const defensePlayEstimate = clamp(
+                (defenseHeavyCount + defenseSomeCount * 0.55) / matchHistoryCount,
+                0,
+                1
+            );
+            const defenseImpactRaw = defensePlayEstimate * 0.4;
+            const defenseImpactConfidence =
+                defensiveSampleCount / (defensiveSampleCount + 6);
 
             return {
                 teamNumber,
@@ -213,6 +428,23 @@ function toPayloadFromLive(
                     avgShootActiveSec: teamAgg.avgShootActiveSec,
                     avgPassActiveSec: teamAgg.avgPassActiveSec,
                 },
+                roleTendencies: {
+                    primaryScorerRate: rolePrimaryCount / matchHistoryCount,
+                    supportRate: roleSupportCount / matchHistoryCount,
+                    defenseRate: roleDefenseCount / matchHistoryCount,
+                },
+                defenseSummary: {
+                    defenseHeavyRate: defenseHeavyCount / matchHistoryCount,
+                    defenseSomeRate: defenseSomeCount / matchHistoryCount,
+                    defensePlayEstimate,
+                    defenseImpactRaw,
+                    defenseImpactConfidence,
+                    defenseEffectiveness:
+                        defenseImpactRaw * defenseImpactConfidence,
+                    defensiveSampleCount,
+                    opponentSuppressionAvg: 0,
+                },
+                matchHistory,
                 timeline: {
                     totalSec: gameConfig.matchDurationSec,
                     binSec: 1,
@@ -223,13 +455,12 @@ function toPayloadFromLive(
                         gameConfig.segments.find(
                             segment => segment.id === 'transition'
                         )?.endSec ?? 23,
-                    bins: buildTimelineBins(rows),
-                    rows: rows
-                        .filter(row => row.actionTimeline != null)
-                        .map(row => ({
-                            matchNumber: row._id.matchNumber,
-                            intervals: row.actionTimeline?.intervals ?? [],
-                        })),
+                    bins: timelineBins,
+                    binsByAlliance: {
+                        red: timelineBinsRed,
+                        blue: timelineBinsBlue,
+                    },
+                    rows: timelineRows,
                 },
                 autoPaths: normalizedPaths,
             };
@@ -245,7 +476,7 @@ function toPayloadFromLive(
 
 function buildDensityGrid(
     traces: TeamProfilePayload['autoPaths'],
-    bins = 28
+    bins = 48
 ) {
     const values = Array.from({ length: bins * bins }, () => 0);
     let max = 0;
@@ -281,6 +512,64 @@ function buildDensityGrid(
     return { values, bins, max };
 }
 
+function buildTeamInsights(team: TeamProfilePayload | undefined) {
+    if (!team) return [] as string[];
+    const insights: string[] = [];
+
+    const avgFuel = getMetricNumber(team.metrics.avgFuelPerMatch, 0);
+    const reliability = getMetricNumber(team.metrics.reliabilityIndex, 0.5);
+    const trend = getMetricNumber(team.metrics.expectedFuelTrendPerMatch, 0);
+    const defensePlayRate = getMetricNumber(
+        team.defenseSummary?.defensePlayEstimate,
+        0
+    );
+    const defenseEffectiveness = getMetricNumber(
+        team.defenseSummary?.defenseEffectiveness,
+        0
+    );
+
+    if (avgFuel >= 22) {
+        insights.push('Strong scoring floor with consistent fuel output.');
+    } else if (avgFuel >= 14) {
+        insights.push('Mid-tier scoring profile with useful alliance value.');
+    } else {
+        insights.push('Lower scoring ceiling; evaluate fit-based use cases.');
+    }
+
+    if (defensePlayRate >= 0.55 || defenseEffectiveness >= 0.35) {
+        insights.push('Meaningful defensive involvement with positive suppression signal.');
+    } else {
+        insights.push('Defense appears situational rather than a primary role.');
+    }
+
+    const primaryRate = getMetricNumber(
+        team.roleTendencies?.primaryScorerRate,
+        0
+    );
+    const supportRate = getMetricNumber(team.roleTendencies?.supportRate, 0);
+    if (primaryRate >= 0.5) {
+        insights.push('Commonly operates as a primary scoring option.');
+    } else if (supportRate >= 0.5) {
+        insights.push('Most often contributes as support and ball movement.');
+    } else {
+        insights.push('Role usage is mixed across matches.');
+    }
+
+    if (reliability >= 0.85) {
+        insights.push('High reliability profile with low disruption risk.');
+    } else if (reliability <= 0.55) {
+        insights.push('Reliability risk is elevated; check breakdown patterns.');
+    }
+
+    if (trend >= 0.15) {
+        insights.push('Performance trend is notably positive over recent matches.');
+    } else if (trend <= -0.15) {
+        insights.push('Performance trend is declining; verify latest match context.');
+    }
+
+    return insights;
+}
+
 function PicklistApp() {
     const [analyzedPayload, reloadAnalyzedPayload] = useFetchJson<PicklistPayload>(
         '/data/retrieve/analyzed'
@@ -297,6 +586,10 @@ function PicklistApp() {
     const [tab, setTab] = useState<PicklistTab>('overview');
     const [useLiveFallback, setUseLiveFallback] = useState(true);
     const [timelineMetric, setTimelineMetric] = useState<TimelineMetric>('shootRate');
+    const [timelineAllianceFilter, setTimelineAllianceFilter] =
+        useState<AllianceFilter>('all');
+    const [autoAllianceFilter, setAutoAllianceFilter] =
+        useState<AllianceFilter>('all');
     const [selectedTeamNumber, setSelectedTeamNumber] = useState<number>();
 
     const livePayload = useMemo(() => {
@@ -306,7 +599,11 @@ function PicklistApp() {
 
     const payload = analyzedPayload ?? (useLiveFallback ? livePayload : undefined);
     const sourceLabel = analyzedPayload
-        ? `Analyzed payload (${analyzedPayload.sourceMode})`
+        ? `Analyzed payload (${analyzedPayload.sourceMode}${
+              analyzedPayload.analysisRunId
+                  ? ` • ${analyzedPayload.analysisRunId}`
+                  : ''
+          })`
         : livePayload
           ? 'Live fallback'
           : 'No data source';
@@ -331,7 +628,45 @@ function PicklistApp() {
         reloadPitData();
     };
 
-    const timelineChartData = selectedTeam?.timeline.bins ?? [];
+    const timelineTotalSec = selectedTeam?.timeline.totalSec ?? gameConfig.matchDurationSec;
+    const timelineBinSec = Math.max(1, selectedTeam?.timeline.binSec ?? 1);
+    const timelineRows = selectedTeam?.timeline.rows ?? [];
+    const timelineRowsFiltered = useMemo(
+        () =>
+            timelineRows.filter(row =>
+                isAllianceIncluded(row, timelineAllianceFilter)
+            ),
+        [timelineAllianceFilter, timelineRows]
+    );
+    const timelineChartData = useMemo(() => {
+        if (!selectedTeam) return [];
+
+        const fallbackFromRows = buildTimelineBins(
+            timelineRowsFiltered,
+            timelineTotalSec,
+            timelineBinSec
+        );
+
+        if (timelineAllianceFilter === 'all') {
+            return selectedTeam.timeline.bins.length
+                ? selectedTeam.timeline.bins
+                : fallbackFromRows;
+        }
+
+        const binsByAlliance = selectedTeam.timeline.binsByAlliance?.[
+            timelineAllianceFilter
+        ];
+        if (binsByAlliance && binsByAlliance.length) {
+            return binsByAlliance;
+        }
+        return fallbackFromRows;
+    }, [
+        selectedTeam,
+        timelineRowsFiltered,
+        timelineTotalSec,
+        timelineBinSec,
+        timelineAllianceFilter,
+    ]);
     const timelineMetricOptions = useMemo(() => {
         const firstBin = timelineChartData[0];
         if (!firstBin) return ['shootRate', 'passRate', 'activityRate'];
@@ -355,9 +690,40 @@ function PicklistApp() {
             ),
         [timelineChartData, activeTimelineMetric]
     );
-    const heatmapSampleStride = Math.max(
-        1,
-        Math.floor(Math.max(1, timelineChartData.length) / 42)
+    const timelineHeatmapRows = useMemo(
+        () =>
+            buildTimelineHeatmapRows(
+                timelineRowsFiltered,
+                activeTimelineMetric,
+                timelineTotalSec,
+                timelineBinSec
+            ),
+        [
+            timelineRowsFiltered,
+            activeTimelineMetric,
+            timelineTotalSec,
+            timelineBinSec,
+        ]
+    );
+    const timelineHeatmapMax = useMemo(
+        () =>
+            Math.max(
+                0.000001,
+                ...timelineHeatmapRows.flatMap(row => row.values),
+                0
+            ),
+        [timelineHeatmapRows]
+    );
+    const selectedTeamAutoPaths = useMemo(() => {
+        if (!selectedTeam) return [];
+        if (autoAllianceFilter === 'all') return selectedTeam.autoPaths;
+        return selectedTeam.autoPaths.filter(
+            path => path.alliance === autoAllianceFilter
+        );
+    }, [selectedTeam, autoAllianceFilter]);
+    const autoPathDensity = useMemo(
+        () => buildDensityGrid(selectedTeamAutoPaths, 52),
+        [selectedTeamAutoPaths]
     );
     const contributionMetricKeys = useMemo(() => {
         const keySet = new Set<string>();
@@ -371,7 +737,7 @@ function PicklistApp() {
         teams.length > 0
             ? mean(
                   teams
-                      .map(team => Number(team.metrics.avgFuelPerMatch))
+                      .map(team => getMetricNumber(team.metrics.avgFuelPerMatch))
                       .filter((value): value is number => Number.isFinite(value))
               )
             : 0;
@@ -379,6 +745,10 @@ function PicklistApp() {
     const selectedTeamInfo = selectedTeam
         ? teamInfo[selectedTeam.teamNumber.toString()]?.info
         : undefined;
+    const selectedTeamInsights = useMemo(
+        () => buildTeamInsights(selectedTeam),
+        [selectedTeam]
+    );
 
     return (
         <main className='min-h-screen bg-gradient-to-b from-[#111722] via-[#0f1520] to-[#0c111a] px-5 pb-12 text-white'>
@@ -494,16 +864,106 @@ function PicklistApp() {
 
                 {tab === 'team_explorer' && selectedTeam && (
                     <section className={sectionClass}>
-                        <h2 className='text-xl font-semibold text-[#48c55c]'>Team Explorer</h2>
-                        <p className='mt-1 text-sm text-gray-300'>
-                            Team {selectedTeam.teamNumber} metrics from analyzed data.
-                        </p>
-                        <button
-                            type='button'
-                            className='mt-3 rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:bg-white/10'
-                            onClick={() => setTab('auto_paths')}>
-                            View Auto Paths
-                        </button>
+                        <div className='flex flex-wrap items-center justify-between gap-3'>
+                            <div>
+                                <h2 className='text-xl font-semibold text-[#48c55c]'>Team Profile</h2>
+                                <p className='mt-1 text-sm text-gray-300'>
+                                    Team {selectedTeam.teamNumber} metrics and match log.
+                                </p>
+                            </div>
+                            <button
+                                type='button'
+                                className='rounded-lg border border-white/20 px-3 py-1.5 text-sm hover:bg-white/10'
+                                onClick={() => setTab('auto_paths')}>
+                                View Auto Paths
+                            </button>
+                        </div>
+
+                        <div className='mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4'>
+                            <div className='rounded-lg border border-white/10 bg-[#101827] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Pick Score</p>
+                                <p className='text-2xl font-semibold'>{selectedTeam.score.toFixed(2)}</p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#101827] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Matches</p>
+                                <p className='text-2xl font-semibold'>{selectedTeam.matchCount}</p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#101827] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Defense Eff.</p>
+                                <p className='text-2xl font-semibold'>
+                                    {formatMetric(selectedTeam.defenseSummary?.defenseEffectiveness)}
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#101827] p-3'>
+                                <p className='text-xs uppercase text-gray-400'>Trend</p>
+                                <p className='text-2xl font-semibold'>
+                                    {formatMetric(selectedTeam.metrics.expectedFuelTrendPerMatch)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className='mt-4 grid gap-3 lg:grid-cols-2'>
+                            <div className='rounded-lg border border-white/10 bg-[#101827] p-3 text-sm'>
+                                <p className='font-semibold text-white'>Role Tendencies</p>
+                                <p>
+                                    Primary Scorer:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.roleTendencies?.primaryScorerRate)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Support:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.roleTendencies?.supportRate)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Defense:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.roleTendencies?.defenseRate)}
+                                    </span>
+                                </p>
+                            </div>
+                            <div className='rounded-lg border border-white/10 bg-[#101827] p-3 text-sm'>
+                                <p className='font-semibold text-white'>Defense Summary</p>
+                                <p>
+                                    Play Estimate:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.defenseSummary?.defensePlayEstimate)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Effectiveness:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.defenseSummary?.defenseEffectiveness)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Confidence:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.defenseSummary?.defenseImpactConfidence)}
+                                    </span>
+                                </p>
+                                <p>
+                                    Defensive Samples:{' '}
+                                    <span className='font-mono'>
+                                        {formatMetric(selectedTeam.defenseSummary?.defensiveSampleCount)}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {selectedTeamInsights.length > 0 && (
+                            <div className='mt-4 rounded-lg border border-white/10 bg-[#101827] p-3 text-sm'>
+                                <p className='font-semibold text-white'>Summary Insights</p>
+                                <ul className='mt-2 list-disc space-y-1 pl-5 text-gray-200'>
+                                    {selectedTeamInsights.map((insight, index) => (
+                                        <li key={`insight-${index}`}>{insight}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
                         <div className='mt-3 grid gap-2 text-sm text-gray-200 md:grid-cols-2'>
                             {Object.entries(selectedTeam.metrics)
                                 .sort(([a], [b]) => a.localeCompare(b))
@@ -522,6 +982,67 @@ function PicklistApp() {
                                 <p>Notes: {pitData[selectedTeam.teamNumber]?.notes ?? 'N/A'}</p>
                             </div>
                         )}
+
+                        <div className='mt-4 rounded-lg border border-white/10 bg-[#101827] p-3'>
+                            <div className='flex items-center justify-between gap-2'>
+                                <p className='font-semibold text-white'>Match History</p>
+                                <p className='text-xs text-gray-300'>
+                                    {(selectedTeam.matchHistory ?? []).length} rows
+                                </p>
+                            </div>
+                            <div className='mt-3 max-h-[340px] overflow-auto'>
+                                <table className='w-full min-w-[980px] text-left text-xs'>
+                                    <thead>
+                                        <tr className='border-b border-white/10 text-gray-400'>
+                                            <th className='py-2'>Match</th>
+                                            <th className='py-2'>Alliance</th>
+                                            <th className='py-2'>Position</th>
+                                            <th className='py-2'>Role</th>
+                                            <th className='py-2'>Fuel Total</th>
+                                            <th className='py-2'>Est. Points</th>
+                                            <th className='py-2'>Defense</th>
+                                            <th className='py-2'>Defended</th>
+                                            <th className='py-2'>Fouls</th>
+                                            <th className='py-2'>Breaks</th>
+                                            <th className='py-2'>Breakdown</th>
+                                            <th className='py-2'>Driver</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(selectedTeam.matchHistory ?? []).map(historyRow => (
+                                            <tr
+                                                key={`history-${historyRow.matchNumber}`}
+                                                className='border-b border-white/5'>
+                                                <td className='py-2'>{historyRow.matchNumber}</td>
+                                                <td className='py-2'>
+                                                    {formatAllianceLabel(historyRow.alliance)}
+                                                </td>
+                                                <td className='py-2'>{historyRow.robotPosition}</td>
+                                                <td className='py-2'>{historyRow.roleEstimate}</td>
+                                                <td className='py-2'>
+                                                    {historyRow.actualFuelTotal.toFixed(2)}
+                                                </td>
+                                                <td className='py-2'>
+                                                    {historyRow.estimatedFuelPoints.toFixed(2)}
+                                                </td>
+                                                <td className='py-2'>{historyRow.defenseProvided}</td>
+                                                <td className='py-2'>
+                                                    {historyRow.defenseReceived ? 'Yes' : 'No'}
+                                                </td>
+                                                <td className='py-2'>
+                                                    {historyRow.foulsTotal.toFixed(0)}
+                                                </td>
+                                                <td className='py-2'>
+                                                    {historyRow.breaksTotal.toFixed(0)}
+                                                </td>
+                                                <td className='py-2'>{historyRow.breakdown}</td>
+                                                <td className='py-2'>{historyRow.driverQuality}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </section>
                 )}
 
@@ -542,6 +1063,22 @@ function PicklistApp() {
                                 ))}
                             </select>
                         </div>
+                        <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
+                            <p className='text-gray-300'>Alliance Filter:</p>
+                            {(['all', 'red', 'blue'] as const).map(option => (
+                                <button
+                                    key={`timeline-filter-${option}`}
+                                    type='button'
+                                    onClick={() => setTimelineAllianceFilter(option)}
+                                    className={`rounded-lg px-2.5 py-1.5 font-semibold ${
+                                        timelineAllianceFilter === option
+                                            ? 'bg-[#48c55c] text-black'
+                                            : 'bg-[#2a3449] text-white'
+                                    }`}>
+                                    {option.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
 
                         <div className='mt-4 h-[300px] w-full'>
                             <ResponsiveContainer width='100%' height='100%'>
@@ -555,8 +1092,7 @@ function PicklistApp() {
                                     <Tooltip
                                         formatter={(value: number) => `${(value * 100).toFixed(1)}%`}
                                         labelFormatter={(value: number) => {
-                                            const binSec = selectedTeam.timeline.binSec || 1;
-                                            return `t=${value}-${value + binSec}s`;
+                                            return `t=${value}-${value + timelineBinSec}s`;
                                         }}
                                     />
                                     {gameConfig.segments.map(segment => (
@@ -580,28 +1116,64 @@ function PicklistApp() {
 
                         <div className='mt-4 rounded-lg border border-white/10 bg-[#101827] p-3'>
                             <p className='text-sm text-gray-300'>
-                                Heat intensity by timeline bin ({selectedTeam.timeline.binSec}s).
+                                Cross-match timeline density for the selected metric.
                             </p>
-                            <div className='mt-2 grid grid-cols-[repeat(41,minmax(0,1fr))] gap-[2px]'>
-                                {timelineChartData
-                                    .filter((_, index) => index % heatmapSampleStride === 0)
-                                    .map(row => {
-                                        const intensity = clamp(
-                                            Number(row[activeTimelineMetric]),
-                                            0,
-                                            1
-                                        );
-                                        return (
+                            <div className='mt-3 max-h-[360px] overflow-auto'>
+                                {timelineHeatmapRows.length === 0 ? (
+                                    <p className='text-sm text-gray-400'>
+                                        No timeline rows available for the selected filter.
+                                    </p>
+                                ) : (
+                                    <div className='min-w-[900px] space-y-1.5'>
+                                        {timelineHeatmapRows.map(row => (
                                             <div
-                                                key={`heat-${row.second}`}
-                                                title={`t=${row.second}s`}
-                                                className='h-4 rounded-sm'
+                                                key={`timeline-heat-${row.matchNumber}`}
+                                                className='grid items-center gap-2'
                                                 style={{
-                                                    background: `rgba(72, 197, 92, ${0.12 + intensity * 0.82})`,
-                                                }}
-                                            />
-                                        );
-                                    })}
+                                                    gridTemplateColumns:
+                                                        '110px minmax(0, 1fr)',
+                                                }}>
+                                                <p className='text-xs text-gray-300'>
+                                                    M{row.matchNumber} •{' '}
+                                                    {formatAllianceLabel(row.alliance)}
+                                                </p>
+                                                <div
+                                                    className='grid gap-[1px]'
+                                                    style={{
+                                                        gridTemplateColumns: `repeat(${Math.max(
+                                                            1,
+                                                            row.values.length
+                                                        )}, minmax(0, 1fr))`,
+                                                    }}>
+                                                    {row.values.map((value, index) => {
+                                                        const intensity = clamp(
+                                                            value / timelineHeatmapMax,
+                                                            0,
+                                                            1
+                                                        );
+                                                        return (
+                                                            <div
+                                                                key={`timeline-cell-${row.matchNumber}-${index}`}
+                                                                className='h-3 rounded-[2px]'
+                                                                title={`Match ${row.matchNumber}, t=${
+                                                                    index * timelineBinSec
+                                                                }-${Math.min(
+                                                                    timelineTotalSec,
+                                                                    (index + 1) * timelineBinSec
+                                                                )}s`}
+                                                                style={{
+                                                                    background: `rgba(72, 197, 92, ${
+                                                                        0.08 + intensity * 0.88
+                                                                    })`,
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </section>
@@ -611,24 +1183,38 @@ function PicklistApp() {
                     <section className={sectionClass}>
                         <h2 className='text-xl font-semibold text-[#48c55c]'>Auto Paths</h2>
                         <p className='mt-1 text-sm text-gray-300'>
-                            Canonical red-side orientation heatmap and shot markers.
+                            High-resolution canonical heatmap and shot markers.
                         </p>
+                        <div className='mt-3 flex flex-wrap items-center gap-2 text-xs'>
+                            <p className='text-gray-300'>Alliance Filter:</p>
+                            {(['all', 'red', 'blue'] as const).map(option => (
+                                <button
+                                    key={`auto-filter-${option}`}
+                                    type='button'
+                                    onClick={() => setAutoAllianceFilter(option)}
+                                    className={`rounded-lg px-2.5 py-1.5 font-semibold ${
+                                        autoAllianceFilter === option
+                                            ? 'bg-[#48c55c] text-black'
+                                            : 'bg-[#2a3449] text-white'
+                                    }`}>
+                                    {option.toUpperCase()}
+                                </button>
+                            ))}
+                        </div>
 
                         <div className='mt-4 overflow-hidden rounded-lg border border-white/15 bg-[#101826]'>
                             <div className='relative'>
                                 <img src='/redsidematch.png' alt='Auto field' className='block w-full select-none' draggable={false} />
                                 <svg viewBox='0 0 1000 1000' preserveAspectRatio='none' className='pointer-events-none absolute inset-0'>
                                     {(() => {
-                                        const normalizedPaths = selectedTeam.autoPaths.map(normalizeAutoPath);
-                                        const density = buildDensityGrid(normalizedPaths);
-                                        const cellSize = 1000 / density.bins;
+                                        const cellSize = 1000 / autoPathDensity.bins;
                                         return (
                                             <>
-                                                {density.values.map((value, index) => {
-                                                    if (value === 0 || density.max === 0) return null;
-                                                    const intensity = value / density.max;
-                                                    const x = (index % density.bins) * cellSize;
-                                                    const y = Math.floor(index / density.bins) * cellSize;
+                                                {autoPathDensity.values.map((value, index) => {
+                                                    if (value === 0 || autoPathDensity.max === 0) return null;
+                                                    const intensity = value / autoPathDensity.max;
+                                                    const x = (index % autoPathDensity.bins) * cellSize;
+                                                    const y = Math.floor(index / autoPathDensity.bins) * cellSize;
                                                     return (
                                                         <rect
                                                             key={`auto-cell-${index}`}
@@ -636,20 +1222,20 @@ function PicklistApp() {
                                                             y={y}
                                                             width={cellSize}
                                                             height={cellSize}
-                                                            fill={`rgba(245, 158, 11, ${0.1 + intensity * 0.55})`}
+                                                            fill={`rgba(245, 158, 11, ${0.05 + intensity * 0.8})`}
                                                         />
                                                     );
                                                 })}
-                                                {normalizedPaths.flatMap((path, pathIndex) =>
+                                                {selectedTeamAutoPaths.flatMap((path, pathIndex) =>
                                                     path.shotMarkers.map((marker, markerIndex) => (
                                                         <circle
                                                             key={`shot-${pathIndex}-${markerIndex}`}
                                                             cx={marker.x * 1000}
                                                             cy={marker.y * 1000}
-                                                            r='7'
-                                                            fill='rgba(72, 197, 92, 0.95)'
-                                                            stroke='rgba(0,0,0,0.6)'
-                                                            strokeWidth='2'
+                                                            r='5'
+                                                            fill='rgba(72, 197, 92, 0.98)'
+                                                            stroke='rgba(0,0,0,0.7)'
+                                                            strokeWidth='1.5'
                                                         />
                                                     ))
                                                 )}
@@ -660,7 +1246,7 @@ function PicklistApp() {
                             </div>
                         </div>
                         <p className='mt-2 text-xs text-gray-300'>
-                            {selectedTeam.autoPaths.length} auto traces available.
+                            {selectedTeamAutoPaths.length} auto traces for {autoAllianceFilter.toUpperCase()} filter.
                         </p>
                     </section>
                 )}
