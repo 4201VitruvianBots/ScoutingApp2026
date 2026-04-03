@@ -21,7 +21,6 @@ import {
 } from '../../lib/tabletId';
 import { MatchTable } from './components/MatchTable';
 import { ScouterTable } from './components/ScouterTable';
-import scheduleFile from '../../assets/matchSchedule.json';
 import { getAlliancePositions } from '../../lib/gameConfig';
 
 const DEFAULT_BALLS_PER_SECOND = 5;
@@ -49,8 +48,8 @@ function AdminApp() {
     const [orientationRows, reloadOrientationRows] = useFetchJson<
         AutoFieldOrientationSetting[]
     >('/config/auto-field-orientation', []);
+    const [schedule] = useFetchJson<MatchScheduleMap>('/config/match-schedule', {});
 
-    const schedule = scheduleFile as MatchScheduleMap;
     const matchNumbers = useMemo(
         () =>
             Object.keys(schedule)

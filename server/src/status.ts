@@ -7,10 +7,8 @@ import {
     RobotPosition,
 } from 'requests';
 import { matchApp } from './Schema.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { gameConfig } from './gameConfig.js';
+import { readMatchSchedule } from './appSettings.js';
 
 const bluePositionsAll: RobotPosition[] = [
     'blue_1',
@@ -33,21 +31,12 @@ const redPositions = redPositionsAll.slice(
     gameConfig.allianceSizeRobots.default
 );
 
-const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const scheduleFile = path.resolve(
-    currentDir,
-    '../../client/src/assets/matchSchedule.json'
-);
-
-const schedule = fs.existsSync(scheduleFile)
-    ? (JSON.parse(
-          fs.readFileSync(scheduleFile, { encoding: 'utf8' })
-      ) as MatchSchedule)
-    : undefined;
-const DEV_USE_DOCKER = ['1', 'true', 'yes', 'on'].includes(
-    String(process.env.DEV_USE_DOCKER ?? '').toLowerCase()
-);
-const DB_ENABLED = process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER;
+let schedule: MatchSchedule | undefined;
+try {
+    schedule = readMatchSchedule();
+} catch {
+    schedule = undefined;
+}
 
 const status: StatusRecieve = { matches: {}, scouters: [] };
 
