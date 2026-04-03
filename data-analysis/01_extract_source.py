@@ -1,154 +1,84 @@
-import json
+import argparse
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from pymongo import MongoClient
 
-from common import ROOT, coerce_bool, coerce_float, coerce_int, load_config, parse_args, parse_json_field, write_csv, write_json
+from common import (
+    coerce_int,
+    create_timestamped_run_dir,
+    flatten_match_row,
+    flatten_pit_row,
+    load_settings,
+    utc_now_iso,
+    write_csv,
+    write_json,
+    write_latest_run_pointer,
+)
 
 
-def convert_objectid_to_str(obj: Any) -> Any:
-    """Recursively convert MongoDB ObjectId objects to strings."""
-    if isinstance(obj, ObjectId):
-        return str(obj)
-    elif isinstance(obj, dict):
-        return {key: convert_objectid_to_str(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_objectid_to_str(item) for item in obj]
-    else:
-        return obj
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description='Extract source data from Docker MongoDB into a timestamped raw run folder.'
+    )
+    parser.add_argument(
+        'run_label',
+        nargs='?',
+        default='source',
+        help='Label included in output folder name. Example: comp_2',
+    )
+    parser.add_argument(
+        '--settings',
+        default='app_settings/settings.json',
+        help='Path to app settings JSON.',
+    )
+    return parser.parse_args()
 
 
-def flatten_match_row(entry: Dict[str, Any]) -> Dict[str, Any]:
-    metadata = entry.get('metadata') or {}
-    return {
-        'scouterName': metadata.get('scouterName', ''),
-        'matchNumber': metadata.get('matchNumber'),
-        'teamNumber': metadata.get('robotTeam'),
-        'robotPosition': metadata.get('robotPosition', ''),
-        'robotAbsent': coerce_bool(entry.get('robotAbsent', False)),
-        'autoStartingPosition': entry.get('autoStartingPosition'),
-        'autoPathJson': json.dumps(convert_objectid_to_str(entry.get('autoPath') or {}), separators=(',', ':')),
-        'shootTimeBySegmentJson': json.dumps(convert_objectid_to_str(entry.get('shootTimeBySegment') or {}), separators=(',', ':')),
-        'passTimeBySegmentJson': json.dumps(convert_objectid_to_str(entry.get('passTimeBySegment') or {}), separators=(',', ':')),
-        'actionTimelineJson': json.dumps(convert_objectid_to_str(entry.get('actionTimeline') or {}), separators=(',', ':')),
-        'ballsPerSecondUsed': coerce_float(entry.get('ballsPerSecondUsed', 0)),
-        'autoFuelScored': coerce_float(entry.get('autoFuelScored', 0)),
-        'teleFuelBySegmentJson': json.dumps(convert_objectid_to_str(entry.get('teleFuelBySegment') or {}), separators=(',', ':')),
-        'teleTower': entry.get('teleTower', 'None'),
-        'breakdown': entry.get('breakdown', 'None'),
-        'driverQuality': entry.get('driverQuality', 'ok'),
-        'defenseProvided': entry.get('defenseProvided', 'None'),
-        'defenseReceived': coerce_bool(entry.get('defenseReceived', False)),
-        'foulsJson': json.dumps(convert_objectid_to_str(entry.get('fouls') or {}), separators=(',', ':')),
-        'breaksJson': json.dumps(convert_objectid_to_str(entry.get('breaks') or {}), separators=(',', ':')),
-        'freeText': entry.get('freeText', ''),
-    }
-
-
-def flatten_pit_row(entry: Dict[str, Any]) -> Dict[str, Any]:
-    intake = parse_json_field(convert_objectid_to_str(entry.get('intakeSources')), {})
-    if not isinstance(intake, dict):
-        intake = {}
-
-    return {
-        'scouterName': entry.get('scouterName', ''),
-        'teamNumber': coerce_int(entry.get('teamNumber')),
-        'drivebase': entry.get('drivebase', ''),
-        'maxFuelStorageEstimate': entry.get('maxFuelStorageEstimate'),
-        'intakeDepot': coerce_bool(intake.get('depot', False)),
-        'intakeOutpostCorral': coerce_bool(intake.get('outpostCorral', False)),
-        'intakeFloorNeutral': coerce_bool(intake.get('floorNeutral', False)),
-        'scoringMethod': entry.get('scoringMethod', ''),
-        'preferredScoringSpot': entry.get('preferredScoringSpot', ''),
-        'robotMaintain': entry.get('robotMaintain', ''),
-        'towerCapabilityClaimed': entry.get('towerCapabilityClaimed', ''),
-        'batteryCount': coerce_int(entry.get('batteryCount', 0)),
-        'notes': entry.get('notes', ''),
-    }
-
-
-def load_from_mongo(config: Dict[str, Any]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    from pymongo import MongoClient
-
-    source = config['source']
-    client = MongoClient(source['mongo_url'])
-    db = client[source['db']]
-    match_rows = list(db.matchapps.find({}))
-    pit_rows = list(db.pitapps.find({}))
+def load_from_mongo(settings: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    mongo = settings['mongo']
+    client = MongoClient(mongo['mongo_url'])
+    db = client[mongo['db']]
+    match_rows = list(db[mongo['match_collection']].find({}))
+    pit_rows = list(db[mongo['pit_collection']].find({}))
     client.close()
     return match_rows, pit_rows
 
 
-def load_from_fake(config: Dict[str, Any]) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    source = config['source']
-    match_path = ROOT / source['fake_match_json']
-    pit_path = ROOT / source['fake_pit_json']
-
-    match_rows = parse_json_field(match_path.read_text(encoding='utf-8'), [])
-    pit_rows = parse_json_field(pit_path.read_text(encoding='utf-8'), [])
-    if not isinstance(match_rows, list) or not isinstance(pit_rows, list):
-        raise ValueError('Fake source JSON must contain list payloads')
-    return match_rows, pit_rows
-
-
-def resolve_repo_path(path_like: str) -> Path:
-    path = Path(path_like)
-    return path if path.is_absolute() else ROOT / path
-
-
-def load_from_csv(config: Dict[str, Any]) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
-    source = config['source']
-    match_path = resolve_repo_path(
-        source.get('fake_match_csv', 'data-analysis/output/fake_match_source.csv')
-    )
-    pit_path = resolve_repo_path(
-        source.get('fake_pit_csv', 'data-analysis/output/fake_pit_source.csv')
-    )
-
-    if not match_path.exists():
-        raise FileNotFoundError(f'CSV source match file does not exist: {match_path}')
-    if not pit_path.exists():
-        raise FileNotFoundError(f'CSV source pit file does not exist: {pit_path}')
-
-    return read_csv(match_path), read_csv(pit_path)
-
-
 def main() -> None:
-    args = parse_args('Stage 01: extract source data from MongoDB, fake JSON source, or local CSV source')
-    config = load_config(args.config)
-    output_dir = Path(config['_output_dir'])
+    args = parse_args()
+    settings = load_settings(args.settings)
 
-    mode = config['source'].get('mode', 'mongo').lower()
-    if mode == 'mongo':
-        match_entries, pit_entries = load_from_mongo(config)
-        match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
-        pit_rows = [flatten_pit_row(entry) for entry in pit_entries if isinstance(entry, dict)]
-    elif mode == 'fake':
-        match_entries, pit_entries = load_from_fake(config)
-        match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
-        pit_rows = [flatten_pit_row(entry) for entry in pit_entries if isinstance(entry, dict)]
-    elif mode == 'csv':
-        match_rows, pit_rows = load_from_csv(config)
-    else:
-        raise ValueError(f'Unsupported source mode: {mode}')
+    raw_root = Path(settings['_raw_runs_root'])
+    run_label = f'{args.run_label}_docker_source'
+    raw_run_dir = create_timestamped_run_dir(raw_root, base_name='', label=run_label)
 
-    write_csv(output_dir / '01_match_raw.csv', match_rows)
-    write_csv(output_dir / '01_pit_raw.csv', pit_rows)
+    match_entries, pit_entries = load_from_mongo(settings)
+    match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
+    pit_rows = [flatten_pit_row(entry) for entry in pit_entries if isinstance(entry, dict)]
+
+    write_csv(raw_run_dir / '01_match_raw.csv', match_rows)
+    write_csv(raw_run_dir / '01_pit_raw.csv', pit_rows)
 
     snapshot = {
         'stage': '01_extract_source',
-        'sourceMode': mode,
+        'createdAt': utc_now_iso(),
+        'sourceMode': 'docker_db',
+        'runLabel': args.run_label,
         'counts': {
             'match': len(match_rows),
             'pit': len(pit_rows),
+            'uniqueTeamsInMatches': len({coerce_int(row.get('teamNumber', 0)) for row in match_rows}),
         },
-        'configPath': config['_config_path'],
+        'settingsPath': settings['_settings_path'],
+        'runFolder': str(raw_run_dir),
     }
-    write_json(output_dir / '01_raw_snapshot.json', snapshot)
+    write_json(raw_run_dir / '01_raw_snapshot.json', snapshot)
+    write_latest_run_pointer(raw_root, raw_run_dir)
 
     print(
-        f"Stage 01 complete: wrote {len(match_rows)} match rows and {len(pit_rows)} pit rows to {output_dir}."
+        'Stage 01 complete: '
+        f'{len(match_rows)} match rows, {len(pit_rows)} pit rows -> {raw_run_dir}'
     )
 
 

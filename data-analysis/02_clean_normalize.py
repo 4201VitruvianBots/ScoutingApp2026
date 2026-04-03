@@ -1,31 +1,43 @@
+﻿import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from common import (
     coerce_bool,
     coerce_float,
     coerce_int,
-    load_config,
-    parse_args,
+    create_timestamped_run_dir,
+    get_expected_robot_positions,
+    load_settings,
     parse_json_field,
     read_csv,
+    resolve_run_dir,
+    utc_now_iso,
     write_csv,
+    write_json,
+    write_latest_run_pointer,
 )
 
-MATCH_POSITIONS = {
-    'red_1',
-    'red_2',
-    'red_3',
-    'red_4',
-    'blue_1',
-    'blue_2',
-    'blue_3',
-    'blue_4',
-}
-
-
 SEGMENTS = ['auto', 'transition', 'shift1', 'shift2', 'shift3', 'shift4', 'endgame']
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description='Stage 02: clean and normalize raw source data into a new analysis run folder.'
+    )
+    parser.add_argument('--settings', default='app_settings/settings.json', help='Path to app settings JSON.')
+    parser.add_argument(
+        '--raw-run',
+        default=None,
+        help='Raw run folder name or absolute path. Defaults to latest raw run pointer.',
+    )
+    parser.add_argument(
+        '--analysis-run-label',
+        default=None,
+        help='Optional label included in the new analysis run folder name.',
+    )
+    return parser.parse_args()
 
 
 def normalize_segment_map(raw: Any) -> Dict[str, float]:
@@ -35,7 +47,7 @@ def normalize_segment_map(raw: Any) -> Dict[str, float]:
     return {segment: max(0.0, coerce_float(payload.get(segment, 0.0))) for segment in SEGMENTS}
 
 
-def flatten_match_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[str]]:
+def flatten_match_row(row: Dict[str, str], valid_positions: set[str]) -> Tuple[Dict[str, Any] | None, List[str]]:
     issues: List[str] = []
 
     match_number = coerce_int(row.get('matchNumber'))
@@ -46,7 +58,7 @@ def flatten_match_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[
         issues.append('invalid_match_number')
     if team_number <= 0:
         issues.append('invalid_team_number')
-    if robot_position not in MATCH_POSITIONS:
+    if robot_position not in valid_positions:
         issues.append('invalid_robot_position')
 
     shoot = normalize_segment_map(row.get('shootTimeBySegmentJson'))
@@ -93,7 +105,7 @@ def flatten_match_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[
         'passSecEndgame': passed['endgame'],
         'teleTower': row.get('teleTower') or 'None',
         'breakdown': row.get('breakdown') or 'None',
-        'driverQuality': row.get('driverQuality') or 'ok',
+        'driverQuality': row.get('driverQuality') or 'Ok',
         'defenseProvided': row.get('defenseProvided') or 'None',
         'defenseReceived': coerce_bool(row.get('defenseReceived')),
         'foulPinning': max(0.0, coerce_float(fouls.get('pinning', 0))),
@@ -113,7 +125,7 @@ def flatten_match_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[
     return clean_row, issues
 
 
-def flatten_pit_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[str]]:
+def flatten_pit_row(row: Dict[str, str]) -> Tuple[Dict[str, Any] | None, List[str]]:
     issues: List[str] = []
     team_number = coerce_int(row.get('teamNumber'))
     if team_number <= 0:
@@ -124,9 +136,11 @@ def flatten_pit_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[st
         'scouterName': (row.get('scouterName') or '').strip(),
         'teamNumber': team_number,
         'drivebase': row.get('drivebase') or '',
-        'swerveModuleType': row.get('swerveModuleType') or '',
-        'swerveGearRatio': coerce_float(row.get('swerveGearRatio'), None),
-        'maxFuelStorageEstimate': coerce_float(row.get('maxFuelStorageEstimate'), 0),
+        'sdsSwerveType': row.get('sdsSwerveType') or '',
+        'wpcSwerveType': row.get('wpcSwerveType') or '',
+        'otherSwerveType': row.get('otherSwerveType') or '',
+        'swerveGearRatio': coerce_float(row.get('swerveGearRatio'), 0.0),
+        'maxFuelStorageEstimate': coerce_float(row.get('maxFuelStorageEstimate'), 0.0),
         'intakeDepot': coerce_bool(row.get('intakeDepot')),
         'intakeOutpostCorral': coerce_bool(row.get('intakeOutpostCorral')),
         'intakeFloorNeutral': coerce_bool(row.get('intakeFloorNeutral')),
@@ -142,19 +156,33 @@ def flatten_pit_row(row: Dict[str, str]) -> tuple[Dict[str, Any] | None, List[st
 
 
 def main() -> None:
-    args = parse_args('Stage 02: clean and normalize raw CSV outputs')
-    config = load_config(args.config)
-    output_dir = Path(config['_output_dir'])
+    args = parse_args()
+    settings = load_settings(args.settings)
 
-    raw_match = read_csv(output_dir / '01_match_raw.csv')
-    raw_pit = read_csv(output_dir / '01_pit_raw.csv')
+    raw_root = Path(settings['_raw_runs_root'])
+    analysis_root = Path(settings['_analysis_runs_root'])
+
+    raw_run_dir = resolve_run_dir(raw_root, args.raw_run)
+
+    analysis_base_name = settings['paths']['analysis_run_base_name']
+    analysis_label = args.analysis_run_label or raw_run_dir.name
+    analysis_run_dir = create_timestamped_run_dir(
+        analysis_root,
+        base_name=analysis_base_name,
+        label=analysis_label,
+    )
+
+    raw_match = read_csv(raw_run_dir / '01_match_raw.csv')
+    raw_pit = read_csv(raw_run_dir / '01_pit_raw.csv')
 
     clean_match: List[Dict[str, Any]] = []
     clean_pit: List[Dict[str, Any]] = []
     validation_rows: List[Dict[str, Any]] = []
 
+    valid_positions = set(get_expected_robot_positions())
+
     for index, row in enumerate(raw_match, start=1):
-        normalized, issues = flatten_match_row(row)
+        normalized, issues = flatten_match_row(row, valid_positions)
         if normalized is None:
             validation_rows.append(
                 {
@@ -181,12 +209,34 @@ def main() -> None:
             continue
         clean_pit.append(normalized)
 
-    write_csv(output_dir / '02_match_clean.csv', clean_match)
-    write_csv(output_dir / '02_pit_clean.csv', clean_pit)
-    write_csv(output_dir / '02_validation_report.csv', validation_rows, fieldnames=['dataset', 'rowNumber', 'severity', 'issues'])
+    write_csv(analysis_run_dir / '02_match_clean.csv', clean_match)
+    write_csv(analysis_run_dir / '02_pit_clean.csv', clean_pit)
+    write_csv(
+        analysis_run_dir / '02_validation_report.csv',
+        validation_rows,
+        fieldnames=['dataset', 'rowNumber', 'severity', 'issues'],
+    )
+
+    run_summary = {
+        'stage': '02_clean_normalize',
+        'createdAt': utc_now_iso(),
+        'sourceRawRun': str(raw_run_dir),
+        'analysisRun': str(analysis_run_dir),
+        'counts': {
+            'rawMatch': len(raw_match),
+            'rawPit': len(raw_pit),
+            'cleanMatch': len(clean_match),
+            'cleanPit': len(clean_pit),
+            'validationIssues': len(validation_rows),
+        },
+    }
+    write_json(analysis_run_dir / '02_stage_summary.json', run_summary)
+    write_latest_run_pointer(analysis_root, analysis_run_dir)
 
     print(
-        f"Stage 02 complete: wrote {len(clean_match)} clean match rows, {len(clean_pit)} clean pit rows, {len(validation_rows)} validation records."
+        'Stage 02 complete: '
+        f'{len(clean_match)} clean match rows, {len(clean_pit)} clean pit rows, '
+        f'{len(validation_rows)} validation records -> {analysis_run_dir}'
     )
 
 

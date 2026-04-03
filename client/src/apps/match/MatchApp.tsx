@@ -30,7 +30,7 @@ import SignIn from '../../components/SignIn';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import { usePreventUnload } from '../../lib/usePreventUnload';
-import scheduleFile from '../../assets/matchSchedule.json';
+import { useFetchJson } from '../../lib/useFetch';
 import { formatMatchTime, gameConfig } from '../../lib/gameConfig';
 
 const DEFAULT_BALLS_PER_SECOND = 5;
@@ -87,14 +87,11 @@ const matchTimelineSegments: MatchTimelineSegment[] = gameConfig.segments.map(
     })
 );
 
-const schedule = scheduleFile as MatchSchedule;
-const scheduleMatchNumbers = Object.keys(schedule)
-    .map(value => Number.parseInt(value, 10))
-    .filter(Number.isFinite)
-    .sort((a, b) => a - b);
-const firstScheduledMatchNumber = scheduleMatchNumbers[0];
-
-function nextScheduledMatchNumber(matchNumber: number | undefined) {
+function nextScheduledMatchNumber(
+    matchNumber: number | undefined,
+    scheduleMatchNumbers: number[]
+) {
+    const firstScheduledMatchNumber = scheduleMatchNumbers[0];
     if (matchNumber == undefined) return firstScheduledMatchNumber;
     return scheduleMatchNumbers.find(value => value > matchNumber) ?? matchNumber + 1;
 }
@@ -411,10 +408,20 @@ function buildActionTimelineFromTicks(ticks: ActionTick[]): MatchData['actionTim
 function MatchApp() {
     usePreventUnload();
     const [sendQueue, sendAll, queue, sending] = useQueue();
-    const [teamNumber, setTeamNumber] = useState<number>();
-    const [matchNumber, setMatchNumber] = useState<number | undefined>(
-        firstScheduledMatchNumber
+    const [schedule] = useFetchJson<MatchSchedule>('/config/match-schedule', {});
+
+    const scheduleMatchNumbers = useMemo(
+        () =>
+            Object.keys(schedule ?? {})
+                .map(value => Number.parseInt(value, 10))
+                .filter(Number.isFinite)
+                .sort((a, b) => a - b),
+        [schedule]
     );
+    const firstScheduledMatchNumber = scheduleMatchNumbers[0];
+
+    const [teamNumber, setTeamNumber] = useState<number>();
+    const [matchNumber, setMatchNumber] = useState<number | undefined>(undefined);
     const [scouterName, setScouterName] = useState('');
     const [robotPosition, setRobotPosition] = useState<RobotPosition>();
     const [signedIn, setSignedIn] = useState(false);
@@ -567,12 +574,18 @@ function MatchApp() {
     useStatus('', robotPosition, matchNumber, scouterName);
 
     useEffect(() => {
+        if (matchNumber != undefined) return;
+        if (firstScheduledMatchNumber == undefined) return;
+        setMatchNumber(firstScheduledMatchNumber);
+    }, [firstScheduledMatchNumber, matchNumber]);
+
+    useEffect(() => {
         if (!schedule || !robotPosition || matchNumber == undefined) {
             setTeamNumber(undefined);
             return;
         }
         setTeamNumber(schedule[matchNumber]?.[robotPosition]);
-    }, [matchNumber, robotPosition]);
+    }, [matchNumber, robotPosition, schedule]);
 
     useEffect(() => {
         let cancelled = false;
@@ -974,10 +987,14 @@ function MatchApp() {
             alert('Pick your scout position before signing in.');
             return;
         }
+        if (scheduleMatchNumbers.length === 0) {
+            alert('No match schedule is loaded. Check /config/match-schedule.');
+            return;
+        }
 
         setScouterName(trimmedName);
         setSignedIn(true);
-        if (matchNumber == undefined) {
+        if (matchNumber == undefined && firstScheduledMatchNumber != undefined) {
             setMatchNumber(firstScheduledMatchNumber);
         }
     };
@@ -1051,7 +1068,7 @@ function MatchApp() {
         sendQueue('/data/match', data);
         setShowCheck(true);
         setTimeout(() => setShowCheck(false), 1800);
-        setMatchNumber(prev => nextScheduledMatchNumber(prev));
+        setMatchNumber(prev => nextScheduledMatchNumber(prev, scheduleMatchNumbers));
         handleResetMatch();
     };
 
@@ -1065,7 +1082,7 @@ function MatchApp() {
                         <h1 className='text-xl font-semibold text-[#48c55c]'>Match Scouting Sign-In</h1>
                         <p className='mt-2 text-xs text-gray-300'>
                             Choose your scout position once, then this app auto-fills team
-                            numbers from the hardcoded schedule using match number + position.
+                            numbers from the configured schedule using match number + position.
                         </p>
                     </section>
 
@@ -1166,7 +1183,7 @@ function MatchApp() {
                             <span className='ml-1.5'>Robot Absent</span>
                         </Checkbox>
                         <p className='select-none text-gray-400'>
-                            Team auto-fills from hardcoded schedule using match number + scout
+                            Team auto-fills from configured schedule using match number + scout
                             position.
                         </p>
                     </div>

@@ -378,7 +378,27 @@ export interface TeamTimelineHeatBin {
 
 export interface TeamTimelineRow {
     matchNumber: number;
+    alliance?: AllianceColor | '';
+    robotPosition?: RobotPosition | '';
     intervals: ActionInterval[];
+}
+
+export interface TeamMatchHistoryRow {
+    matchNumber: number;
+    alliance: AllianceColor | '';
+    robotPosition: RobotPosition | '' | string;
+    roleEstimate: 'primary_scorer' | 'support' | 'defense' | string;
+    autoFuelScored: number;
+    teleFuelTotal: number;
+    actualFuelTotal: number;
+    estimatedFuelPoints: number;
+    defenseProvided: DefenseProvided | string;
+    defenseReceived: boolean;
+    foulsTotal: number;
+    breaksTotal: number;
+    breakdown: BreakdownType | string;
+    driverQuality: DriverQuality | string;
+    timelineIntervalCount: number;
 }
 
 export interface TeamProfilePayload {
@@ -387,12 +407,32 @@ export interface TeamProfilePayload {
     score: number;
     metricContributions: Record<string, number>;
     metrics: Record<string, number | string>;
+    roleTendencies?: {
+        primaryScorerRate: number;
+        supportRate: number;
+        defenseRate: number;
+    };
+    defenseSummary?: {
+        defenseHeavyRate: number;
+        defenseSomeRate: number;
+        defensePlayEstimate: number;
+        defenseImpactRaw: number;
+        defenseImpactConfidence: number;
+        defenseEffectiveness: number;
+        defensiveSampleCount: number;
+        opponentSuppressionAvg: number;
+    };
+    matchHistory?: TeamMatchHistoryRow[];
     timeline: {
         totalSec: number;
         binSec: number;
         autoEndSec: number;
         delayEndSec: number;
         bins: TeamTimelineHeatBin[];
+        binsByAlliance?: {
+            red: TeamTimelineHeatBin[];
+            blue: TeamTimelineHeatBin[];
+        };
         rows: TeamTimelineRow[];
     };
     autoPaths: AutoPathTrace[];
@@ -400,7 +440,8 @@ export interface TeamProfilePayload {
 
 export interface PicklistPayload {
     generatedAt: string;
-    sourceMode: 'mongo' | 'fake' | 'csv';
+    sourceMode: 'mongo' | 'fake' | 'analyzed';
+    analysisRunId?: string;
     teams: TeamProfilePayload[];
 }
 

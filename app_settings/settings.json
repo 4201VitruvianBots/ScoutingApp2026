@@ -1,0 +1,42 @@
+{
+  "paths": {
+    "raw_runs_root": "data-analysis/raw_runs",
+    "analysis_runs_root": "data-analysis/analysis_runs",
+    "raw_run_base_name": "test_1",
+    "analysis_run_base_name": "test_1"
+  },
+  "mongo": {
+    "mongo_url": "mongodb://localhost:27017/",
+    "db": "test",
+    "match_collection": "matchapps",
+    "pit_collection": "pitapps",
+    "balls_per_second_collection": "ballspersecondapps",
+    "clear_before_seed": true
+  },
+  "fake_data": {
+    "destination": "local_csv",
+    "match_source_mode": "schedule",
+    "random_match_count": 72,
+    "include_pit": true,
+    "scouter_count": 12
+  },
+  "analysis": {
+    "timeline_bin_sec": 1,
+    "normalization": "zscore",
+    "score_scale": {
+      "center": 50,
+      "spread": 18,
+      "min": 0,
+      "max": 100
+    },
+    "component_weights": {
+      "offense": 1.3,
+      "auto": 0.8,
+      "consistency": 0.9,
+      "reliability": 1.0,
+      "defense": 1.0,
+      "trend": 0.5
+    },
+    "defense_shrinkage_k": 6
+  }
+}
