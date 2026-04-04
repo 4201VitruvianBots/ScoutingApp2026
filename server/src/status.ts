@@ -30,9 +30,18 @@ const redPositions = redPositionsAll.slice(
     0,
     gameConfig.allianceSizeRobots.default
 );
-const DB_ENABLED = ['1', 'true', 'yes', 'on'].includes(
-    String(process.env.DB_ENABLED ?? '').toLowerCase()
-);
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+    if (value == undefined) return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length === 0) return undefined;
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return undefined;
+}
+
+const DEV_USE_DOCKER = parseBooleanEnv(process.env.DEV_USE_DOCKER) === true;
+const explicitDbEnabled = parseBooleanEnv(process.env.DB_ENABLED);
+const DB_ENABLED = explicitDbEnabled ?? (process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER);
 
 function readMatchScheduleSafe(): MatchSchedule | undefined {
     try {

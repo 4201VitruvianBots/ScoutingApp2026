@@ -40,12 +40,20 @@ import {
 
 // import { MatchData } from 'requests';
 
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+    if (value == undefined) return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length === 0) return undefined;
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return undefined;
+}
+
 // If DEV is true then the app should forward requests to localhost:5173 instead of serving from /static
 const DEV = process.env.NODE_ENV === 'dev';
-const DEV_USE_DOCKER = ['1', 'true', 'yes', 'on'].includes(
-    String(process.env.DEV_USE_DOCKER ?? '').toLowerCase()
-);
-const DB_ENABLED = process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER;
+const DEV_USE_DOCKER = parseBooleanEnv(process.env.DEV_USE_DOCKER) === true;
+const explicitDbEnabled = parseBooleanEnv(process.env.DB_ENABLED);
+const DB_ENABLED = explicitDbEnabled ?? (process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER);
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, '../..');
 const staticDir = path.resolve(currentDir, '../static');

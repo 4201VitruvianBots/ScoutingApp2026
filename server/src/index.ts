@@ -3,7 +3,6 @@ import ngrok from 'ngrok';
 import dotenv from 'dotenv-mono';
 import chalk from 'chalk';
 import { startDockerContainer, stopDockerContainer } from 'database';
-import { app } from './server.js';
 
 // If DEV is true then change the port we are running on, to prevent undesired caching
 const BACKEND_PORT = process.env.NODE_ENV === 'dev' ? 8081 : 8080;
@@ -11,12 +10,20 @@ const BACKEND_PORT = process.env.NODE_ENV === 'dev' ? 8081 : 8080;
 dotenv.load({ path: '.env' });
 dotenv.load({ path: '.env.local' });
 
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+    if (value == undefined) return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length === 0) return undefined;
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return undefined;
+}
+
 const REMOTE = process.env.LOCATION === 'remote';
 const isDev = process.env.NODE_ENV === 'dev';
-const devUseDocker = ['1', 'true', 'yes', 'on'].includes(
-    String(process.env.DEV_USE_DOCKER ?? '').toLowerCase()
-);
-const dbEnabled = !isDev || devUseDocker;
+const devUseDocker = parseBooleanEnv(process.env.DEV_USE_DOCKER) === true;
+const explicitDbEnabled = parseBooleanEnv(process.env.DB_ENABLED);
+const dbEnabled = explicitDbEnabled ?? (!isDev || devUseDocker);
 process.env.DB_ENABLED = dbEnabled ? 'true' : 'false';
 
 let container: Awaited<ReturnType<typeof startDockerContainer>> | null = null;
@@ -32,6 +39,8 @@ if (dbEnabled) {
         )
     );
 }
+
+const { app } = await import('./server.js');
 
 const server = app.listen(BACKEND_PORT, () => {
     console.log(chalk.green('Server running at http://localhost:' + BACKEND_PORT));
