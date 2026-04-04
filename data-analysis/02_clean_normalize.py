@@ -12,7 +12,7 @@ from common import (
     load_settings,
     parse_json_field,
     read_csv,
-    resolve_run_dir,
+    resolve_raw_run_dir_from_settings,
     utc_now_iso,
     write_csv,
     write_json,
@@ -30,7 +30,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--raw-run',
         default=None,
-        help='Raw run folder name or absolute path. Defaults to latest raw run pointer.',
+        help=(
+            'Raw run folder name or absolute path. '
+            'Defaults to settings.paths.raw_run_folder when set, otherwise latest raw run pointer.'
+        ),
     )
     parser.add_argument(
         '--analysis-run-label',
@@ -159,10 +162,9 @@ def main() -> None:
     args = parse_args()
     settings = load_settings(args.settings)
 
-    raw_root = Path(settings['_raw_runs_root'])
     analysis_root = Path(settings['_analysis_runs_root'])
 
-    raw_run_dir = resolve_run_dir(raw_root, args.raw_run)
+    raw_run_dir = resolve_raw_run_dir_from_settings(settings, args.raw_run)
 
     analysis_base_name = settings['paths']['analysis_run_base_name']
     analysis_label = args.analysis_run_label or raw_run_dir.name
@@ -242,3 +244,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+    

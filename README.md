@@ -52,6 +52,7 @@ Required sections:
 - `paths`
   - `raw_runs_root`: root folder for raw run outputs
   - `analysis_runs_root`: root folder for analysis run outputs
+  - `raw_run_folder` (optional): default raw run folder name/path for stage `02` and `run_fake_local_full.py`
   - `raw_run_base_name`: base suffix used for fake local raw runs
   - `analysis_run_base_name`: base suffix used for analysis runs
 - `mongo`
@@ -150,7 +151,7 @@ python data-analysis/02_clean_normalize.py
 
 Defaults:
 
-- raw source: latest raw run pointer
+- raw source: `paths.raw_run_folder` when set, otherwise latest raw run pointer
 - creates a **new analysis run folder** under `paths.analysis_runs_root`
 - folder name uses timestamp + `analysis_run_base_name`
 
@@ -194,17 +195,24 @@ Stages `03`-`06` default to the latest analysis pointer unless `--analysis-run` 
 
 ### D) Optional full-run wrappers
 
-Run fake generation (local CSV) and then full analysis:
+Run full analysis (`02` -> `06`) against an existing raw run:
 
 ```powershell
 python data-analysis/run_fake_local_full.py
 ```
 
+Optional raw source override:
+
+```powershell
+python data-analysis/run_fake_local_full.py --raw-run <raw_run_folder_name_or_abs_path>
+```
+
 Notes:
 
-- requires `fake_data.destination = local_csv`
-- runs `generate_fake_data.py` then `02` -> `06`
-- pins `02` to the newly generated raw run and pins `03`-`06` to the same analysis run
+- does not generate fake data
+- uses `--raw-run` when provided
+- otherwise uses `paths.raw_run_folder` when set, then falls back to `raw_runs_root/latest_run.json`
+- pins `03`-`06` to the same analysis run created by stage `02`
 
 Run full analysis sourced from Docker Mongo:
 

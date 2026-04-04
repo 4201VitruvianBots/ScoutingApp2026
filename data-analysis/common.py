@@ -72,6 +72,13 @@ def load_settings(settings_path: str | Path = SETTINGS_PATH) -> Dict[str, Any]:
     if missing_paths:
         raise ValueError(f'Missing required paths settings: {", ".join(missing_paths)}')
 
+    raw_run_folder = paths.get('raw_run_folder', '')
+    if raw_run_folder is None:
+        raw_run_folder = ''
+    if not isinstance(raw_run_folder, str):
+        raise ValueError('paths.raw_run_folder must be a string when provided.')
+    paths['raw_run_folder'] = raw_run_folder.strip()
+
     fake_data = settings['fake_data']
     destination = str(fake_data.get('destination', '')).strip().lower()
     if destination not in {'local_csv', 'docker_db'}:
@@ -293,6 +300,18 @@ def resolve_run_dir(root_dir: Path, run_name_or_path: str | None) -> Path:
     raise FileNotFoundError(
         f'Run folder not found for argument "{run_name_or_path}" under {root_dir}'
     )
+
+
+def resolve_raw_run_dir_from_settings(settings: Dict[str, Any], run_name_or_path: str | None) -> Path:
+    raw_root = Path(settings['_raw_runs_root'])
+    if run_name_or_path:
+        return resolve_run_dir(raw_root, run_name_or_path)
+
+    configured_raw_run = str(settings.get('paths', {}).get('raw_run_folder', '')).strip()
+    if configured_raw_run:
+        return resolve_run_dir(raw_root, configured_raw_run)
+
+    return read_latest_run_pointer(raw_root)
 
 
 def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str] | None = None) -> None:

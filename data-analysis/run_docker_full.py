@@ -41,12 +41,12 @@ def main() -> None:
 
     raw_root = Path(settings['_raw_runs_root'])
     raw_run_dir = read_latest_run_pointer(raw_root)
-    raw_run_id = raw_run_dir.name
+    raw_run_reference = str(raw_run_dir.resolve())
 
     analysis_run_dir = run_analysis_chain(
         settings=settings,
         settings_arg=args.settings,
-        raw_run_id=raw_run_id,
+        raw_run_reference=raw_run_reference,
         analysis_run_label=args.analysis_run_label,
     )
 

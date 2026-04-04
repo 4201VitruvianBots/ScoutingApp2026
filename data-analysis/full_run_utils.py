@@ -19,10 +19,10 @@ def run_python_script(script_name: str, *args: str) -> None:
 def run_analysis_chain(
     settings: Dict[str, Any],
     settings_arg: str,
-    raw_run_id: str,
+    raw_run_reference: str,
     analysis_run_label: Optional[str] = None,
 ) -> Path:
-    stage_02_args = ['--settings', settings_arg, '--raw-run', raw_run_id]
+    stage_02_args = ['--settings', settings_arg, '--raw-run', raw_run_reference]
     if analysis_run_label:
         stage_02_args.extend(['--analysis-run-label', analysis_run_label])
 
