@@ -1,4 +1,5 @@
 import {
+    useCallback,
     useEffect,
     useMemo,
     useRef,
@@ -30,7 +31,6 @@ import SignIn from '../../components/SignIn';
 import { useStatus } from '../../lib/useStatus';
 import { useQueue } from '../../lib/useQueue';
 import { usePreventUnload } from '../../lib/usePreventUnload';
-import { useFetchJson } from '../../lib/useFetch';
 import { formatMatchTime, gameConfig } from '../../lib/gameConfig';
 
 const DEFAULT_BALLS_PER_SECOND = 5;
@@ -94,6 +94,13 @@ function nextScheduledMatchNumber(
     const firstScheduledMatchNumber = scheduleMatchNumbers[0];
     if (matchNumber == undefined) return firstScheduledMatchNumber;
     return scheduleMatchNumbers.find(value => value > matchNumber) ?? matchNumber + 1;
+}
+
+function sortedScheduleMatchNumbers(schedule: MatchSchedule) {
+    return Object.keys(schedule)
+        .map(value => Number.parseInt(value, 10))
+        .filter(Number.isFinite)
+        .sort((a, b) => a - b);
 }
 
 const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
@@ -408,14 +415,25 @@ function buildActionTimelineFromTicks(ticks: ActionTick[]): MatchData['actionTim
 function MatchApp() {
     usePreventUnload();
     const [sendQueue, sendAll, queue, sending] = useQueue();
-    const [schedule] = useFetchJson<MatchSchedule>('/config/match-schedule', {});
+    const [schedule, setSchedule] = useState<MatchSchedule>({});
+    const refreshSchedule = useCallback(async () => {
+        try {
+            const response = await fetch('/config/match-schedule', {
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                throw new Error('Failed to load match schedule');
+            }
+            const payload = (await response.json()) as MatchSchedule;
+            setSchedule(payload ?? {});
+            return payload ?? {};
+        } catch {
+            return undefined;
+        }
+    }, []);
 
     const scheduleMatchNumbers = useMemo(
-        () =>
-            Object.keys(schedule ?? {})
-                .map(value => Number.parseInt(value, 10))
-                .filter(Number.isFinite)
-                .sort((a, b) => a - b),
+        () => sortedScheduleMatchNumbers(schedule),
         [schedule]
     );
     const firstScheduledMatchNumber = scheduleMatchNumbers[0];
@@ -570,6 +588,17 @@ function MatchApp() {
                 : { width, height }
         );
     };
+
+    useEffect(() => {
+        void refreshSchedule();
+        const intervalId = window.setInterval(() => {
+            void refreshSchedule();
+        }, 30000);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [refreshSchedule]);
 
     useStatus('', robotPosition, matchNumber, scouterName);
 
@@ -977,7 +1006,12 @@ function MatchApp() {
         setScrubbingTimeline(false);
     };
 
-    const handleSignIn = () => {
+    const handleSignIn = async () => {
+        const latestSchedule = (await refreshSchedule()) ?? schedule;
+        const latestScheduleMatchNumbers = sortedScheduleMatchNumbers(
+            latestSchedule
+        );
+        const latestFirstScheduledMatchNumber = latestScheduleMatchNumbers[0];
         const trimmedName = scouterName.trim();
         if (!trimmedName) {
             alert('Enter your name before signing in.');
@@ -987,15 +1021,18 @@ function MatchApp() {
             alert('Pick your scout position before signing in.');
             return;
         }
-        if (scheduleMatchNumbers.length === 0) {
+        if (latestScheduleMatchNumbers.length === 0) {
             alert('No match schedule is loaded. Check /config/match-schedule.');
             return;
         }
 
         setScouterName(trimmedName);
         setSignedIn(true);
-        if (matchNumber == undefined && firstScheduledMatchNumber != undefined) {
-            setMatchNumber(firstScheduledMatchNumber);
+        if (
+            matchNumber == undefined &&
+            latestFirstScheduledMatchNumber != undefined
+        ) {
+            setMatchNumber(latestFirstScheduledMatchNumber);
         }
     };
 

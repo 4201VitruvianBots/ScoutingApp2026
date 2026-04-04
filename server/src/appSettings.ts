@@ -1,7 +1,7 @@
 ﻿import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { MatchSchedule } from 'requests';
+import { MatchSchedule, RobotPosition } from 'requests';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +11,17 @@ const appSettingsDir = path.resolve(repoRoot, 'app_settings');
 const settingsPath = path.resolve(appSettingsDir, 'settings.json');
 const schedulePath = path.resolve(appSettingsDir, 'match_schedule.json');
 const teamsPath = path.resolve(appSettingsDir, 'teams_list.txt');
+const robotPositions: RobotPosition[] = [
+    'red_1',
+    'red_2',
+    'red_3',
+    'red_4',
+    'blue_1',
+    'blue_2',
+    'blue_3',
+    'blue_4',
+];
+const robotPositionSet = new Set<RobotPosition>(robotPositions);
 
 type AppSettings = {
     paths: {
@@ -55,9 +66,57 @@ function getRawRunsRoot() {
     return resolveFromRepo(settings.paths.raw_runs_root);
 }
 
+function parsePositiveInteger(value: unknown) {
+    if (typeof value === 'number') {
+        return Number.isInteger(value) && value > 0 ? value : undefined;
+    }
+    if (typeof value === 'string') {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+    }
+    return undefined;
+}
+
+function normalizeMatchSchedule(raw: unknown): MatchSchedule {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error(`Invalid match schedule file format: ${schedulePath}`);
+    }
+
+    const output: MatchSchedule = {};
+    Object.entries(raw as Record<string, unknown>).forEach(
+        ([matchKey, assignmentsRaw]) => {
+            const matchNumber = parsePositiveInteger(matchKey);
+            if (matchNumber == undefined) return;
+            if (
+                !assignmentsRaw ||
+                typeof assignmentsRaw !== 'object' ||
+                Array.isArray(assignmentsRaw)
+            ) {
+                return;
+            }
+
+            const normalizedAssignments: Partial<Record<RobotPosition, number>> =
+                {};
+            Object.entries(assignmentsRaw as Record<string, unknown>).forEach(
+                ([position, teamRaw]) => {
+                    if (!robotPositionSet.has(position as RobotPosition)) return;
+                    const teamNumber = parsePositiveInteger(teamRaw);
+                    if (teamNumber == undefined) return;
+                    normalizedAssignments[position as RobotPosition] = teamNumber;
+                }
+            );
+
+            if (Object.keys(normalizedAssignments).length === 0) return;
+            output[matchNumber] = normalizedAssignments;
+        }
+    );
+
+    return output;
+}
+
 function readMatchSchedule(): MatchSchedule {
-    const schedule = readJsonFile<MatchSchedule>(schedulePath);
-    return schedule;
+    const raw = readJsonFile<unknown>(schedulePath);
+    return normalizeMatchSchedule(raw);
 }
 
 function readTeamsList(): number[] {

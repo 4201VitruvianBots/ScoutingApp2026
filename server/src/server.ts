@@ -741,6 +741,12 @@ app.get('/config/auto-field-orientation', async (req, res) => {
 
 app.get('/config/match-schedule', (_req, res) => {
     try {
+        res.set({
+            'Cache-Control':
+                'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+        });
         res.send(readMatchSchedule());
     } catch (error) {
         res.status(500).send({

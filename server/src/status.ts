@@ -30,12 +30,16 @@ const redPositions = redPositionsAll.slice(
     0,
     gameConfig.allianceSizeRobots.default
 );
+const DB_ENABLED = ['1', 'true', 'yes', 'on'].includes(
+    String(process.env.DB_ENABLED ?? '').toLowerCase()
+);
 
-let schedule: MatchSchedule | undefined;
-try {
-    schedule = readMatchSchedule();
-} catch {
-    schedule = undefined;
+function readMatchScheduleSafe(): MatchSchedule | undefined {
+    try {
+        return readMatchSchedule();
+    } catch {
+        return undefined;
+    }
 }
 
 const status: StatusRecieve = { matches: {}, scouters: [] };
@@ -49,6 +53,7 @@ function notifyWatchers() {
 }
 
 async function updateMatchStatus() {
+    const schedule = readMatchScheduleSafe();
     const matchEntries = DB_ENABLED
         ? await matchApp
               .find()
