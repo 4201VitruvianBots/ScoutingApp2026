@@ -33,11 +33,7 @@ import { dataUriToBuffer } from 'data-uri-to-buffer';
 import { gameConfig } from './gameConfig.js';
 import {
     getLatestAnalysisRunDir,
-    readMatchSchedule,
-    readTeamsList,
-} from './appSettings.js';
-import {
-    getLatestAnalysisRunDir,
+    settingsPath,
     readMatchSchedule,
     readTeamsList,
 } from './appSettings.js';
@@ -53,19 +49,15 @@ const DB_ENABLED = process.env.NODE_ENV !== 'dev' || DEV_USE_DOCKER;
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, '../..');
 const staticDir = path.resolve(currentDir, '../static');
-const analyzedPayloadPath = path.resolve(
-    repoRoot,
-    'data-analysis/output/06_picklist_payload.json'
-);
-const pipelineConfigPath = path.resolve(repoRoot, 'data-analysis/pipeline_config.json');
 const exportPayloadScriptPath = path.resolve(repoRoot, 'data-analysis/06_export_app_payloads.py');
-const analyzedInputCsvPaths = [
-    path.resolve(repoRoot, 'data-analysis/output/03_match_features.csv'),
-    path.resolve(repoRoot, 'data-analysis/output/03_timeseries_long.csv'),
-    path.resolve(repoRoot, 'data-analysis/output/03_auto_path_points.csv'),
-    path.resolve(repoRoot, 'data-analysis/output/04_team_aggregates.csv'),
-    path.resolve(repoRoot, 'data-analysis/output/05_picklist_scores.csv'),
-    path.resolve(repoRoot, 'data-analysis/output/05_metric_contributions.csv'),
+const analyzedPayloadFilename = '06_picklist_payload.json';
+const analyzedInputFilenames = [
+    '03_match_features.csv',
+    '03_timeseries_long.csv',
+    '03_auto_path_points.csv',
+    '04_team_aggregates.csv',
+    '05_picklist_scores.csv',
+    '05_metric_contributions.csv',
 ];
 const clientDistDir = path.resolve(repoRoot, 'client/dist');
 const DEFAULT_BALLS_PER_SECOND = 5;
@@ -77,7 +69,7 @@ const pythonCommand =
     process.env.PYTHON_CMD ??
     process.env.PYTHON ??
     (process.platform === 'win32' ? 'python' : 'python3');
-let analyzedCsvBuildInFlight: Promise<void> | null = null;
+const analyzedCsvBuildInFlightByRun = new Map<string, Promise<void>>();
 
 const app = express();
 
@@ -131,19 +123,29 @@ const matchTimelineSegments = gameConfig.segments.map(segment => ({
 
 function shouldServeAnalyzedFromLocalCsv() {
     const mode = String(process.env.PICKLIST_ANALYZED_SOURCE ?? '').toLowerCase();
-    if (mode === 'mongo') return false;
-    if (mode === 'csv' || mode === 'local' || mode === 'output') return true;
-    return DEV;
+    return mode === 'csv' || mode === 'local' || mode === 'output';
 }
 
-function runLocalCsvExport() {
+function getAnalyzedPayloadPath(analysisRunDir: string) {
+    return path.resolve(analysisRunDir, analyzedPayloadFilename);
+}
+
+function getAnalyzedInputCsvPaths(analysisRunDir: string) {
+    return analyzedInputFilenames.map(filename =>
+        path.resolve(analysisRunDir, filename)
+    );
+}
+
+function runLocalCsvExport(analysisRunDir: string) {
     return new Promise<void>((resolve, reject) => {
         const child = spawn(
             pythonCommand,
             [
                 exportPayloadScriptPath,
-                '--config',
-                pipelineConfigPath,
+                '--settings',
+                settingsPath,
+                '--analysis-run',
+                analysisRunDir,
             ],
             { cwd: repoRoot }
         );
@@ -171,35 +173,48 @@ function runLocalCsvExport() {
     });
 }
 
-async function shouldRebuildAnalyzedPayloadFromLocalCsv() {
+async function shouldRebuildAnalyzedPayloadFromLocalCsv(analysisRunDir: string) {
+    const payloadPath = getAnalyzedPayloadPath(analysisRunDir);
     let payloadMtimeMs = 0;
     try {
-        payloadMtimeMs = (await fs.promises.stat(analyzedPayloadPath)).mtimeMs;
+        payloadMtimeMs = (await fs.promises.stat(payloadPath)).mtimeMs;
     } catch {
         return true;
     }
 
     const inputStats = await Promise.all(
-        analyzedInputCsvPaths.map(csvPath => fs.promises.stat(csvPath))
+        getAnalyzedInputCsvPaths(analysisRunDir).map(async csvPath => {
+            try {
+                return await fs.promises.stat(csvPath);
+            } catch {
+                return null;
+            }
+        })
     );
+    const existingInputStats = inputStats.filter(
+        (entry): entry is fs.Stats => entry !== null
+    );
+    if (!existingInputStats.length) return false;
     const newestInputMtimeMs = Math.max(
-        ...inputStats.map(entry => entry.mtimeMs)
+        ...existingInputStats.map(entry => entry.mtimeMs)
     );
     return newestInputMtimeMs > payloadMtimeMs;
 }
 
-async function ensureAnalyzedPayloadFromLocalCsv() {
+async function ensureAnalyzedPayloadFromLocalCsv(analysisRunDir: string) {
     if (!shouldServeAnalyzedFromLocalCsv()) return;
-    if (analyzedCsvBuildInFlight) {
-        await analyzedCsvBuildInFlight;
+    const inFlight = analyzedCsvBuildInFlightByRun.get(analysisRunDir);
+    if (inFlight) {
+        await inFlight;
         return;
     }
-    if (!(await shouldRebuildAnalyzedPayloadFromLocalCsv())) return;
+    if (!(await shouldRebuildAnalyzedPayloadFromLocalCsv(analysisRunDir))) return;
 
-    analyzedCsvBuildInFlight = runLocalCsvExport().finally(() => {
-        analyzedCsvBuildInFlight = null;
+    const buildPromise = runLocalCsvExport(analysisRunDir).finally(() => {
+        analyzedCsvBuildInFlightByRun.delete(analysisRunDir);
     });
-    await analyzedCsvBuildInFlight;
+    analyzedCsvBuildInFlightByRun.set(analysisRunDir, buildPromise);
+    await buildPromise;
 }
 
 type AutoPathTrace = NonNullable<MatchData['autoPath']>;
@@ -746,28 +761,6 @@ app.get('/config/teams-list', (_req, res) => {
     }
 });
 
-app.get('/config/match-schedule', (_req, res) => {
-    try {
-        res.send(readMatchSchedule());
-    } catch (error) {
-        res.status(500).send({
-            message: 'Failed to load match schedule from app_settings.',
-            error: error instanceof Error ? error.message : String(error),
-        });
-    }
-});
-
-app.get('/config/teams-list', (_req, res) => {
-    try {
-        res.send(readTeamsList());
-    } catch (error) {
-        res.status(500).send({
-            message: 'Failed to load teams list from app_settings.',
-            error: error instanceof Error ? error.message : String(error),
-        });
-    }
-});
-
 app.post('/config/auto-field-orientation', async (req, res) => {
     if (!DB_ENABLED) {
         sendDbDisabled(res);
@@ -856,20 +849,10 @@ app.get('/data/retrieve/analyzed', async (_req, res) => {
         return;
     }
 
-    const payloadPath = path.resolve(latestRunDir, '06_picklist_payload.json');
-    const latestRunDir = getLatestAnalysisRunDir();
-    if (!latestRunDir) {
-        res.status(404).send({
-            message:
-                'No analysis run pointer found. Run 02 -> 06 in data-analysis first.',
-        });
-        return;
-    }
-
-    const payloadPath = path.resolve(latestRunDir, '06_picklist_payload.json');
+    const payloadPath = getAnalyzedPayloadPath(latestRunDir);
     try {
-        await ensureAnalyzedPayloadFromLocalCsv();
-        const payloadRaw = await fs.promises.readFile(analyzedPayloadPath, 'utf8');
+        await ensureAnalyzedPayloadFromLocalCsv(latestRunDir);
+        const payloadRaw = await fs.promises.readFile(payloadPath, 'utf8');
         if (shouldServeAnalyzedFromLocalCsv()) {
             const payload = JSON.parse(payloadRaw) as Record<string, unknown>;
             payload.sourceMode = 'csv';
@@ -878,14 +861,10 @@ app.get('/data/retrieve/analyzed', async (_req, res) => {
         }
         res.type('application/json').send(payloadRaw);
     } catch (error) {
-    } catch (error) {
         res.status(404).send({
             message:
                 'Analyzed payload not found in latest analysis run. Run stage 06_export_app_payloads.py.',
-            message:
-                'Analyzed payload not found in latest analysis run. Run stage 06_export_app_payloads.py.',
             path: payloadPath,
-            error: error instanceof Error ? error.message : String(error),
             error: error instanceof Error ? error.message : String(error),
         });
     }

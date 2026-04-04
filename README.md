@@ -261,6 +261,8 @@ Inside each analysis run folder:
 Server endpoint `/data/retrieve/analyzed` now serves:
 
 - latest analysis run `06_picklist_payload.json` resolved via pointer
+- by default, this is pointer-first in all environments
+- set `PICKLIST_ANALYZED_SOURCE=csv` (or `local`/`output`) to force CSV rebuild mode before serving
 
 ## Defense Metric (Stage 04)
 
