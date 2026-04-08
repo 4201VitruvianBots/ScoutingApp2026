@@ -150,6 +150,7 @@ def flatten_pit_row(row: Dict[str, str]) -> Tuple[Dict[str, Any] | None, List[st
         'scoringMethod': row.get('scoringMethod') or '',
         'preferredScoringSpot': row.get('preferredScoringSpot') or '',
         'robotMaintain': row.get('robotMaintain') or '',
+        'robotQuality': row.get('robotQuality') or '',
         'towerCapabilityClaimed': row.get('towerCapabilityClaimed') or '',
         'batteryCount': max(0, coerce_int(row.get('batteryCount'), 0)),
         'notes': row.get('notes') or '',

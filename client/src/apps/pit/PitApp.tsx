@@ -5,6 +5,7 @@ import {
     PitFile,
     PreferredScoringSpot,
     RobotMaintain,
+    RobotQuality,
     ScoringMethod,
     SDSSwerveModuleType,
     TowerCapabilityClaimed,
@@ -53,6 +54,7 @@ function PitApp() {
     const [preferredScoringSpot, setPreferredScoringSpot] =
         useState<PreferredScoringSpot>('nearHub');
     const [robotMaintain, setRobotMaintain] = useState<RobotMaintain>('easyMaintain');
+    const [robotQuality, setRobotQuality] = useState<RobotQuality>('quality3');
     const [towerCapabilityClaimed, setTowerCapabilityClaimed] =
         useState<TowerCapabilityClaimed>('unknown');
     const [robotImage, setRobotImage] = useState('');
@@ -84,6 +86,7 @@ function PitApp() {
             scoringMethod,
             preferredScoringSpot,
             robotMaintain,
+            robotQuality,
             towerCapabilityClaimed,
             batteryCount,
             photo: robotImage,
@@ -390,13 +393,24 @@ function PitApp() {
                     </h2>
                     <p className='text-sm text-gray-200'>How easy is it to maintain the robot?</p>
                     <div className='mt-3 flex flex-wrap gap-2'>
-                    <MultiButton
-                        onChange={setRobotMaintain}
-                        value={robotMaintain}
-                        labels={['Easy to Maintain', 'Hard to Maintain']}
-                        values={['easyMaintain', 'hardMaintain']}
-                        selectedClassName='bg-[#48c55c] text-black'
-                        unSelectedClassName={'bg-gray-700 text-white'}
+                        <MultiButton
+                            onChange={setRobotMaintain}
+                            value={robotMaintain}
+                            labels={['Easy to Maintain', 'Hard to Maintain']}
+                            values={['easyMaintain', 'hardMaintain']}
+                            selectedClassName='bg-[#48c55c] text-black'
+                            unSelectedClassName='bg-gray-700 text-white'
+                        />
+                    </div>
+                    <p className='text-sm text-gray-200 mt-5'>How reliable does the robot look? (1-5)</p>
+                    <div className='mt-3 flex flex-wrap gap-2'>
+                        <MultiButton
+                            onChange={setRobotQuality}
+                            value={robotQuality}
+                            labels={['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5']}
+                            values={['quality1', 'quality2', 'quality3', 'quality4', 'quality5']}
+                            selectedClassName='bg-[#48c55c] text-black'
+                            unSelectedClassName='bg-gray-700 text-white'
                         />
                     </div>
                 </section>
