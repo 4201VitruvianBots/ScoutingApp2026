@@ -1,6 +1,5 @@
 ﻿import csv
 import json
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -72,19 +71,35 @@ def load_settings(settings_path: str | Path = SETTINGS_PATH) -> Dict[str, Any]:
     if missing_paths:
         raise ValueError(f'Missing required paths settings: {", ".join(missing_paths)}')
 
+    raw_run_base_name = paths.get('raw_run_base_name', 'raw')
+    if raw_run_base_name is None:
+        raw_run_base_name = 'raw'
+    if not isinstance(raw_run_base_name, str):
+        raise ValueError('paths.raw_run_base_name must be a string when provided.')
+    raw_run_base_name = raw_run_base_name.strip() or 'raw'
+    paths['raw_run_base_name'] = raw_run_base_name
+
+    analysis_run_base_name = paths.get('analysis_run_base_name', 'analysis')
+    if analysis_run_base_name is None:
+        analysis_run_base_name = 'analysis'
+    if not isinstance(analysis_run_base_name, str):
+        raise ValueError('paths.analysis_run_base_name must be a string when provided.')
+    analysis_run_base_name = analysis_run_base_name.strip() or 'analysis'
+    paths['analysis_run_base_name'] = analysis_run_base_name
+
     raw_run_folder = paths.get('raw_run_folder', '')
     if raw_run_folder is None:
         raw_run_folder = ''
     if not isinstance(raw_run_folder, str):
         raise ValueError('paths.raw_run_folder must be a string when provided.')
-    paths['raw_run_folder'] = raw_run_folder.strip()
+    paths['raw_run_folder'] = raw_run_folder.strip() or raw_run_base_name
 
     analysis_run_folder = paths.get('analysis_run_folder', '')
     if analysis_run_folder is None:
         analysis_run_folder = ''
     if not isinstance(analysis_run_folder, str):
         raise ValueError('paths.analysis_run_folder must be a string when provided.')
-    paths['analysis_run_folder'] = analysis_run_folder.strip()
+    paths['analysis_run_folder'] = analysis_run_folder.strip() or analysis_run_base_name
 
     fake_data = settings['fake_data']
     destination = str(fake_data.get('destination', '')).strip().lower()
@@ -216,34 +231,38 @@ def load_teams_list(teams_path: str | Path = TEAMS_PATH) -> List[int]:
     return teams
 
 
-def to_timestamp() -> str:
-    return datetime.now().strftime('%y%m%d-%H%M')
-
-
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 
-def slugify(value: str) -> str:
-    trimmed = value.strip().lower()
-    if not trimmed:
-        return ''
-    slug = re.sub(r'[^a-z0-9]+', '_', trimmed)
-    return slug.strip('_')
+def resolve_configured_run_folder_name(
+    paths: Dict[str, Any],
+    *,
+    folder_key: str,
+    base_name_key: str,
+    default_name: str,
+) -> str:
+    folder_name = str(paths.get(folder_key, '') or '').strip()
+    if folder_name:
+        return folder_name
+
+    base_name = str(paths.get(base_name_key, default_name) or '').strip()
+    if base_name:
+        return base_name
+
+    return default_name
 
 
-def create_timestamped_run_dir(root_dir: Path, base_name: str) -> Path:
+def resolve_run_output_dir(root_dir: Path, run_name_or_path: str) -> Path:
     root_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = to_timestamp()
-    base_slug = slugify(base_name)
-    candidate_name = timestamp if not base_slug else f'{timestamp}_{base_slug}'
-    candidate = root_dir / candidate_name
-    suffix = 1
-    while candidate.exists():
-        candidate = root_dir / f'{candidate_name}_{suffix:02d}'
-        suffix += 1
+    candidate = Path(run_name_or_path)
+    if not candidate.is_absolute():
+        candidate = root_dir / run_name_or_path
 
-    candidate.mkdir(parents=True, exist_ok=False)
+    if candidate.exists() and not candidate.is_dir():
+        raise NotADirectoryError(f'Configured run path is not a directory: {candidate}')
+
+    candidate.mkdir(parents=True, exist_ok=True)
     return candidate
 
 
@@ -254,12 +273,20 @@ def latest_run_pointer_path(root_dir: Path) -> Path:
 def write_latest_run_pointer(root_dir: Path, run_dir: Path) -> None:
     pointer_path = latest_run_pointer_path(root_dir)
     root_dir.mkdir(parents=True, exist_ok=True)
+    resolved_run_dir = run_dir.resolve()
+    relative_path = ''
+    try:
+        relative_path = str(resolved_run_dir.relative_to(ROOT.resolve()))
+    except ValueError:
+        relative_path = ''
+
     payload = {
-        'runId': run_dir.name,
-        'path': str(run_dir.resolve()),
-        'relativePath': str(run_dir.resolve().relative_to(ROOT.resolve())),
+        'runId': resolved_run_dir.name,
+        'path': str(resolved_run_dir),
         'updatedAt': utc_now_iso(),
     }
+    if relative_path:
+        payload['relativePath'] = relative_path
     write_json(pointer_path, payload)
 
 
@@ -319,7 +346,9 @@ def resolve_raw_run_dir_from_settings(settings: Dict[str, Any], run_name_or_path
     if configured_raw_run:
         return resolve_run_dir(raw_root, configured_raw_run)
 
-    return read_latest_run_pointer(raw_root)
+    raise ValueError(
+        'Unable to resolve raw run folder. Set paths.raw_run_folder or paths.raw_run_base_name in settings.'
+    )
 
 
 def resolve_analysis_run_dir_from_settings(
@@ -333,7 +362,10 @@ def resolve_analysis_run_dir_from_settings(
     if configured_analysis_run:
         return resolve_run_dir(analysis_root, configured_analysis_run)
 
-    return read_latest_run_pointer(analysis_root)
+    raise ValueError(
+        'Unable to resolve analysis run folder. Set paths.analysis_run_folder or '
+        'paths.analysis_run_base_name in settings.'
+    )
 
 
 def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str] | None = None) -> None:

@@ -32,7 +32,7 @@ import {
 import { dataUriToBuffer } from 'data-uri-to-buffer';
 import { gameConfig } from './gameConfig.js';
 import {
-    getLatestAnalysisRunDir,
+    getConfiguredAnalysisRunDir,
     settingsPath,
     readMatchSchedule,
     readTeamsList,
@@ -854,18 +854,18 @@ app.get('/data/retrieve/matchOutlier', async (req, res) => {
 });
 
 app.get('/data/retrieve/analyzed', async (_req, res) => {
-    const latestRunDir = getLatestAnalysisRunDir();
-    if (!latestRunDir) {
+    const configuredRunDir = getConfiguredAnalysisRunDir();
+    if (!configuredRunDir) {
         res.status(404).send({
             message:
-                'No analysis run pointer found. Run 02 -> 06 in data-analysis first.',
+                'Configured analysis run folder not found. Check app_settings/settings.json paths.analysis_run_folder and run stages 02 -> 06.',
         });
         return;
     }
 
-    const payloadPath = getAnalyzedPayloadPath(latestRunDir);
+    const payloadPath = getAnalyzedPayloadPath(configuredRunDir);
     try {
-        await ensureAnalyzedPayloadFromLocalCsv(latestRunDir);
+        await ensureAnalyzedPayloadFromLocalCsv(configuredRunDir);
         const payloadRaw = await fs.promises.readFile(payloadPath, 'utf8');
         if (shouldServeAnalyzedFromLocalCsv()) {
             const payload = JSON.parse(payloadRaw) as Record<string, unknown>;
@@ -877,7 +877,7 @@ app.get('/data/retrieve/analyzed', async (_req, res) => {
     } catch (error) {
         res.status(404).send({
             message:
-                'Analyzed payload not found in latest analysis run. Run stage 06_export_app_payloads.py.',
+                'Analyzed payload not found in configured analysis run folder. Run stage 06_export_app_payloads.py.',
             path: payloadPath,
             error: error instanceof Error ? error.message : String(error),
         });

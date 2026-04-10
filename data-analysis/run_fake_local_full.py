@@ -24,12 +24,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--analysis-run-label',
         default=None,
-        help='Deprecated alias for analysis run base name override.',
+        help='Deprecated alias for analysis run folder override.',
     )
     parser.add_argument(
         '--analysis-run-base-name',
         default=None,
-        help='Analysis run base name override.',
+        help='Analysis run folder override.',
     )
     return parser.parse_args()
 

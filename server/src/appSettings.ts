@@ -135,31 +135,43 @@ function readTeamsList(): number[] {
     return Array.from(new Set(teams));
 }
 
-function getLatestRunDir(runRoot: string): string | null {
-    const pointerPath = path.resolve(runRoot, 'latest_run.json');
-    if (!fs.existsSync(pointerPath)) {
-        return null;
-    }
+function resolveConfiguredRunDir(
+    runRoot: string,
+    runFolder: string | undefined,
+    runBaseName: string | undefined
+): string | null {
+    const configuredFolder = (runFolder ?? '').trim();
+    const configuredBaseName = (runBaseName ?? '').trim();
+    const selected = configuredFolder || configuredBaseName;
+    if (!selected) return null;
 
-    const pointer = readJsonFile<{ path?: string; relativePath?: string }>(pointerPath);
-    const resolved = pointer.path
-        ? path.resolve(pointer.path)
-        : pointer.relativePath
-          ? path.resolve(repoRoot, pointer.relativePath)
-          : null;
+    const resolved = path.isAbsolute(selected)
+        ? path.resolve(selected)
+        : path.resolve(runRoot, selected);
+    if (!fs.existsSync(resolved)) return null;
 
-    if (!resolved) {
-        return null;
-    }
-
-    if (!fs.existsSync(resolved)) {
-        return null;
-    }
-    return resolved;
+    const stats = fs.statSync(resolved);
+    return stats.isDirectory() ? resolved : null;
 }
 
-function getLatestAnalysisRunDir(): string | null {
-    return getLatestRunDir(getAnalysisRunsRoot());
+function getConfiguredAnalysisRunDir(): string | null {
+    const settings = loadAppSettings();
+    const analysisRoot = resolveFromRepo(settings.paths.analysis_runs_root);
+    return resolveConfiguredRunDir(
+        analysisRoot,
+        settings.paths.analysis_run_folder,
+        settings.paths.analysis_run_base_name
+    );
+}
+
+function getConfiguredRawRunDir(): string | null {
+    const settings = loadAppSettings();
+    const rawRoot = resolveFromRepo(settings.paths.raw_runs_root);
+    return resolveConfiguredRunDir(
+        rawRoot,
+        settings.paths.raw_run_folder,
+        settings.paths.raw_run_base_name
+    );
 }
 
 export {
@@ -173,5 +185,6 @@ export {
     getRawRunsRoot,
     readMatchSchedule,
     readTeamsList,
-    getLatestAnalysisRunDir,
+    getConfiguredAnalysisRunDir,
+    getConfiguredRawRunDir,
 };

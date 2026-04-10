@@ -64,8 +64,8 @@ Pipeline config lives in:
   "paths": {
     "raw_runs_root": "data-analysis/raw_runs",
     "analysis_runs_root": "data-analysis/analysis_runs",
-    "raw_run_folder": "",
-    "analysis_run_folder": "",
+    "raw_run_folder": "test_1",
+    "analysis_run_folder": "test_1",
     "raw_run_base_name": "test_1",
     "analysis_run_base_name": "test_1"
   },
@@ -106,8 +106,7 @@ Pipeline config lives in:
 Selection precedence for all scripts:
 
 1. CLI override
-2. Settings-selected folder
-3. `latest_run.json` pointer
+2. Settings-selected folder (`*_run_folder`, then `*_run_base_name`)
 
 Settings-selected keys:
 
@@ -116,20 +115,14 @@ Settings-selected keys:
 
 ## Run Folder Naming
 
-Raw and analysis run folder names are compact:
+Raw and analysis run folders use configured names directly (no timestamp prefix).
 
-- `<YYMMDD-HHMM>_<base_name_slug>`
-- collisions append suffix: `_01`, `_02`, ...
-
-Examples:
-
-- `260406-0915_test_1`
-- `260406-0915_test_1_01`
-
-Base names come from:
+Folder names come from:
 
 - Raw: `paths.raw_run_base_name`
 - Analysis: `paths.analysis_run_base_name`
+
+If `paths.raw_run_folder` / `paths.analysis_run_folder` are set, those names are used directly.
 
 ## Typical Workflows
 
@@ -193,7 +186,7 @@ python data-analysis/02_clean_normalize.py
 Or override directly:
 
 ```powershell
-python data-analysis/02_clean_normalize.py --raw-run 260406-0915_test_1
+python data-analysis/02_clean_normalize.py --raw-run test_1
 ```
 
 ### 5) Run analysis stages individually (`03`-`06`)
@@ -225,7 +218,7 @@ Behavior:
 Overrides:
 
 ```powershell
-python data-analysis/run_analysis_full.py --raw-source-mode existing_raw --raw-run 260406-0915_test_1
+python data-analysis/run_analysis_full.py --raw-source-mode existing_raw --raw-run test_1
 python data-analysis/run_analysis_full.py --raw-source-mode docker_export --raw-run-base-name event_a_raw
 ```
 
@@ -277,7 +270,7 @@ python data-analysis/run_analysis_full.py --raw-source-mode docker_export --raw-
   - `06_picklist_payload.json`
   - `06_team_profiles.json`
 
-Server `/data/retrieve/analyzed` resolves latest analysis run from `analysis_runs_root/latest_run.json`.
+Server `/data/retrieve/analyzed` resolves the configured analysis run folder from `app_settings/settings.json`.
 
 ## NPM Shortcuts
 

@@ -8,7 +8,6 @@ from pymongo import MongoClient
 
 from common import (
     coerce_bool,
-    create_timestamped_run_dir,
     flatten_match_row,
     flatten_pit_row,
     get_expected_robot_positions,
@@ -16,6 +15,8 @@ from common import (
     load_match_schedule,
     load_settings,
     load_teams_list,
+    resolve_configured_run_folder_name,
+    resolve_run_output_dir,
     utc_now_iso,
     write_csv,
     write_json,
@@ -618,11 +619,13 @@ def write_local_raw_run(
 ) -> Path:
     paths = settings['paths']
     raw_root = Path(settings['_raw_runs_root'])
-    run_base_name = str(paths.get('raw_run_base_name', 'raw')).strip() or 'raw'
-    run_dir = create_timestamped_run_dir(
-        raw_root,
-        base_name=run_base_name,
+    run_folder_name = resolve_configured_run_folder_name(
+        paths,
+        folder_key='raw_run_folder',
+        base_name_key='raw_run_base_name',
+        default_name='raw',
     )
+    run_dir = resolve_run_output_dir(raw_root, run_folder_name)
 
     match_rows = [flatten_match_row(entry) for entry in match_docs]
     pit_rows = [flatten_pit_row(entry) for entry in pit_docs]
@@ -637,7 +640,7 @@ def write_local_raw_run(
         'createdAt': utc_now_iso(),
         'destination': 'local_csv',
         'matchSourceMode': source_mode,
-        'runBaseName': run_base_name,
+        'runBaseName': run_folder_name,
         'matchCount': len(schedule),
         'matchRows': len(match_rows),
         'pitRows': len(pit_rows),

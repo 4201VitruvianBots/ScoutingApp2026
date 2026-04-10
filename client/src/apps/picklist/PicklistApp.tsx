@@ -574,6 +574,8 @@ function PicklistApp() {
     const [analyzedPayload, reloadAnalyzedPayload] = useFetchJson<PicklistPayload>(
         '/data/retrieve/analyzed'
     );
+    const [localAnalyzedPayload, reloadLocalAnalyzedPayload] =
+        useFetchJson<PicklistPayload>('/06_picklist_payload.local.json');
     const [matchAgg, reloadMatchAgg] = useFetchJson<MatchDataAggregations[]>(
         '/data/retrieve'
     );
@@ -597,14 +599,21 @@ function PicklistApp() {
         return toPayloadFromLive(matchAgg, matchRows);
     }, [matchAgg, matchRows]);
 
-    const payload = analyzedPayload ?? (useLiveFallback ? livePayload : undefined);
+    const resolvedAnalyzedPayload = analyzedPayload ?? localAnalyzedPayload;
+    const payload = resolvedAnalyzedPayload ?? (useLiveFallback ? livePayload : undefined);
     const sourceLabel = analyzedPayload
         ? `Analyzed payload (${analyzedPayload.sourceMode}${
               analyzedPayload.analysisRunId
                   ? ` • ${analyzedPayload.analysisRunId}`
                   : ''
           })`
-        : livePayload
+        : localAnalyzedPayload
+          ? `Local analyzed copy (${localAnalyzedPayload.sourceMode}${
+                localAnalyzedPayload.analysisRunId
+                    ? ` • ${localAnalyzedPayload.analysisRunId}`
+                    : ''
+            })`
+          : livePayload
           ? 'Live fallback'
           : 'No data source';
 
@@ -623,6 +632,7 @@ function PicklistApp() {
 
     const reloadAll = () => {
         reloadAnalyzedPayload();
+        reloadLocalAnalyzedPayload();
         reloadMatchAgg();
         reloadMatchRows();
         reloadPitData();
@@ -800,9 +810,9 @@ function PicklistApp() {
                             />
                             Enable live fallback if analyzed payload is missing
                         </label>
-                        {!analyzedPayload && (
+                        {!resolvedAnalyzedPayload && (
                             <p className='text-amber-300'>
-                                Analyzed payload not found; fallback is
+                                Analyzed payload not found via API or local copy; fallback is
                                 {useLiveFallback ? ' enabled.' : ' disabled.'}
                             </p>
                         )}

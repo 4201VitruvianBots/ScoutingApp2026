@@ -51,7 +51,11 @@ function getLatestAnalysisProfilesPath() {
     }
 
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-        paths?: { analysis_runs_root?: string };
+        paths?: {
+            analysis_runs_root?: string;
+            analysis_run_folder?: string;
+            analysis_run_base_name?: string;
+        };
     };
     const analysisRootSetting = settings.paths?.analysis_runs_root;
     if (!analysisRootSetting) {
@@ -61,23 +65,16 @@ function getLatestAnalysisProfilesPath() {
     const analysisRoot = path.isAbsolute(analysisRootSetting)
         ? analysisRootSetting
         : repoPath(analysisRootSetting);
-    const pointerPath = path.resolve(analysisRoot, 'latest_run.json');
-    if (!fs.existsSync(pointerPath)) {
+    const configuredRunFolder = (settings.paths?.analysis_run_folder ?? '').trim();
+    const configuredBaseName = (settings.paths?.analysis_run_base_name ?? '').trim();
+    const runFolder = configuredRunFolder || configuredBaseName;
+    if (!runFolder) {
         return null;
     }
-
-    const pointer = JSON.parse(fs.readFileSync(pointerPath, 'utf8')) as {
-        path?: string;
-        relativePath?: string;
-    };
-
-    const runDir = pointer.path
-        ? path.resolve(pointer.path)
-        : pointer.relativePath
-          ? repoPath(pointer.relativePath)
-          : null;
-
-    if (!runDir) {
+    const runDir = path.isAbsolute(runFolder)
+        ? path.resolve(runFolder)
+        : path.resolve(analysisRoot, runFolder);
+    if (!fs.existsSync(runDir)) {
         return null;
     }
 

@@ -6,10 +6,11 @@ from pymongo import MongoClient
 
 from common import (
     coerce_int,
-    create_timestamped_run_dir,
     flatten_match_row,
     flatten_pit_row,
     load_settings,
+    resolve_configured_run_folder_name,
+    resolve_run_output_dir,
     utc_now_iso,
     write_csv,
     write_json,
@@ -30,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--run-base-name',
         default=None,
-        help='Raw run folder base name override. Defaults to settings.paths.raw_run_base_name.',
+        help='Raw run folder override. Defaults to settings.paths.raw_run_folder.',
     )
     parser.add_argument(
         '--settings',
@@ -55,9 +56,14 @@ def main() -> None:
     settings = load_settings(args.settings)
 
     raw_root = Path(settings['_raw_runs_root'])
-    configured_base = str(settings['paths'].get('raw_run_base_name', 'raw')).strip() or 'raw'
-    run_base_name = (args.run_base_name or args.run_label or configured_base).strip() or configured_base
-    raw_run_dir = create_timestamped_run_dir(raw_root, base_name=run_base_name)
+    configured_folder = resolve_configured_run_folder_name(
+        settings['paths'],
+        folder_key='raw_run_folder',
+        base_name_key='raw_run_base_name',
+        default_name='raw',
+    )
+    run_folder_name = (args.run_base_name or args.run_label or configured_folder).strip() or configured_folder
+    raw_run_dir = resolve_run_output_dir(raw_root, run_folder_name)
 
     match_entries, pit_entries = load_from_mongo(settings)
     match_rows = [flatten_match_row(entry) for entry in match_entries if isinstance(entry, dict)]
@@ -70,7 +76,7 @@ def main() -> None:
         'stage': '01_extract_source',
         'createdAt': utc_now_iso(),
         'sourceMode': 'docker_export',
-        'runBaseName': run_base_name,
+        'runBaseName': run_folder_name,
         'counts': {
             'match': len(match_rows),
             'pit': len(pit_rows),

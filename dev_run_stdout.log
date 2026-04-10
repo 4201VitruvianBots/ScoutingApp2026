@@ -1,0 +1,48 @@
+
+> ScoutingApp2026@1.0.0 dev
+> npm run dev:data && concurrently "npm run dev --workspace client" "npm run dev --workspace server"
+
+
+> ScoutingApp2026@1.0.0 dev:data
+> python data-analysis/generate_fake_data.py && python data-analysis/run_analysis_full.py --raw-source-mode existing_raw
+
+Fake data generation complete (local_csv): 444 match docs, 37 pit docs -> C:\Users\benja\code\ScoutingApp2026\data-analysis\raw_runs\test_1
+Running: C:\Users\benja\AppData\Local\Programs\Python\Python313\python.exe C:\Users\benja\code\ScoutingApp2026\data-analysis\02_clean_normalize.py --settings app_settings/settings.json --raw-run C:\Users\benja\code\ScoutingApp2026\data-analysis\raw_runs\test_1
+Stage 02 complete: 444 clean match rows, 37 clean pit rows, 0 validation records -> C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Running: C:\Users\benja\AppData\Local\Programs\Python\Python313\python.exe C:\Users\benja\code\ScoutingApp2026\data-analysis\03_feature_engineering.py --settings app_settings/settings.json --analysis-run C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Stage 03 complete: 444 feature rows, 72372 timeseries rows, 6730 auto-path rows -> C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Running: C:\Users\benja\AppData\Local\Programs\Python\Python313\python.exe C:\Users\benja\code\ScoutingApp2026\data-analysis\04_team_aggregation.py --settings app_settings/settings.json --analysis-run C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Stage 04 complete: wrote 37 team aggregate rows -> C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Running: C:\Users\benja\AppData\Local\Programs\Python\Python313\python.exe C:\Users\benja\code\ScoutingApp2026\data-analysis\05_picklist_scores.py --settings app_settings/settings.json --analysis-run C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Stage 05 complete: 37 scored teams, 222 contribution rows -> C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Running: C:\Users\benja\AppData\Local\Programs\Python\Python313\python.exe C:\Users\benja\code\ScoutingApp2026\data-analysis\06_export_app_payloads.py --settings app_settings/settings.json --analysis-run C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Stage 06 complete: wrote payload with 37 teams -> C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+
+Full analysis workflow complete.
+Raw source mode: existing_raw
+Raw run: C:\Users\benja\code\ScoutingApp2026\data-analysis\raw_runs\test_1
+Analysis run: C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1
+Picklist payload: C:\Users\benja\code\ScoutingApp2026\data-analysis\analysis_runs\test_1\06_picklist_payload.json
+[0] 
+[0] > client@0.0.0 dev
+[0] > vite
+[0] 
+[1] 
+[1] > server@1.0.0 dev
+[1] > cross-env NODE_ENV=dev tsx watch src/index.ts
+[1] 
+[0] Port 5173 is in use, trying another one...
+[0] 
+[0]   [32m[1mVITE[22m v4.5.14[39m  [2mready in [0m[1m915[22m[2m[0m ms[22m
+[0] 
+[0]   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5174[22m/[39m
+[0] [2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[1] ^C^C^Cnpm error Lifecycle script `dev` failed with error:
+[0] npm error code 3221225786
+[0] npm error path C:\Users\benja\code\ScoutingApp2026\client
+[0] npm error workspace client@0.0.0
+[0] npm error location C:\Users\benja\code\ScoutingApp2026\client
+[0] npm error command failed
+[0] npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vite
+[1] ^CTerminate batch job (Y/N)? ^CTerminate batch job (Y/N)? npm run dev --workspace server exited with code 3221225786
+[0] npm run dev --workspace client exited with code 3221225786

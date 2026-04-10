@@ -15,7 +15,7 @@ def parse_args() -> argparse.Namespace:
         'run_label',
         nargs='?',
         default=None,
-        help='Legacy compatibility raw run base name override for stage 01.',
+        help='Legacy compatibility raw run folder override for stage 01.',
     )
     parser.add_argument(
         '--settings',
@@ -25,17 +25,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--analysis-run-label',
         default=None,
-        help='Deprecated alias for analysis run base name override.',
+        help='Deprecated alias for analysis run folder override.',
     )
     parser.add_argument(
         '--analysis-run-base-name',
         default=None,
-        help='Analysis run base name override.',
+        help='Analysis run folder override.',
     )
     parser.add_argument(
         '--raw-run-base-name',
         default=None,
-        help='Raw run base name override for stage 01.',
+        help='Raw run folder override for stage 01.',
     )
     return parser.parse_args()
 

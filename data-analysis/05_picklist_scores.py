@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             'Analysis run folder name or absolute path. '
-            'Defaults to settings.paths.analysis_run_folder when set, otherwise latest analysis run pointer.'
+            'Defaults to settings.paths.analysis_run_folder.'
         ),
     )
     return parser.parse_args()

@@ -7,12 +7,13 @@ from common import (
     coerce_bool,
     coerce_float,
     coerce_int,
-    create_timestamped_run_dir,
     get_expected_robot_positions,
     load_settings,
     parse_json_field,
     read_csv,
+    resolve_configured_run_folder_name,
     resolve_raw_run_dir_from_settings,
+    resolve_run_output_dir,
     utc_now_iso,
     write_csv,
     write_json,
@@ -32,13 +33,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             'Raw run folder name or absolute path. '
-            'Defaults to settings.paths.raw_run_folder when set, otherwise latest raw run pointer.'
+            'Defaults to settings.paths.raw_run_folder.'
         ),
     )
     parser.add_argument(
         '--analysis-run-base-name',
         default=None,
-        help='Override analysis run folder base name. Defaults to settings.paths.analysis_run_base_name.',
+        help='Override analysis run folder name. Defaults to settings.paths.analysis_run_folder.',
     )
     parser.add_argument(
         '--analysis-run-label',
@@ -171,13 +172,18 @@ def main() -> None:
 
     raw_run_dir = resolve_raw_run_dir_from_settings(settings, args.raw_run)
 
-    configured_analysis_base = str(settings['paths'].get('analysis_run_base_name', 'analysis')).strip() or 'analysis'
-    analysis_base_name = (
+    configured_analysis_folder = resolve_configured_run_folder_name(
+        settings['paths'],
+        folder_key='analysis_run_folder',
+        base_name_key='analysis_run_base_name',
+        default_name='analysis',
+    )
+    analysis_folder_name = (
         args.analysis_run_base_name
         or args.analysis_run_label
-        or configured_analysis_base
-    ).strip() or configured_analysis_base
-    analysis_run_dir = create_timestamped_run_dir(analysis_root, base_name=analysis_base_name)
+        or configured_analysis_folder
+    ).strip() or configured_analysis_folder
+    analysis_run_dir = resolve_run_output_dir(analysis_root, analysis_folder_name)
 
     raw_match = read_csv(raw_run_dir / '01_match_raw.csv')
     raw_pit = read_csv(raw_run_dir / '01_pit_raw.csv')
@@ -229,7 +235,7 @@ def main() -> None:
         'createdAt': utc_now_iso(),
         'sourceRawRun': str(raw_run_dir),
         'analysisRun': str(analysis_run_dir),
-        'runBaseName': analysis_base_name,
+        'runBaseName': analysis_folder_name,
         'counts': {
             'rawMatch': len(raw_match),
             'rawPit': len(raw_pit),

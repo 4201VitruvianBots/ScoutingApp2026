@@ -6,3 +6,4 @@ import_report.json
 data-analysis/raw_runs/
 data-analysis/analysis_runs/
 data-analysis/output/
+client/public/06_picklist_payload.local.json
