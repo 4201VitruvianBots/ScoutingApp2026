@@ -1,8 +1,17 @@
 ﻿import argparse
-from pathlib import Path
 from typing import Any, Dict, List
 
-from common import coerce_float, load_settings, mean, read_csv, resolve_run_dir, stdev, utc_now_iso, write_csv, write_json
+from common import (
+    coerce_float,
+    load_settings,
+    mean,
+    read_csv,
+    resolve_analysis_run_dir_from_settings,
+    stdev,
+    utc_now_iso,
+    write_csv,
+    write_json,
+)
 
 
 COMPONENT_KEYS = ['offense', 'auto', 'consistency', 'reliability', 'defense', 'trend']
@@ -16,7 +25,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--analysis-run',
         default=None,
-        help='Analysis run folder name or absolute path. Defaults to latest analysis run pointer.',
+        help=(
+            'Analysis run folder name or absolute path. '
+            'Defaults to settings.paths.analysis_run_folder when set, otherwise latest analysis run pointer.'
+        ),
     )
     return parser.parse_args()
 
@@ -77,8 +89,7 @@ def main() -> None:
     args = parse_args()
     settings = load_settings(args.settings)
 
-    analysis_root = Path(settings['_analysis_runs_root'])
-    analysis_run_dir = resolve_run_dir(analysis_root, args.analysis_run)
+    analysis_run_dir = resolve_analysis_run_dir_from_settings(settings, args.analysis_run)
 
     team_rows = read_csv(analysis_run_dir / '04_team_aggregates.csv')
     normalization_mode = str(settings['analysis'].get('normalization', 'zscore')).lower()

@@ -618,10 +618,10 @@ def write_local_raw_run(
 ) -> Path:
     paths = settings['paths']
     raw_root = Path(settings['_raw_runs_root'])
+    run_base_name = str(paths.get('raw_run_base_name', 'raw')).strip() or 'raw'
     run_dir = create_timestamped_run_dir(
         raw_root,
-        base_name=paths['raw_run_base_name'],
-        label=source_mode,
+        base_name=run_base_name,
     )
 
     match_rows = [flatten_match_row(entry) for entry in match_docs]
@@ -637,6 +637,7 @@ def write_local_raw_run(
         'createdAt': utc_now_iso(),
         'destination': 'local_csv',
         'matchSourceMode': source_mode,
+        'runBaseName': run_base_name,
         'matchCount': len(schedule),
         'matchRows': len(match_rows),
         'pitRows': len(pit_rows),

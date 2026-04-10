@@ -1,12 +1,15 @@
 import argparse
+import subprocess
+import sys
+from pathlib import Path
 
-from common import load_settings, resolve_raw_run_dir_from_settings
-from full_run_utils import run_analysis_chain
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description='Run analysis stages 02-06 against an existing raw run folder.'
+        description='Compatibility shim: runs run_analysis_full.py in existing_raw mode.'
     )
     parser.add_argument(
         '--settings',
@@ -16,37 +19,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--raw-run',
         default=None,
-        help=(
-            'Raw run folder name or absolute path. '
-            'Defaults to settings.paths.raw_run_folder when set, otherwise latest raw run pointer.'
-        ),
+        help='Raw run folder name or absolute path override.',
     )
     parser.add_argument(
         '--analysis-run-label',
         default=None,
-        help='Optional analysis run label passed to stage 02.',
+        help='Deprecated alias for analysis run base name override.',
+    )
+    parser.add_argument(
+        '--analysis-run-base-name',
+        default=None,
+        help='Analysis run base name override.',
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    settings = load_settings(args.settings)
+    command = [
+        sys.executable,
+        str(SCRIPT_DIR / 'run_analysis_full.py'),
+        '--settings',
+        args.settings,
+        '--raw-source-mode',
+        'existing_raw',
+    ]
+    if args.raw_run:
+        command.extend(['--raw-run', args.raw_run])
+    if args.analysis_run_base_name:
+        command.extend(['--analysis-run-base-name', args.analysis_run_base_name])
+    elif args.analysis_run_label:
+        command.extend(['--analysis-run-label', args.analysis_run_label])
 
-    raw_run_dir = resolve_raw_run_dir_from_settings(settings, args.raw_run)
-    raw_run_reference = str(raw_run_dir.resolve())
-
-    analysis_run_dir = run_analysis_chain(
-        settings=settings,
-        settings_arg=args.settings,
-        raw_run_reference=raw_run_reference,
-        analysis_run_label=args.analysis_run_label,
+    print(
+        'run_fake_local_full.py is deprecated; forwarding to run_analysis_full.py '
+        '(raw-source-mode=existing_raw).'
     )
-
-    print('\nFull analysis workflow complete (stages 02-06).')
-    print(f'Raw run: {raw_run_dir}')
-    print(f'Analysis run: {analysis_run_dir}')
-    print(f'Picklist payload: {analysis_run_dir / "06_picklist_payload.json"}')
+    subprocess.run(command, check=True)
 
 
 if __name__ == '__main__':

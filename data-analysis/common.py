@@ -79,6 +79,13 @@ def load_settings(settings_path: str | Path = SETTINGS_PATH) -> Dict[str, Any]:
         raise ValueError('paths.raw_run_folder must be a string when provided.')
     paths['raw_run_folder'] = raw_run_folder.strip()
 
+    analysis_run_folder = paths.get('analysis_run_folder', '')
+    if analysis_run_folder is None:
+        analysis_run_folder = ''
+    if not isinstance(analysis_run_folder, str):
+        raise ValueError('paths.analysis_run_folder must be a string when provided.')
+    paths['analysis_run_folder'] = analysis_run_folder.strip()
+
     fake_data = settings['fake_data']
     destination = str(fake_data.get('destination', '')).strip().lower()
     if destination not in {'local_csv', 'docker_db'}:
@@ -118,6 +125,13 @@ def load_settings(settings_path: str | Path = SETTINGS_PATH) -> Dict[str, Any]:
     timeline_bin = coerce_int(analysis.get('timeline_bin_sec', 0), 0)
     if timeline_bin <= 0:
         raise ValueError('analysis.timeline_bin_sec must be a positive integer.')
+
+    raw_source_mode = str(analysis.get('raw_source_mode', 'existing_raw')).strip().lower()
+    if raw_source_mode not in {'existing_raw', 'docker_export'}:
+        raise ValueError(
+            'analysis.raw_source_mode must be either "existing_raw" or "docker_export".'
+        )
+    analysis['raw_source_mode'] = raw_source_mode
 
     raw_root = resolve_repo_path(paths['raw_runs_root'])
     analysis_root = resolve_repo_path(paths['analysis_runs_root'])
@@ -203,7 +217,7 @@ def load_teams_list(teams_path: str | Path = TEAMS_PATH) -> List[int]:
 
 
 def to_timestamp() -> str:
-    return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return datetime.now().strftime('%y%m%d-%H%M')
 
 
 def utc_now_iso() -> str:
@@ -218,17 +232,11 @@ def slugify(value: str) -> str:
     return slug.strip('_')
 
 
-def create_timestamped_run_dir(root_dir: Path, base_name: str, label: str | None = None) -> Path:
+def create_timestamped_run_dir(root_dir: Path, base_name: str) -> Path:
     root_dir.mkdir(parents=True, exist_ok=True)
-    parts: List[str] = [to_timestamp()]
-    label_slug = slugify(label or '')
-    if label_slug:
-        parts.append(label_slug)
+    timestamp = to_timestamp()
     base_slug = slugify(base_name)
-    if base_slug:
-        parts.append(base_slug)
-
-    candidate_name = '_'.join(parts)
+    candidate_name = timestamp if not base_slug else f'{timestamp}_{base_slug}'
     candidate = root_dir / candidate_name
     suffix = 1
     while candidate.exists():
@@ -312,6 +320,20 @@ def resolve_raw_run_dir_from_settings(settings: Dict[str, Any], run_name_or_path
         return resolve_run_dir(raw_root, configured_raw_run)
 
     return read_latest_run_pointer(raw_root)
+
+
+def resolve_analysis_run_dir_from_settings(
+    settings: Dict[str, Any], run_name_or_path: str | None
+) -> Path:
+    analysis_root = Path(settings['_analysis_runs_root'])
+    if run_name_or_path:
+        return resolve_run_dir(analysis_root, run_name_or_path)
+
+    configured_analysis_run = str(settings.get('paths', {}).get('analysis_run_folder', '')).strip()
+    if configured_analysis_run:
+        return resolve_run_dir(analysis_root, configured_analysis_run)
+
+    return read_latest_run_pointer(analysis_root)
 
 
 def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str] | None = None) -> None:

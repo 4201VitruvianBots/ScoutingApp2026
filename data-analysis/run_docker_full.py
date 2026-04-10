@@ -1,19 +1,21 @@
 import argparse
+import subprocess
+import sys
 from pathlib import Path
 
-from common import load_settings, read_latest_run_pointer
-from full_run_utils import run_analysis_chain, run_python_script
+
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description='Run full analysis stages by extracting source data from Docker Mongo first.'
+        description='Compatibility shim: runs run_analysis_full.py in docker_export mode.'
     )
     parser.add_argument(
         'run_label',
         nargs='?',
-        default='docker_run',
-        help='Label used by 01_extract_source.py (e.g. comp_2).',
+        default=None,
+        help='Legacy compatibility raw run base name override for stage 01.',
     )
     parser.add_argument(
         '--settings',
@@ -23,37 +25,44 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         '--analysis-run-label',
         default=None,
-        help='Optional analysis run label passed to stage 02.',
+        help='Deprecated alias for analysis run base name override.',
+    )
+    parser.add_argument(
+        '--analysis-run-base-name',
+        default=None,
+        help='Analysis run base name override.',
+    )
+    parser.add_argument(
+        '--raw-run-base-name',
+        default=None,
+        help='Raw run base name override for stage 01.',
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    settings = load_settings(args.settings)
-
-    run_python_script(
-        '01_extract_source.py',
-        args.run_label,
+    command = [
+        sys.executable,
+        str(SCRIPT_DIR / 'run_analysis_full.py'),
         '--settings',
         args.settings,
+        '--raw-source-mode',
+        'docker_export',
+    ]
+    raw_run_base_name = args.raw_run_base_name or args.run_label
+    if raw_run_base_name:
+        command.extend(['--raw-run-base-name', raw_run_base_name])
+    if args.analysis_run_base_name:
+        command.extend(['--analysis-run-base-name', args.analysis_run_base_name])
+    elif args.analysis_run_label:
+        command.extend(['--analysis-run-label', args.analysis_run_label])
+
+    print(
+        'run_docker_full.py is deprecated; forwarding to run_analysis_full.py '
+        '(raw-source-mode=docker_export).'
     )
-
-    raw_root = Path(settings['_raw_runs_root'])
-    raw_run_dir = read_latest_run_pointer(raw_root)
-    raw_run_reference = str(raw_run_dir.resolve())
-
-    analysis_run_dir = run_analysis_chain(
-        settings=settings,
-        settings_arg=args.settings,
-        raw_run_reference=raw_run_reference,
-        analysis_run_label=args.analysis_run_label,
-    )
-
-    print('\nFull Docker-source workflow complete.')
-    print(f'Raw run: {raw_run_dir}')
-    print(f'Analysis run: {analysis_run_dir}')
-    print(f'Picklist payload: {analysis_run_dir / "06_picklist_payload.json"}')
+    subprocess.run(command, check=True)
 
 
 if __name__ == '__main__':

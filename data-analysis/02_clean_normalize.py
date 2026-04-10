@@ -36,9 +36,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        '--analysis-run-base-name',
+        default=None,
+        help='Override analysis run folder base name. Defaults to settings.paths.analysis_run_base_name.',
+    )
+    parser.add_argument(
         '--analysis-run-label',
         default=None,
-        help='Optional label included in the new analysis run folder name.',
+        help='Deprecated alias for --analysis-run-base-name.',
     )
     return parser.parse_args()
 
@@ -166,13 +171,13 @@ def main() -> None:
 
     raw_run_dir = resolve_raw_run_dir_from_settings(settings, args.raw_run)
 
-    analysis_base_name = settings['paths']['analysis_run_base_name']
-    analysis_label = args.analysis_run_label or raw_run_dir.name
-    analysis_run_dir = create_timestamped_run_dir(
-        analysis_root,
-        base_name=analysis_base_name,
-        label=analysis_label,
-    )
+    configured_analysis_base = str(settings['paths'].get('analysis_run_base_name', 'analysis')).strip() or 'analysis'
+    analysis_base_name = (
+        args.analysis_run_base_name
+        or args.analysis_run_label
+        or configured_analysis_base
+    ).strip() or configured_analysis_base
+    analysis_run_dir = create_timestamped_run_dir(analysis_root, base_name=analysis_base_name)
 
     raw_match = read_csv(raw_run_dir / '01_match_raw.csv')
     raw_pit = read_csv(raw_run_dir / '01_pit_raw.csv')
@@ -224,6 +229,7 @@ def main() -> None:
         'createdAt': utc_now_iso(),
         'sourceRawRun': str(raw_run_dir),
         'analysisRun': str(analysis_run_dir),
+        'runBaseName': analysis_base_name,
         'counts': {
             'rawMatch': len(raw_match),
             'rawPit': len(raw_pit),

@@ -3,6 +3,7 @@
     "raw_runs_root": "data-analysis/raw_runs",
     "analysis_runs_root": "data-analysis/analysis_runs",
     "raw_run_folder": "",
+    "analysis_run_folder": "",
     "raw_run_base_name": "test_1",
     "analysis_run_base_name": "test_1"
   },
@@ -22,6 +23,7 @@
     "scouter_count": 12
   },
   "analysis": {
+    "raw_source_mode": "existing_raw",
     "timeline_bin_sec": 1,
     "normalization": "zscore",
     "score_scale": {

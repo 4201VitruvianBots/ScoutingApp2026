@@ -29,6 +29,8 @@ type AppSettings = {
         analysis_runs_root: string;
         raw_run_base_name: string;
         analysis_run_base_name: string;
+        raw_run_folder?: string;
+        analysis_run_folder?: string;
     };
     mongo: Record<string, unknown>;
     fake_data: Record<string, unknown>;
