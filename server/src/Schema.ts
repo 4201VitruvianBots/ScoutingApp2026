@@ -220,6 +220,10 @@ const pitDataSchema = new mongoose.Schema<PitDataSchemaType>({
         type: String,
         enum: ['easyMaintain','hardMaintain'],
     },
+    robotQuality: {
+        type: String,
+        enum: ['quality1', 'quality2', 'quality3', 'quality4', 'quality5']
+    },
     towerCapabilityClaimed: {
         type: String,
         enum: ['level1', 'level2', 'level3', 'unknown'],

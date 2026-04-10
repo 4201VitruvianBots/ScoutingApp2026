@@ -11,6 +11,7 @@ import {
     PitFile,
     PreferredScoringSpot,
     RobotMaintain,
+    RobotQuality,
     ScoringMethod,
     ScouterData,
     SDSSwerveModuleType,
@@ -178,6 +179,13 @@ const preferredScoringSpots: PreferredScoringSpot[] = [
 const robotMaintain: RobotMaintain[] = [
     'easyMaintain',
     'hardMaintain',
+];
+const robotQuality: RobotQuality[] = [
+    'quality1',
+    'quality2',
+    'quality3',
+    'quality4',
+    'quality5',
 ];
 const towerCapabilities: TowerCapabilityClaimed[] = [
     'level1',
@@ -594,6 +602,7 @@ if (includePit) {
             scoringMethod: choose(scoringMethods),
             preferredScoringSpot: choose(preferredScoringSpots),
             robotMaintain: choose(robotMaintain),
+            robotQuality: choose(robotQuality),
             towerCapabilityClaimed: choose(towerCapabilities),
             batteryCount: clamp(randint(7), 0, 6),
             photo: Buffer.from([]),

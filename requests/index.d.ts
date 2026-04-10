@@ -208,6 +208,7 @@ export type OtherSwerveModuleType = 'other';
 export type ScoringMethod = 'dump' | 'low-shot' | 'high-shot' | 'other';
 export type PreferredScoringSpot = 'nearHub' | 'backOfZone' | 'scoreOnTheRun' |'varies';
 export type RobotMaintain = 'easyMaintain' | 'hardMaintain';
+export type RobotQuality = 'quality1' | 'quality2' | 'quality3' | 'quality4' | 'quality5';
 export type TowerCapabilityClaimed =
     | 'level1'
     | 'level2'
@@ -230,6 +231,7 @@ export interface PitFile {
     scoringMethod: ScoringMethod;
     preferredScoringSpot: PreferredScoringSpot;
     robotMaintain: RobotMaintain;
+    robotQuality: RobotQuality;
     towerCapabilityClaimed: TowerCapabilityClaimed;
     batteryCount: number;
     photo: string;

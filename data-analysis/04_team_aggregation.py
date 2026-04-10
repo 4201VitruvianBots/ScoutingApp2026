@@ -292,6 +292,7 @@ def main() -> None:
                 'pitScoringMethod': pit.get('scoringMethod', ''),
                 'pitPreferredScoringSpot': pit.get('preferredScoringSpot', ''),
                 'pitRobotMaintain': pit.get('robotMaintain', ''),
+                'pitRobotQuality': pit.get('robotQuality', ''),
                 'pitTowerCapabilityClaimed': pit.get('towerCapabilityClaimed', ''),
             }
         )
