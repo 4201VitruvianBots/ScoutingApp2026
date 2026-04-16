@@ -729,6 +729,7 @@ function MatchApp() {
     const handleTimelinePointerDown = (
         event: ReactPointerEvent<HTMLDivElement>
     ) => {
+        if (isRunning) return;
         setScrubbingTimeline(true);
         event.currentTarget.setPointerCapture(event.pointerId);
         updateElapsedFromPointer(event.clientX);
@@ -737,7 +738,7 @@ function MatchApp() {
     const handleTimelinePointerMove = (
         event: ReactPointerEvent<HTMLDivElement>
     ) => {
-        if (!scrubbingTimeline) return;
+        if (!scrubbingTimeline || isRunning) return;
         updateElapsedFromPointer(event.clientX);
     };
 
@@ -1493,9 +1494,9 @@ function MatchApp() {
                         onPointerMove={handleTimelinePointerMove}
                         onPointerUp={stopTimelineScrub}
                         onPointerCancel={stopTimelineScrub}
-                        className={`select-none relative mt-2 h-24 cursor-ew-resize overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
-                            scrubbingTimeline ? 'ring-2 ring-[#48c55c]/60' : ''
-                        }`}>
+                        className={`select-none relative mt-2 h-24 overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
+                            isRunning ? 'pointer-events-none cursor-not-allowed' : 'cursor-ew-resize'
+                        } ${scrubbingTimeline ? 'ring-2 ring-[#48c55c]/60' : ''}`}>
                         <div className='absolute inset-0 bg-gradient-to-r from-[#141b2a] via-[#101826] to-[#0c1320]' />
 
                         {matchTimelineSegments.map((segment, index) => {
