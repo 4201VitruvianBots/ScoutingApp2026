@@ -103,13 +103,6 @@ function sortedScheduleMatchNumbers(schedule: MatchSchedule) {
         .sort((a, b) => a - b);
 }
 
-const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
-    { label: 'Left', value: 'left' },
-    { label: 'Center', value: 'center' },
-    { label: 'Right', value: 'right' },
-    { label: 'N/A', value: null },
-];
-
 const teleTowerOptions: TeleTowerResult[] = ['None', 'Failed', 'level1', 'level2', 'level3'];
 const driverQualityOptions: DriverQuality[] = ['Poor', 'Rough', 'Ok', 'Good', 'Great'];
 const breakdownOptions: BreakdownType[] = ['None', 'stuck', 'tipped', 'comms', 'mechanism', 'other'];
@@ -756,7 +749,7 @@ function MatchApp() {
         const rect = field.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return null;
         const rawX = clamp((clientX - rect.left) / rect.width, 0, 1);
-        const x = roundToTenThousandth(fieldIsFlipped ? 1 - rawX : rawX);
+        const x = roundToTenThousandth(flipped ? 1 - rawX : rawX);
         const y = roundToTenThousandth(clamp((clientY - rect.top) / rect.height, 0, 1));
         return { x, y };
     };
@@ -1110,7 +1103,16 @@ function MatchApp() {
         handleResetMatch();
     };
 
+    const [buttonFullscreen, setFullscreen] = useState(false);
     const [shooterAccuracy, setAccuracy] = useState(0);
+    const [flipped, flipTheField] = useState(false);
+
+    const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
+    { label: 'Left', value: flipped ? 'right' : 'right' },
+    { label: 'Center', value: 'center' },
+    { label: 'Right', value: flipped ? 'left' : 'left'},
+    { label: 'N/A', value: null },
+];
 
     if (!signedIn) {
         return (
@@ -1247,6 +1249,13 @@ function MatchApp() {
                                 </button>
                             )}
                             <button
+                                type="button"
+                                onClick={() => flipTheField(flipped => !flipped)}
+                                className='select-none rounded bg-[#48c55c] px-3 py-1 text-xs font-semibold text-black'>
+                            
+                                Flipped: {flipped ? "true" : "false"}
+                            </button>
+                            <button
                                 type='button'
                                 onClick={() => setAutoPanelManualOverride(!autoPanelOpen)}
                                 className='select-none rounded bg-[#48c55c] px-3 py-1 text-xs font-semibold text-black'>
@@ -1282,16 +1291,16 @@ function MatchApp() {
                                 onPointerCancel={event => stopAutoDrawing(event)}
                                 className='relative mx-auto w-full max-w-xl touch-none overflow-hidden rounded-xl border border-white/15 bg-[#0f1522]'>
                                 <div
-                                    className='relative'
+                                    className={`relative ${flipped ? "scale-x-[-100%] -scale-y-100" : "scale-x-[100%] scale-y-[100%]"}`}
                                     style={{
-                                        transform: fieldIsFlipped ? 'scaleX(-1)' : 'scaleX(1)',
+                                        //transform: flipped ? 'scaleX(-1) scaleY(-1)' : 'scaleX(1) scale(-1)',
                                         transformOrigin: 'center',
                                     }}>
                                     <img
                                         ref={autoFieldImageRef}
                                         src={autoFieldImage}
                                         alt={`${allianceColor} auto field`}
-                                        className='block w-full select-none'
+                                        className="block w-full select-none"
                                         draggable={false}
                                         onLoad={syncAutoFieldSize}
                                     />
@@ -1443,6 +1452,12 @@ function MatchApp() {
                     </div>
 
                     <div className='select-none mt-4 grid gap-3 md:grid-cols-2'>
+                        <button className={`col-span-2 w-[80px] h-[40px] rounded px-1 py-1 ${canTrackActions ? "bg-green-600 text-black cursor-pointer" : "cursor-not-allowed bg-[#404958] text-gray-300"}`}
+                        onClick={() => setFullscreen(prev => !prev)}
+                        disabled={!canTrackActions}>
+                            {canTrackActions ? `${buttonFullscreen ? "Minimize" : "Maximize"}` : "Maximize"} 
+                            {/* if buttons are active then allow text to be changed otherwise don't */}
+                        </button>
                         {(
                             [
                                 { action: 'shoot', label: 'HOLD TO TRACK SHOOTING', color: 'bg-emerald-400', ticks: shootTickCount },
@@ -1457,8 +1472,8 @@ function MatchApp() {
                                     onHoldEnd={() => endActionHold(item.action)}
                                     disabled={!canTrackActions}
                                     ariaLabel={item.label}
-                                    className={`w-full rounded-lg px-4 py-3 text-sm font-bold text-black ${
-                                        canTrackActions ? item.color : 'cursor-not-allowed bg-[#404958] text-gray-300'
+                                    className={`w-full rounded-lg font-bold text-black ${
+                                        canTrackActions ? `${item.color} ${buttonFullscreen ? 'h-[200px]' : 'text-sm px-4 py-3'}` : 'cursor-not-allowed bg-[#404958] text-gray-300 text-sm px-4 py-3'
                                     }`}>
                                     {item.label}
                                 </HoldButton>
@@ -1468,10 +1483,10 @@ function MatchApp() {
                                     repeatInterval={HOLD_INTERVAL_MS}
                                     disabled={item.ticks === 0}
                                     ariaLabel={`Undo ${item.action}`}
-                                    className={`mt-2 w-full rounded-lg px-3 py-2 text-xs font-semibold ${
+                                    className={`mt-2 w-full rounded-lg font-semibold ${
                                         item.ticks === 0
-                                            ? 'cursor-not-allowed bg-[#434955] text-gray-400'
-                                            : 'bg-[#586177] text-white'
+                                            ? 'cursor-not-allowed bg-[#434955] text-gray-400 text-xs px-3 py-2'
+                                            : `bg-[#586177] text-white ${buttonFullscreen ? 'h-[50px]' : 'text-xs px-3 py-2'}`
                                     }`}>
                                     {`Undo Last ${item.action === 'shoot' ? 'Shooting' : 'Passing'} Hold`}
                                 </HoldButton>
