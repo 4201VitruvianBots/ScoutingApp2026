@@ -719,10 +719,12 @@ function MatchApp() {
         setMatchTimeFromElapsed(ratio * MATCH_TOTAL_SEC);
     };
 
+    const [timelineLockedOnPlay, setTimelineLocked] = useState(true);
+
     const handleTimelinePointerDown = (
         event: ReactPointerEvent<HTMLDivElement>
     ) => {
-        if (isRunning) return;
+        if (isRunning && timelineLockedOnPlay) return;
         setScrubbingTimeline(true);
         event.currentTarget.setPointerCapture(event.pointerId);
         updateElapsedFromPointer(event.clientX);
@@ -731,7 +733,7 @@ function MatchApp() {
     const handleTimelinePointerMove = (
         event: ReactPointerEvent<HTMLDivElement>
     ) => {
-        if (!scrubbingTimeline || isRunning) return;
+        if (!scrubbingTimeline || (isRunning && timelineLockedOnPlay)) return;
         updateElapsedFromPointer(event.clientX);
     };
 
@@ -914,6 +916,8 @@ function MatchApp() {
         if (!canTrackActions) return;
         if (activeHoldsRef.current[action]) return;
 
+        document.body.classList.add('overflow-hidden')
+
         const hold: ActiveHold = {
             action,
             startSec: elapsedSec,
@@ -929,6 +933,8 @@ function MatchApp() {
     const endActionHold = (action: ActionKind) => {
         const hold = activeHoldsRef.current[action];
         if (!hold) return;
+
+        document.body.classList.remove('overflow-hidden')
 
         const elapsedByClock = hold.startSec + (performance.now() - hold.startMs) / 1000;
         const endSec = clamp(
@@ -1094,6 +1100,7 @@ function MatchApp() {
             fouls,
             breaks,
             freeText,
+            shooterAccuracy,
         };
 
         sendQueue('/data/match', data);
@@ -1104,8 +1111,9 @@ function MatchApp() {
     };
 
     const [buttonFullscreen, setFullscreen] = useState(false);
-    const [shooterAccuracy, setAccuracy] = useState(0);
+    const [shooterAccuracy, setAccuracy] = useState<MatchData['shooterAccuracy']>(0);
     const [flipped, flipTheField] = useState(false);
+    const [ButtonBeingHeld, setIfHeld] = useState(false);
 
     const autoStartingOptions: Array<{ label: string; value: AutoStartingPosition | null }> = [
     { label: 'Left', value: flipped ? 'right' : 'right' },
@@ -1452,12 +1460,20 @@ function MatchApp() {
                     </div>
 
                     <div className='select-none mt-4 grid gap-3 md:grid-cols-2'>
-                        <button className={`col-span-2 w-[80px] h-[40px] rounded px-1 py-1 ${canTrackActions ? "bg-green-600 text-black cursor-pointer" : "cursor-not-allowed bg-[#404958] text-gray-300"}`}
-                        onClick={() => setFullscreen(prev => !prev)}
-                        disabled={!canTrackActions}>
-                            {canTrackActions ? `${buttonFullscreen ? "Minimize" : "Maximize"}` : "Maximize"} 
-                            {/* if buttons are active then allow text to be changed otherwise don't */}
+                        <button className={`col-span-1 w-auto h-[40px] rounded-xl px-1 py-1 text-s ${canTrackActions ? "bg-green-600 text-black cursor-pointer" : "cursor-not-allowed bg-[#404958] text-gray-300"}`}
+                            onClick={() => setFullscreen(prev => !prev)}
+                            disabled={!canTrackActions}>
+                                {canTrackActions ? `${buttonFullscreen ? "Minimize" : "Maximize"}` : "Maximize"} 
+                                {/* if buttons are active then allow text to be changed otherwise don't */}
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setTimelineLocked(timelineLockedOnPlay => !timelineLockedOnPlay)}
+                            className='cols-span-1 w-auto h-[40px] px-1 py-1 rounded-xl bg-green-600 text-s font-semibold text-black cursor-pointer'>
+                            
+                            Timeline Locked On Play: {timelineLockedOnPlay ? "true" : "false"}
+                        </button>
+
                         {(
                             [
                                 { action: 'shoot', label: 'HOLD TO TRACK SHOOTING', color: 'bg-emerald-400', ticks: shootTickCount },
@@ -1468,12 +1484,19 @@ function MatchApp() {
                                 <HoldButton
                                     onHold={() => {}}
                                     triggerOnPress={false}
-                                    onHoldStart={() => beginActionHold(item.action)}
-                                    onHoldEnd={() => endActionHold(item.action)}
+                                    onHoldStart={() => {beginActionHold(item.action); setIfHeld(true);}}
+                                    onHoldEnd={() => {endActionHold(item.action); setIfHeld(false); }}
                                     disabled={!canTrackActions}
                                     ariaLabel={item.label}
-                                    className={`w-full rounded-lg font-bold text-black ${
-                                        canTrackActions ? `${item.color} ${buttonFullscreen ? 'h-[200px]' : 'text-sm px-4 py-3'}` : 'cursor-not-allowed bg-[#404958] text-gray-300 text-sm px-4 py-3'
+                                    className={`w-full rounded-lg font-bold text-black ${canTrackActions 
+                                        ? `${buttonFullscreen 
+                                            ? `h-[200px] ${item.color} ${ButtonBeingHeld 
+                                                ? `brightness-75 outline-4 outline-offset-[2px]`
+                                                : `brightness-100 outline-0`}`
+                                            : `text-sm px-4 py-3 ${item.color} ${ButtonBeingHeld 
+                                                ?`brightness-75 outline-4 outline-offset-[2px]`
+                                                : `brightness-100 outline-0`}`}`
+                                        : 'cursor-not-allowed bg-[#404958] text-gray-300 text-sm px-4 py-3'
                                     }`}>
                                     {item.label}
                                 </HoldButton>
@@ -1510,8 +1533,9 @@ function MatchApp() {
                         onPointerUp={stopTimelineScrub}
                         onPointerCancel={stopTimelineScrub}
                         className={`select-none relative mt-2 h-24 overflow-hidden rounded-xl border border-white/15 bg-[#0f1522] ${
-                            isRunning ? 'pointer-events-none cursor-not-allowed' : 'cursor-ew-resize'
-                        } ${scrubbingTimeline ? 'ring-2 ring-[#48c55c]/60' : ''}`}>
+                            isRunning && timelineLockedOnPlay ? 'pointer-events-none cursor-not-allowed' : 'cursor-ew-resize'
+                        } ${scrubbingTimeline ?  'ring-2 ring-[#48c55c]/60' : ''}`}>
+
                         <div className='absolute inset-0 bg-gradient-to-r from-[#141b2a] via-[#101826] to-[#0c1320]' />
 
                         {matchTimelineSegments.map((segment, index) => {
@@ -1670,13 +1694,11 @@ function MatchApp() {
                                         key={entry.key}
                                         className='rounded-lg border border-white/10 bg-[#121a28]'>
                                         <div className='flex items-center gap-2 px-2 py-2'>
-                                            <HoldButton
-                                                onHold={() => adjustFoul(entry.key, -1)}
-                                                repeatDelay={120}
-                                                repeatInterval={90}
+                                            <button
+                                                onClick={() => adjustFoul(entry.key, -1)}
                                                 className='select-none rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
                                                 -
-                                            </HoldButton>
+                                            </button>
                                             <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
                                             <button
                                                 type='button'
@@ -1696,13 +1718,11 @@ function MatchApp() {
                                             <span className='w-8 text-right text-sm font-semibold tabular-nums text-white'>
                                                 {fouls[entry.key]}
                                             </span>
-                                            <HoldButton
-                                                onHold={() => adjustFoul(entry.key, 1)}
-                                                repeatDelay={120}
-                                                repeatInterval={90}
+                                            <button
+                                                onClick={() => adjustFoul(entry.key, 1)}
                                                 className='select-none rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
                                                 +
-                                            </HoldButton>
+                                            </button>
                                         </div>
                                         {activeFoulInfo === entry.key ? (
                                             <div className='border-t border-white/10 bg-[#0f1522] px-3 py-2 text-[11px] text-gray-200'>
@@ -1725,13 +1745,11 @@ function MatchApp() {
                                         key={entry.key}
                                         className='rounded-lg border border-white/10 bg-[#121a28]'>
                                         <div className='flex items-center gap-2 px-2 py-2'>
-                                            <HoldButton
-                                                onHold={() => adjustBreak(entry.key, -1)}
-                                                repeatDelay={120}
-                                                repeatInterval={90}
+                                            <button
+                                                onClick={() => adjustBreak(entry.key, -1)}
                                                 className='select-none rounded bg-[#c44e4e] px-2 py-1 text-xs font-semibold text-white'>
                                                 -
-                                            </HoldButton>
+                                            </button>
                                             <span className='flex-1 text-xs text-gray-200'>{entry.label}</span>
                                             <button
                                                 type='button'
@@ -1751,13 +1769,11 @@ function MatchApp() {
                                             <span className='w-8 text-right text-sm font-semibold tabular-nums text-white'>
                                                 {breaks[entry.key]}
                                             </span>
-                                            <HoldButton
-                                                onHold={() => adjustBreak(entry.key, 1)}
-                                                repeatDelay={120}
-                                                repeatInterval={90}
+                                            <button
+                                                onClick={() => adjustBreak(entry.key, 1)}
                                                 className='select-none rounded bg-[#48c55c] px-2 py-1 text-xs font-semibold text-black'>
                                                 +
-                                            </HoldButton>
+                                            </button>
                                         </div>
                                         {activeBreakInfo === entry.key ? (
                                             <div className='border-t border-white/10 bg-[#0f1522] px-3 py-2 text-[11px] text-gray-200'>
@@ -1792,6 +1808,7 @@ function MatchApp() {
                                     <span>75</span>
                                     <span>100</span>
                                 </div>
+                                <p className='mt-[6px]'>(If the robot is absent just set the accuracy to 0)</p>
                             </div>
                         </div>
 

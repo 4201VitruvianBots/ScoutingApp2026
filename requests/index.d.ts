@@ -199,6 +199,7 @@ export interface MatchData {
     fouls: MatchFouls;
     breaks: MatchBreaks;
     freeText: string;
+    shooterAccuracy: number;
 }
 
 export type Drivebase = 'tank' | 'swerve' | 'other';
